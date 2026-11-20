@@ -1,0 +1,28 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Rust
+target/
+
+# IDE and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Local databases and logs
+*.sqlite
+*.sqlite3
+*.db
+*.log

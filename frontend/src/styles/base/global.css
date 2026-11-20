@@ -1,0 +1,21 @@
+@import "../tokens/colors.css";
+@import "../tokens/typography.css";
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--color-sage-dark);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-pale-sage);
+  color: var(--color-forest);
+}
