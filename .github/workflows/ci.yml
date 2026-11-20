@@ -21,9 +21,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Use stable npm 10 release
-        run: npm install --global npm@10.8.2
-      - run: npm install
+      - run: npm install --global npm@10.8.2
+      - name: Install frontend dependencies
+        run: npm install --verbose
+      - name: Print npm diagnostics on failure
+        if: failure()
+        run: |
+          for file in ~/.npm/_logs/*debug-0.log; do
+            echo "===== $file ====="
+            cat "$file"
+          done
       - run: npm audit --audit-level=moderate
       - run: npm run format:check
       - run: npm run typecheck
