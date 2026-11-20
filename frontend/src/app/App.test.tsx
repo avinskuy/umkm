@@ -6,11 +6,7 @@ describe("App", () => {
   it("renders the USahapintar project identity", () => {
     render(<App />);
 
-    expect(
-      screen.getByRole("heading", { name: "USahapintar" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/business owners and investors/i),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "USahapintar" })).toBeInTheDocument();
+    expect(screen.getByText(/business owners and investors/i)).toBeInTheDocument();
   });
 });

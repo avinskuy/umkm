@@ -20,13 +20,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install
-      - name: Inspect formatter output and dependency advisories
-        run: |
-          npx prettier eslint.config.js index.html src/app/App.test.tsx src/app/App.tsx src/styles/tokens/typography.css tsconfig.json
-          npm audit --json > npm-audit.json || true
-          node -e 'const a=require("./npm-audit.json"); for (const [name,v] of Object.entries(a.vulnerabilities||{})) console.log(JSON.stringify({name,severity:v.severity,range:v.range,fixAvailable:v.fixAvailable}))'
+      - run: npm audit --audit-level=moderate
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run lint
