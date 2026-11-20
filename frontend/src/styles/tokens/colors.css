@@ -1,0 +1,13 @@
+:root {
+  color-scheme: light;
+  --color-background: #f8faf7;
+  --color-surface: #ffffff;
+  --color-forest: #344e41;
+  --color-sage: #a3b18a;
+  --color-sage-dark: #6b9277;
+  --color-pale-sage: #e8ede5;
+  --color-beige: #d8cdbb;
+  --color-text: #29332d;
+  --color-muted: #657267;
+  --color-border: #dce4da;
+}
