@@ -11,9 +11,7 @@ export function App() {
       <p className={styles.description}>
         Connecting business owners and investors through meaningful opportunities.
       </p>
-      <span className={styles.status}>
-        Project foundation is ready to grow.
-      </span>
+      <span className={styles.status}>Project foundation is ready to grow.</span>
     </main>
   );
 }
