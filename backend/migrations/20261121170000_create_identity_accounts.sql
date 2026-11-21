@@ -195,6 +195,59 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    IF NEW.account_status IS DISTINCT FROM OLD.account_status THEN
+        CASE OLD.account_status
+            WHEN 'pending_verification' THEN
+                IF NEW.account_status = 'pending_expired' THEN
+                    IF OLD.pending_expires_at > now() THEN
+                        RAISE EXCEPTION 'pending registration cannot expire before its deadline'
+                            USING ERRCODE = '23514';
+                    END IF;
+                ELSIF NEW.account_status <> 'active' THEN
+                    RAISE EXCEPTION 'invalid transition from pending_verification'
+                        USING ERRCODE = '23514';
+                END IF;
+            WHEN 'active' THEN
+                IF NEW.account_status NOT IN ('deactivated', 'deletion_pending') THEN
+                    RAISE EXCEPTION 'invalid transition from active'
+                        USING ERRCODE = '23514';
+                END IF;
+            WHEN 'deactivated' THEN
+                IF NEW.account_status NOT IN ('active', 'deletion_pending') THEN
+                    RAISE EXCEPTION 'invalid transition from deactivated'
+                        USING ERRCODE = '23514';
+                END IF;
+            WHEN 'deletion_pending' THEN
+                IF NEW.account_status = 'deletion_processing' THEN
+                    IF OLD.status_changed_at > now() - INTERVAL '30 days' THEN
+                        RAISE EXCEPTION 'permanent deletion cannot start before the 30-day waiting period'
+                            USING ERRCODE = '23514';
+                    END IF;
+                ELSIF NEW.account_status NOT IN ('active', 'deactivated') THEN
+                    RAISE EXCEPTION 'invalid transition from deletion_pending'
+                        USING ERRCODE = '23514';
+                END IF;
+            WHEN 'deletion_processing' THEN
+                IF NEW.account_status <> 'closed' THEN
+                    RAISE EXCEPTION 'deletion_processing can only transition to closed'
+                        USING ERRCODE = '23514';
+                END IF;
+            WHEN 'pending_expired' THEN
+                RAISE EXCEPTION 'pending_expired is a terminal account state'
+                    USING ERRCODE = '23514';
+            WHEN 'closed' THEN
+                RAISE EXCEPTION 'closed is a terminal account state'
+                    USING ERRCODE = '23514';
+            ELSE
+                RAISE EXCEPTION 'unsupported account lifecycle transition'
+                    USING ERRCODE = '23514';
+        END CASE;
+    ELSIF OLD.account_status = 'pending_verification'
+          AND NEW.pending_expires_at IS DISTINCT FROM OLD.pending_expires_at THEN
+        RAISE EXCEPTION 'pending registration expiry is immutable'
+            USING ERRCODE = '23514';
+    END IF;
+
     IF OLD.initial_contact_verified_at IS NOT NULL
        AND NEW.initial_contact_verified_at IS DISTINCT FROM OLD.initial_contact_verified_at
        AND NOT (
