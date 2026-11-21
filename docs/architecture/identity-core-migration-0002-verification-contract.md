@@ -49,15 +49,15 @@ Satu baris mewakili satu proses verifikasi. Resend tidak membuat sesi baru.
 
 - `user_id` wajib untuk `registration`, `primary_contact_change`, dan `recovery_contact_add`. Nilai NULL hanya sah untuk `account_recovery` pra-pemilihan akun.
 - `account_recovery` boleh dibuat sebelum akun tujuan diketahui. Setelah OTP berhasil, pemilihan akun dan pemeriksaan risiko dilakukan. Pengaitan `user_id` hanya boleh dari NULL menjadi satu akun, satu kali, secara atomik setelah pemeriksaan yang diwajibkan selesai.
-- `user_id` yang sudah terisi tidak dapat diganti atau dikosongkan.
-- Tujuan dinormalisasi sebelum dienkripsi dan dihitung HMAC. Kanal `email` hanya untuk alamat email; `whatsapp` hanya untuk nomor telepon format E.164. Validasi format dilakukan sebelum sesi dibuat.
+- `user_id` yang sudah terisi tidak dapat diganti atau dikosongkan. Pengaitan NULL → target hanya diizinkan sekali pada purpose `account_recovery`, setelah sesi verified dan pemeriksaan pemilihan akun diselesaikan dalam transaksi.
+- Tujuan dinormalisasi sebelum dienkripsi dan dihitung HMAC. Kanal `email` hanya untuk alamat email; `whatsapp` hanya untuk nomor telepon format E.164. Validasi format dilakukan sebelum sesi dibuat. Backend harus memastikan tujuan dan purpose cocok dengan kontak/aksi yang sedang diverifikasi.
 - Ciphertext, nonce, dan versi key harus tersedia bersama; HMAC dan versi HMAC harus tersedia bersama. Key material tidak pernah disimpan di PostgreSQL.
 - Status awal `pending`. Transisi yang diizinkan hanya `pending` → `verified`, `expired`, atau `cancelled`. Status terminal tidak dapat dibuka kembali.
-- `verified_at` dan `cancelled_at` konsisten dengan status; keduanya tidak dapat diubah setelah ditetapkan.
+- `verified_at`, `expired_at`, dan `cancelled_at` konsisten dengan status; tepat satu timestamp terminal terisi sesuai status, dan tidak dapat diubah setelah ditetapkan. Perubahan ke status expired mencatat `expired_at` dari waktu server.
 - `failed_attempt_count` tidak boleh negatif atau lebih dari lima. Saat mencapai lima, `locked_until` ditetapkan satu jam ke depan menggunakan waktu server. Selama lock, semua percobaan verifikasi ditolak.
 - Setelah lock benar-benar berakhir, counter reset ke nol secara atomik ketika sesi pending digunakan kembali. Penerbitan/resend OTP tidak mengubah atau mempercepat lock.
 - Sesi yang terminal atau telah melewati `expires_at` tidak dapat diverifikasi kembali.
-- Masa berlaku sesi ditetapkan oleh flow yang membuatnya; jangan menyamakan masa berlaku sesi dengan masa berlaku OTP 10 menit. Sesi registrasi juga tidak boleh melampaui deadline registrasi akun 30 menit.
+- Masa berlaku sesi ditetapkan oleh flow yang membuatnya; jangan menyamakan masa berlaku sesi dengan masa berlaku OTP 10 menit. Untuk purpose `registration`, akun target harus masih `pending_verification` dan deadline sesi tidak boleh melampaui `users.pending_expires_at`. Karena ini lintas tabel, enforce dalam operasi transaksi backend dan trigger database yang memvalidasi pembuatan sesi; jangan mengandalkan CHECK biasa.
 - Resend menggunakan sesi yang sama dan tunduk pada `resend_available_at`, rate limit lintas sesi, serta batas lain yang berlaku.
 
 ## 3. Tabel `verification_challenges`
@@ -81,7 +81,7 @@ Satu baris mewakili satu kode OTP yang diterbitkan untuk sesi tertentu.
 
 - Tidak ada kolom `user_id`; identitas akun diturunkan dari sesi induk. Ini juga menjaga sesi recovery pra-pemilihan akun tetap mungkin.
 - Hanya satu challenge `pending` per sesi, dijaga dengan partial unique index.
-- Status awal `pending`; transisi hanya menuju satu status terminal.
+- Status awal `pending`; transisi hanya menuju satu status terminal. Timestamp terminal yang sesuai wajib dicatat dan tidak dapat diubah.
 - Challenge hanya dapat dikonsumsi sekali. Verifikasi yang berhasil harus mengonsumsi challenge dan menyelesaikan sesi dalam satu transaksi.
 - Penerbitan challenge baru dalam sesi yang sama harus mengubah challenge pending sebelumnya menjadi `superseded` dan membuat challenge baru dalam transaksi yang sama.
 - Challenge kedaluwarsa setelah 10 menit. Kedaluwarsa challenge tidak otomatis mengakhiri sesi induk.
@@ -108,7 +108,7 @@ Tabel ini adalah catatan percobaan penerbitan/pengiriman yang menjadi sumber keb
 ### Invariant dan operasi
 
 - Event dibuat di dalam transaksi yang memegang lock rate limit, sebelum pekerjaan pengiriman diteruskan ke provider.
-- Event yang sudah dibuat mengonsumsi kuota, termasuk status `failed` atau `unknown`. Hasil provider yang tidak pasti tidak boleh otomatis mengembalikan kuota.
+- Status dispatch hanya berubah dari `pending` ke salah satu status terminal `accepted`, `failed`, atau `unknown`; status terminal tidak dibuka kembali. Event yang sudah dibuat mengonsumsi kuota, termasuk status `failed` atau `unknown`. Hasil provider yang tidak pasti tidak boleh otomatis mengembalikan kuota.
 - Event yang ditolak sebelum penerbitan tidak dibuat sebagai event dispatch.
 - Event tidak menyimpan tujuan plaintext, OTP, isi pesan, token provider, atau data pribadi lain.
 - Rate limit dasar berlaku lintas purpose dan sesi: maksimal lima event untuk fingerprint tujuan/kanal pada jendela bergulir 60 menit dan cooldown minimal 60 detik antar-event.
@@ -129,7 +129,7 @@ Migration SQL harus sekurang-kurangnya meninjau dan menerapkan:
 - Partial unique index untuk satu challenge pending per sesi.
 - Indeks rate-limit berdasarkan `destination_hmac`, `channel`, dan `created_at`.
 - Indeks pendukung cleanup challenge/session kedaluwarsa tanpa menghapus sesi yang masih dibutuhkan.
-- CHECK constraints untuk vocabulary, rentang counter, pasangan timestamp/status, pasangan ciphertext/key version/HMAC, dan batas waktu OTP.
+- CHECK constraints untuk vocabulary, rentang counter, pasangan timestamp/status, pasangan ciphertext/key version/HMAC, dan batas waktu OTP. Tambahkan trigger untuk aturan lintas tabel pada sesi registrasi.
 
 Nama indeks dan detail kolom final ditetapkan saat review SQL. Jangan membuat indeks duplikat yang tidak punya kebutuhan query terukur.
 
@@ -159,7 +159,7 @@ Migration belum siap dibuat/dianggap selesai sebelum pengujian nyata membuktikan
 - Challenge tanpa sesi induk ditolak.
 - Dua challenge pending pada sesi yang sama ditolak.
 - Challenge dengan expiry lebih dari 10 menit ditolak.
-- Status terminal, timestamp terminal, dan transisi sesi/challenge tidak dapat dibuka kembali.
+- Status terminal, timestamp terminal, dan transisi sesi/challenge tidak dapat dibuka kembali; timestamp expired harus tersedia untuk kedua tabel.
 
 ### Rate limit dan concurrency
 - Lima pengiriman dalam jendela 60 menit diterima; pengiriman keenam ditolak.
