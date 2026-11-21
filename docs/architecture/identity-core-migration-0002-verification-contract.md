@@ -1,8 +1,8 @@
 # Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP
 
-> Status: migration 0002 telah lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL; patch final tetap melalui review sebelum merge
+> Status: diimplementasikan sebagai migration SQLx dan lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL.
 
-Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, operasi enkripsi/HMAC, atau koneksi database pada HTTP startup.
+Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, atau operasi enkripsi/HMAC. HTTP server secara terpisah menginisialisasi pool PostgreSQL saat startup, tetapi tidak menjalankan migration secara otomatis.
 
 Migration 0002 mencakup sesi verifikasi, challenge OTP, event percobaan verifikasi lintas sesi, dan event pengiriman untuk rate limit kontak lintas sesi/instance. Recovery contacts, account recovery cases, password reset, login sessions, audit, dan notifikasi tetap berada pada slice terpisah.
 
