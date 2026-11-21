@@ -88,7 +88,7 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
         }),
     };
 
-    let event_id = append_audit_event(&mut transaction, &audit_event)
+    append_audit_event(&mut transaction, &audit_event)
         .await
         .expect("application may append a validated audit event");
 
