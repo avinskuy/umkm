@@ -211,7 +211,8 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Akun aktif tanpa `initial_contact_verified_at` atau tanpa setidaknya satu kontak utama terverifikasi ditolak.
 - Mengganti kontak utama tanpa verifikasi nilai baru ditolak; provenance `initial_contact_channel` tidak dapat diubah.
 - Timestamp verified tanpa nilai kontak ditolak.
-- Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.\n- Aktivasi sebelum/ sesudah deadline, expiry terlalu awal, lompatan lifecycle, pembatalan setelah deletion processing, dan pembukaan kembali status terminal ditolak.
+- Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.
+- Aktivasi sebelum/ sesudah deadline, expiry terlalu awal, lompatan lifecycle, pembatalan setelah deletion processing, dan pembukaan kembali status terminal ditolak.
 - Email dan nomor telepon duplikat ditolak pada seluruh status yang masih memegang reservasi.
 - Email/nomor yang sama dapat digunakan kembali setelah transisi terminal yang sah melepaskan reservasi.
 
