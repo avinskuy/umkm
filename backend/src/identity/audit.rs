@@ -1,5 +1,5 @@
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx::PgConnection;
 
 /// Jenis actor yang diizinkan oleh kontrak audit Identity Core.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +53,7 @@ pub struct AuditEvent<'a> {
 
 /// Menambahkan event audit tanpa menyediakan operasi baca/perubahan/penghapusan.
 pub async fn append_audit_event(
-    pool: &PgPool,
+    connection: &mut PgConnection,
     event: &AuditEvent<'_>,
 ) -> Result<String, sqlx::Error> {
     let metadata = event.metadata.to_string();
@@ -69,6 +69,6 @@ pub async fn append_audit_event(
     .bind(event.reason_code)
     .bind(event.request_id)
     .bind(metadata)
-    .fetch_one(pool)
+    .fetch_one(connection)
     .await
 }
