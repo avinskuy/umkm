@@ -833,6 +833,59 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
         "registration verification cannot outlive the pending account"
     );
 
+    let lock_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (              user_id, purpose, channel, destination_ciphertext, destination_nonce,              encryption_key_version, destination_hmac, hmac_key_version, expires_at          ) VALUES ($1::uuid, 'registration', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1',              clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text"
+    )
+    .bind(&pending_user_id)
+    .bind(vec![1_u8])
+    .bind(vec![2_u8])
+    .bind(vec![3_u8])
+    .fetch_one(pool)
+    .await
+    .expect("second registration session should be accepted");
+
+    for count in 1_i16..=4 {
+        sqlx::query(
+            "UPDATE public.verification_sessions SET failed_attempt_count = $2 WHERE id = $1::uuid"
+        )
+        .bind(&lock_session_id)
+        .bind(count)
+        .execute(pool)
+        .await
+        .expect("failed attempt counter should increment one at a time");
+    }
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET failed_attempt_count = 5 WHERE id = $1::uuid"
+    )
+    .bind(&lock_session_id)
+    .execute(pool)
+    .await
+    .expect("fifth failed attempt should establish a one-hour lock");
+
+    let remaining_lock_seconds: f64 = sqlx::query_scalar(
+        "SELECT EXTRACT(EPOCH FROM (locked_until - clock_timestamp()))::double precision          FROM public.verification_sessions WHERE id = $1::uuid"
+    )
+    .bind(&lock_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("fifth failed attempt should persist a lock deadline");
+    assert!(
+        remaining_lock_seconds >= 3590.0,
+        "fifth failed attempt should lock the session for one hour"
+    );
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_sessions              SET failed_attempt_count = 0, locked_until = NULL WHERE id = $1::uuid"
+        )
+        .bind(&lock_session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "session failure counter cannot reset before its one-hour lock expires"
+    );
+
     let recovery_session_id: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions (              purpose, channel, destination_ciphertext, destination_nonce,              encryption_key_version, destination_hmac, hmac_key_version, expires_at          )          VALUES (              'account_recovery', 'email', '\\x01', '\\x02', 'enc-v1', '\\x03', 'hmac-v1',              clock_timestamp() + INTERVAL '20 minutes'          )          RETURNING id::text",
     )
