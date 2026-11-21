@@ -52,7 +52,7 @@ Pemilik bisnis menentukan informasi bisnis mana yang boleh dibagikan. Data yang 
 
 - Tidak menggunakan microservices untuk produk tahap awal.
 - Hindari folder penampung umum seperti `utils` atau `common` tanpa tanggung jawab yang jelas.
-- Hindari ketergantungan melingkar antarf fitur.
+- Hindari ketergantungan melingkar antarfitur.
 - Kode bersama harus memiliki lebih dari satu pengguna nyata atau tanggung jawab tingkat platform yang jelas.
 - Pisahkan kebutuhan transport/API dari aturan domain.
 - Jangan mempercayai klaim role atau kepemilikan yang berasal dari frontend.
