@@ -1,30 +1,30 @@
 # USahapintar
 
-**Business Promotion, Intelligence & Investor Networking Platform**
+**Platform Promosi Bisnis, Intelijen, dan Jejaring Investor**
 
-USahapintar connects business owners and investors through business discovery, partnership opportunities, and data-informed business intelligence.
+USahapintar menghubungkan pemilik usaha dengan investor melalui penemuan bisnis, peluang kemitraan, dan informasi bisnis berbasis data.
 
-> Project status: foundation phase. Product scope, architecture, and implementation are being developed incrementally.
+> Status proyek: tahap fondasi. Cakupan produk, arsitektur, dan implementasi dikembangkan secara bertahap.
 
-## Project structure
+## Struktur proyek
 
-- `frontend/` — React + TypeScript web application.
-- `backend/` — Rust API built with Axum.
-- `docs/` — product, architecture, security, and engineering documentation.
-- `infra/` — deployment and infrastructure assets, added when needed.
-- `scripts/` — repeatable development and maintenance tasks.
+- `frontend/` — aplikasi web React + TypeScript.
+- `backend/` — API Rust yang dibangun dengan Axum.
+- `docs/` — dokumentasi produk, arsitektur, keamanan, dan rekayasa perangkat lunak.
+- `infra/` — aset deployment dan infrastruktur, ditambahkan saat dibutuhkan.
+- `scripts/` — tugas pengembangan dan pemeliharaan yang dapat dijalankan ulang.
 
-## Development principles
+## Prinsip pengembangan
 
-- Modular monolith; no premature microservices.
-- Feature-oriented frontend modules and domain-oriented backend modules.
-- Clear ownership for every file and responsibility.
-- Small, reviewable changes with tests.
-- No secrets in source control.
-- Role and resource authorization enforced by the backend.
+- Menggunakan modular monolith; tidak memecah layanan menjadi microservices sebelum benar-benar diperlukan.
+- Modul frontend disusun berdasarkan fitur dan modul backend berdasarkan domain.
+- Setiap file dan tanggung jawab harus memiliki tempat yang jelas.
+- Perubahan dibuat dalam ukuran kecil, mudah ditinjau, dan disertai pengujian.
+- Tidak menyimpan rahasia di source control.
+- Otorisasi role dan akses sumber daya ditegakkan oleh backend.
 
-## Getting started
+## Memulai pengembangan
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the documentation under [docs/](docs/).
+Lihat [CONTRIBUTING.md](CONTRIBUTING.md) untuk alur kerja pengembangan dan dokumentasi di [docs/](docs/).
 
-The frontend and backend setup instructions will be expanded alongside their first functional modules.
+Petunjuk penyiapan frontend dan backend akan dilengkapi seiring hadirnya modul fungsional pertama.
