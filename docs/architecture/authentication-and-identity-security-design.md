@@ -79,7 +79,7 @@ Jangan menerapkan otorisasi sebagai kondisi frontend yang tersebar. Gunakan extr
 
 ## 3. Rancangan model data
 
-PostgreSQL 16 merupakan baseline database relasional. Migration SQLx Identity Core 0001–0005 untuk akun, verifikasi, sesi, recovery, dan audit sudah tersedia serta tercakup dalam pengujian integrasi PostgreSQL. HTTP server menginisialisasi pool database saat startup melalui principal aplikasi; migration tetap dijalankan secara eksplisit oleh proses terpisah. Backend baru membuka operasi terbatas untuk membuat akun pending dan menambahkan audit event, belum menyediakan alur autentikasi lengkap. Migration harus berversi dan tidak boleh diubah setelah diterapkan pada database bersama. Gunakan primary key UUID dan `timestamptz`.
+PostgreSQL 16 merupakan dasar database relasional. Migration SQLx Identity Core 0001–0005 untuk akun, verifikasi, sesi, recovery, dan audit sudah tersedia serta tercakup dalam pengujian integrasi PostgreSQL. HTTP server menginisialisasi pool database saat startup melalui principal aplikasi; migration tetap dijalankan secara eksplisit oleh proses terpisah. Backend baru membuka operasi terbatas untuk membuat akun pending dan menambahkan audit event, belum menyediakan alur autentikasi lengkap. Migration harus berversi dan tidak boleh diubah setelah diterapkan pada database bersama. Gunakan primary key UUID dan `timestamptz`.
 
 ### `users`
 
@@ -100,13 +100,13 @@ Migration 0001 mengimplementasikan field akun berikut. Data profil dan riwayat p
 | `created_at`, `updated_at`, `status_changed_at` | Database-managed timestamps |
 
 Constraint dan pengaman siklus hidup:
-- Partial unique index mereservasi kontak email dan telepon yang tidak NULL selama akun berstatus pending, active, deactivated, deletion-pending, atau deletion-processing.
+- Indeks unik parsial mereservasi kontak email dan telepon yang tidak NULL selama akun berstatus pending, active, deactivated, deletion-pending, atau deletion-processing.
 - Akun pending memiliki tepat satu kontak awal yang belum diverifikasi. Akun active memiliki setidaknya satu kontak utama terverifikasi yang masih berlaku.
 - Role dan kanal pendaftaran awal tidak dapat diubah. Verifikasi kontak awal hanya dapat dicatat satu kali selama aktivasi yang sah.
 - Pendaftaran pending tidak dapat diaktifkan setelah 30 menit atau kedaluwarsa sebelum batas waktunya. Masa berlaku pending tidak dapat diperpanjang.
 - Penghapusan harus menunggu 30 hari dalam status `deletion_pending` sebelum masuk ke `deletion_processing`; proses hanya dapat berakhir pada status `closed`. `pending_expired` dan `closed` bersifat terminal.
 - Suspensi dan batas fitur dicatat sebagai record moderasi/penegakan, bukan sebagai nilai `account_status`.
-- Field profil, riwayat permintaan penonaktifan/penghapusan, dan record retensi tidak disimpan dalam tahap pertama ini.
+- Kolom profil, riwayat permintaan penonaktifan/penghapusan, dan catatan retensi tidak disimpan dalam tahap pertama ini.
 - Jangan pernah menyimpan kata sandi dalam bentuk teks asli. Jangan gunakan ID database mentah sebagai secret otorisasi.
 
 ### `user_identities`
@@ -154,8 +154,8 @@ Constraints:
 - Waktu pembuatan, aktivitas awal, rotasi token, dan batas absolut ditetapkan database. Batas absolut selalu 30 hari.
 - Backend wajib menolak sesi yang tidak aktif lebih dari 7 hari, telah melewati `expires_at`, dicabut, atau dimiliki akun yang tidak aktif. Perangkat yang diingat tidak boleh melewati batas ini.
 - Rotasi token dilakukan setelah autentikasi dan perubahan privilege; hash lama diganti secara atomik dan timestamp rotasi diperbarui database.
-- Pencabutan sesi harus segera berlaku dari server. Logout, pencabutan satu perangkat, logout semua perangkat, reset password, perubahan status akun, tindakan Admin, dan peristiwa keamanan memiliki reason code yang eksplisit.
-- Perubahan lifecycle akun dari `active` ke status lain otomatis mencabut seluruh sesi yang belum dicabut. Restriksi/suspensi moderasi dan peristiwa keamanan lain tetap harus memicu pencabutan melalui runtime.
+- Pencabutan sesi harus segera berlaku dari server. Logout, pencabutan satu perangkat, logout semua perangkat, reset password, perubahan status akun, tindakan Admin, dan peristiwa keamanan memiliki kode alasan yang eksplisit.
+- Perubahan siklus hidup akun dari `active` ke status lain otomatis mencabut seluruh sesi yang belum dicabut. Restriksi/suspensi moderasi dan peristiwa keamanan lain tetap harus memicu pencabutan melalui runtime.
 - Hash prefix jaringan, jika digunakan, harus berupa HMAC berkunci dan menyimpan versi key agar rotasi dapat dikelola. Jangan mengumpulkan alamat IP penuh atau fingerprint perangkat lengkap tanpa kebutuhan keamanan dan kebijakan retensi yang terdokumentasi.
 
 ### `verification_challenges`
@@ -183,7 +183,7 @@ Controls:
 - Masa berlaku singkat, konsumsi satu kali, batas percobaan, jeda kirim ulang, serta rate limit berdasarkan tujuan/akun/IP.
 - Use a keyed hash/HMAC for short numeric OTPs so database disclosure alone does not make offline guessing trivial.
 - Jangan mencatat nilai kode dalam log atau mengirimkannya ke analytics.
-- Batalkan challenge aktif yang lebih lama ketika challenge baru diterbitkan untuk tujuan/purpose yang sama.
+- Batalkan challenge aktif yang lebih lama ketika challenge baru diterbitkan untuk tujuan penggunaan yang sama.
 - Kegagalan pengiriman oleh penyedia tidak boleh menandai tujuan sebagai terverifikasi.
 
 ### Kontak pemulihan dan kasus pemulihan akun
@@ -197,13 +197,13 @@ Jika kontak utama dan seluruh kontak pemulihan tidak dapat diakses, alur pemulih
 ### `password_reset_tokens`
 
 - Store a hash of a cryptographically random, single-use token.
-- Sertakan user ID, masa berlaku, timestamp pembuatan, dan timestamp konsumsi.
+- Sertakan ID pengguna, masa berlaku, waktu pembuatan, dan waktu konsumsi.
 - Cabut sesi yang sudah ada setelah reset berhasil sesuai kebijakan keamanan.
 - Jangan mengungkap keberadaan akun dalam respons permintaan.
 
 ### `admin_audit_logs`
 
-- Record append-only untuk tindakan administratif yang sensitif.
+- Catatan append-only untuk tindakan administratif yang sensitif.
 - Sertakan actor ID, tindakan, jenis/ID target, timestamp, hasil, serta alasan/konteks minimum.
 - Jangan menyimpan kata sandi, OTP, token sesi mentah, token reset, atau konten privat yang tidak diperlukan.
 - Lindungi izin baca audit log secara terpisah dari izin Admin biasa.
@@ -248,7 +248,7 @@ Jika kontak utama dan seluruh kontak pemulihan sama-sama tidak dapat diakses, gu
 
 ## 4. Kontrak API (usulan)
 
-Semua rute menggunakan versi `/api/v1`. Bentuk request/response JSON harus ditetapkan dalam OpenAPI sebelum implementasi. Tabel di bawah merupakan inventaris rute, bukan dokumentasi format wire final.
+Semua rute menggunakan versi `/api/v1`. Bentuk permintaan/respons JSON harus ditetapkan dalam OpenAPI sebelum implementasi. Tabel di bawah merupakan inventaris rute, bukan dokumentasi format data final.
 
 ### Pendaftaran dan verifikasi
 
@@ -318,9 +318,9 @@ Hindari menyimpan bearer token berumur panjang di localStorage. Jika arsitektur 
 
 ### CSRF dan CORS
 
-- Untuk request perubahan state yang diautentikasi melalui cookie, gunakan perlindungan CSRF yang sesuai dengan topologi deployment (token atau strategi origin/referer yang kuat).
-- Batasi CORS ke origin frontend tepercaya yang ditentukan secara tepat; jangan pernah menggabungkan request berkredensial dengan wildcard origin.
-- Validasi content type dan origin request untuk endpoint sensitif.
+- Untuk permintaan yang mengubah status dan diautentikasi melalui cookie, gunakan perlindungan CSRF yang sesuai dengan topologi deployment (token atau strategi origin/referer yang kuat).
+- Batasi CORS ke origin frontend tepercaya yang ditentukan secara tepat; jangan pernah menggabungkan permintaan dengan kredensial dengan wildcard origin.
+- Validasi content type dan origin permintaan untuk endpoint sensitif.
 - Simpan origin produksi dan OAuth redirect URI dalam konfigurasi environment, bukan hard-coded di source.
 
 ### Siklus hidup sesi
@@ -363,7 +363,7 @@ Also require:
 - One-time use.
 - Bounded attempts.
 - Resend cooldown.
-- Pembatalan challenge setelah verifikasi berhasil atau digantikan oleh request baru.
+- Pembatalan challenge setelah verifikasi berhasil atau digantikan oleh permintaan baru.
 - Respons seragam yang tidak mengonfirmasi keberadaan akun.
 - Pemantauan kegagalan pengiriman berulang, pola enumerasi akun, dan volume permintaan OTP yang tidak wajar.
 
@@ -429,9 +429,9 @@ Requirements:
 - Stable machine-readable error codes.
 - Pesan yang aman dan mudah dipahami pengguna.
 - Jangan sertakan stack trace, error SQL, token penyedia, atau nilai secret.
-- Sertakan correlation/request ID untuk kebutuhan dukungan.
+- Sertakan ID korelasi/permintaan untuk kebutuhan dukungan.
 - Jangan memberikan respons pemulihan tanpa autentikasi yang berbeda sehingga mengungkap keberadaan akun.
-- Error validasi menjelaskan masalah pada field yang aman tanpa mengulang nilai sensitif.
+- Error validasi menjelaskan masalah pada kolom input yang aman tanpa mengulang nilai sensitif.
 
 ## 11. Model ancaman dan mitigasi wajib
 
@@ -451,7 +451,7 @@ Requirements:
 | Penyalahgunaan penyedia verifikasi | Rate limit per tujuan/global, batas biaya, pemantauan |
 | Replay token reset/verifikasi | Konsumsi satu kali, masa berlaku, penyimpanan dalam bentuk hash, pembaruan atomik |
 
-Ini merupakan baseline model ancaman, bukan pengganti penetration test atau penilaian keamanan formal.
+Ini merupakan dasar model ancaman, bukan pengganti uji penetrasi atau penilaian keamanan formal.
 
 ## 12. Rencana pengujian wajib
 
@@ -513,7 +513,7 @@ Ini merupakan baseline model ancaman, bukan pengganti penetration test atau peni
 ## 13. Urutan implementasi
 
 1. **Reproducibilitas dependency — selesai:** lockfile frontend/backend tersedia dan CI menggunakan instalasi dependency yang terkunci.
-2. **Fondasi database — selesai:** pool PostgreSQL runtime, pemisahan principal aplikasi/migrator, migration Identity Core 0001–0005, serta akses terbatas untuk pembuatan akun pending dan penambahan audit event sudah tersedia. Migration produksi tetap merupakan operasi terpisah.
+2. **Fondasi database — selesai:** pool PostgreSQL saat runtime, pemisahan principal aplikasi/migrator, migration Identity Core 0001–0005, serta akses terbatas untuk pembuatan akun pending dan penambahan audit event sudah tersedia. Migration produksi tetap merupakan operasi terpisah.
 3. **Tipe domain:** definisikan User, PrimaryRole, AccountStatus, Session, VerificationChallenge, dan kode error bertipe.
 4. **Pendaftaran:** implementasikan pendaftaran Owner/Investor dengan validasi dan status pending yang aman.
 5. **Verifikasi:** implementasikan siklus hidup challenge email dan telepon di balik interface penyedia.
