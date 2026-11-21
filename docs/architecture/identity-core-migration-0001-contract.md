@@ -149,6 +149,7 @@ Constraint dan indeks:
 - Index pada `user_id` untuk pencarian identitas milik akun.
 - Tidak menyimpan access token, refresh token, ID token, atau email provider di tabel ini. Jika token provider kelak benar-benar diperlukan, desain penyimpanannya harus ditinjau terpisah.
 - Jangan auto-link berdasarkan kecocokan email. Linking memerlukan sesi akun yang sudah terautentikasi dan bukti kontrol terbaru atas identitas provider.
+- Untuk akun klien tanpa `password_hash`, identitas Google adalah metode autentikasi yang diperlukan. Jangan mengizinkan unlink identitas Google terakhir sebelum akun memiliki kredensial lokal atau metode autentikasi lain yang telah diverifikasi.
 
 Keunikan satu provider subject global tidak berarti satu email provider dapat menggabungkan beberapa akun. Identitas ditentukan oleh stable provider subject.
 
@@ -213,6 +214,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - FK menolak user yang tidak ada.
 - Identitas provider tidak dapat dipindahkan otomatis hanya karena email cocok.
 - Linking identitas memerlukan otorisasi akun yang ada dan bukti kontrol provider.
+- Akun tanpa password hash tidak dapat melepas identitas Google terakhir sebelum metode autentikasi pengganti tersedia.
 
 ### Concurrency dan lifecycle
 - Dua registrasi paralel untuk email yang sama: hanya satu reservasi berhasil.
