@@ -50,10 +50,10 @@ The product's shorter labels “Owner” and “Investor” are display language
 | `users` | Account identity, immutable primary role, account status, normalized contact values, optional password hash | Unique non-null normalized email and phone; role check; status check; role immutable after insert |
 | `user_identities` | External provider identities such as Google | Unique (`provider`, `provider_subject`); FK to user; never auto-link by matching email |
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
-| `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; status jeda pengiriman tersimpan secara persisten |
+| `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
-| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi |
-| `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | Tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
+| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi; email serta nomor HP pemulihan yang sudah diverifikasi boleh terhubung ke beberapa akun |
+| `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | Tepat satu kasus per `verification_session_id` (FK wajib dan unique); `target_user_id` boleh NULL sebelum akun tujuan dipilih, lalu dikaitkan secara atomik; tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
 
@@ -148,10 +148,11 @@ Moderation status is not publication status. An opportunity can be published and
 erDiagram
     USERS ||--o{ USER_IDENTITIES : links
     USERS ||--o{ SESSIONS : owns
-    USERS ||--o{ VERIFICATION_SESSIONS : starts
+    USERS o|--o{ VERIFICATION_SESSIONS : starts
     VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
+    VERIFICATION_SESSIONS ||--o| ACCOUNT_RECOVERY_CASES : records
     USERS ||--o{ RECOVERY_CONTACTS : owns
-    USERS ||--o{ ACCOUNT_RECOVERY_CASES : requests
+    USERS o|--o{ ACCOUNT_RECOVERY_CASES : targets
     USERS ||--o{ PASSWORD_RESET_TOKENS : resets
     USERS ||--o| OWNER_PROFILES : has
     USERS ||--o| INVESTOR_PROFILES : has
@@ -178,7 +179,7 @@ erDiagram
     USERS ||--o{ ADMIN_AUDIT_LOGS : acts
 ```
 
-The diagram is a conceptual overview. Exact cardinalities, nullable relationships, and target references must be resolved in individual migration reviews. In particular, polymorphic moderation targets should not be implemented with unchecked IDs; choose explicit nullable foreign keys or a rigorously validated target model.
+The diagram is a conceptual overview. Exact cardinalities, nullable relationships, and target references must be resolved in individual migration reviews. `account_recovery_cases` has a one-to-zero-or-one relationship with `verification_sessions`: each case references exactly one session, and a session can create at most one case. OTP resends reuse that session and case; a new recovery attempt creates a new session and case. `target_user_id` is nullable only while the recovery target has not yet been selected; each case must retain its verification-session reference and be linked to the selected account atomically after the required checks. In particular, polymorphic moderation targets should not be implemented with unchecked IDs; choose explicit nullable foreign keys or a rigorously validated target model.
 
 ## 5. Index and query design baseline
 
@@ -188,8 +189,8 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `user_identities(provider, provider_subject)`: unique.
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
-- `recovery_contacts(user_id, status, created_at)` dan indeks unik parsial pada nilai kontak yang sudah dinormalisasi sesuai kebijakan keunikan yang disetujui.
-- `account_recovery_cases(user_id, status, created_at)` serta indeks untuk antrean pemeriksaan petugas berdasarkan status dan waktu penugasan.
+- `recovery_contacts(user_id, status, created_at)` untuk daftar kontak per akun; unique constraint komposit `(user_id, channel, contact_hash)` untuk mencegah relasi kontak duplikat di akun yang sama; serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk pencarian lintas akun. Jangan menerapkan unique constraint global pada email atau nomor HP pemulihan.
+- `account_recovery_cases(verification_session_id)`: unique dan NOT NULL untuk menjamin satu kasus per sesi verifikasi. `account_recovery_cases(target_user_id, status, created_at)` untuk riwayat kasus per akun setelah target dipilih; `account_recovery_cases(status, created_at)` untuk antrean kasus yang belum memiliki target.
 - `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
 - `business_data_shares(business_id, investor_user_id, revoked_at)`.
@@ -234,6 +235,8 @@ Each migration must be immutable after application to a shared database. Include
 
 ## 8. Keputusan Identity Core dan keputusan skema yang masih tersisa
 
+> Tinjauan khusus mengenai sesi pemulihan tanpa akun tujuan, kontak pemulihan bersama, pemilihan akun, rate limit lintas sesi, dan reservasi kontak utama tersedia di [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md). Dokumen tersebut melengkapi bagian ini dan harus dibaca sebelum migrasi.
+
 ### Batas awal kebijakan Identity Core yang telah disetujui
 
 Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui berikut:
@@ -242,7 +245,7 @@ Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui beri
 - Satu kontak dipilih saat pendaftaran awal (email atau nomor HP/WhatsApp); kontak lainnya dapat ditambahkan dan diverifikasi secara terpisah setelah akun aktif.
 - Pendaftaran menggunakan email/nomor HP wajib memiliki kata sandi lokal. Pendaftaran yang hanya menggunakan Google boleh memiliki `password_hash` bernilai null, tetapi tetap wajib memilih dan memverifikasi kontak pendaftaran secara terpisah.
 - Pendaftaran tertunda kedaluwarsa setelah 30 menit. Proses pembersihan harus idempotent, aman terhadap proses bersamaan, melepaskan reservasi tertunda yang memenuhi syarat, dan tidak pernah menghapus akun yang sudah aktif.
-- Baseline OTP: kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, maksimal lima percobaan gagal per sesi verifikasi, terkunci satu jam setelah kegagalan kelima, jeda kirim ulang 60 detik, dan maksimal lima pengiriman per alamat tujuan dalam satu jam. Kode baru membatalkan kode sebelumnya, tetapi tidak menghapus status penguncian atau batas pengiriman. Batas tambahan berdasarkan IP/jaringan/akun/tujuan tetap diperlukan.
+- Baseline OTP: kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, maksimal lima percobaan gagal per sesi verifikasi, terkunci satu jam setelah kegagalan kelima, jeda kirim ulang 60 detik, dan maksimal lima pengiriman per alamat tujuan dalam satu jam. Selama penguncian, semua percobaan verifikasi ditolak, termasuk dengan OTP baru. Setelah satu jam benar-benar berlalu, sesi `pending` yang sama dapat digunakan kembali dan penghitung kegagalan sesi direset secara atomik; penerbitan OTP baru tidak mempercepat atau mengatur ulang penguncian. Kode baru menggantikan kode sebelumnya, tetapi tidak menghapus batas pengiriman atau rate limit lintas sesi. Batas tambahan berdasarkan IP/jaringan/akun/tujuan tetap diperlukan.
 - Beberapa sesi aktif diperbolehkan. Batas awal tanpa aktivitas adalah tujuh hari dan batas absolut adalah 30 hari. Sesi persisten melalui fitur Ingat perangkat tidak boleh melewati kedua batas atau pencabutan dari server. Sistem wajib menyediakan daftar sesi aktif, pencabutan individual, dan logout dari semua perangkat.
 - Penonaktifan sementara dan penghapusan permanen merupakan proses terpisah. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus didokumentasikan.
 - Pemulihan mendukung alur lupa kata sandi dan lupa email melalui kontak pemulihan yang sudah diverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Jika kontak utama dan pemulihan sama-sama tidak dapat diakses, gunakan pemulihan alternatif berbasis risiko dengan bukti perangkat/sesi tepercaya dan eskalasi ke pemeriksaan manual oleh petugas berwenang khusus. Pemulihan berisiko tinggi dapat ditunda atau ditolak; seluruh tindakan diaudit dan role tidak pernah berubah.
