@@ -49,7 +49,7 @@ The product's shorter labels “Owner” and “Investor” are display language
 
 | Table | Responsibility | Important constraints |
 | --- | --- | --- |
-| `users` | Account identity, immutable primary role, lifecycle, normalized contact values, optional password hash | Unique reserved email/phone; role/lifecycle checks; verified-contact invariants; immutable role and initial-contact provenance |
+| `users` | Account identity, immutable primary role, lifecycle, normalized contact values, optional password hash | Unique reserved email/phone; role/lifecycle checks; verified-contact invariants; immutable role and initial-contact provenance; guarded lifecycle transitions |
 | `user_identities` | External provider identities, initially Google | Unique (`provider`, `provider_subject`); FK to user; stable subject only; never auto-link by matching email |
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
 | `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
