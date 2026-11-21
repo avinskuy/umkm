@@ -90,7 +90,7 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
 | `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
-| `primary_role` | Owner, Investor, or Admin |
+| `primary_role` | Canonical persisted role: `business_owner`, `investor`, or `admin` |
 | `account_status` | Pending verification, active, suspended, deactivated, deletion pending, deletion processing, or closed; transitions are explicit and audited |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
 | `email_verified_at` | Verification timestamp, independently nullable |
@@ -136,10 +136,10 @@ Opaque, server-managed sessions.
 | `id` | UUID primary key |
 | `user_id` | Session owner |
 | `token_hash` | Hash of a high-entropy opaque session token |
-| `created_at`, `last_seen_at` | Activity timestamps |
+| `created_at` | Session creation timestamp |
+| `last_seen_at` | Server-updated activity timestamp used to enforce the 7-day idle timeout |
 | `expires_at` | Absolute expiry (30 days from issuance at the initial baseline) |
 | `remember_device` | Whether the browser session uses persistent-cookie behavior; never bypasses idle/absolute expiry |
-| `last_seen_at` | Server-updated activity timestamp used to enforce the 7-day idle timeout |
 | `revoked_at` | Revocation timestamp |
 | `user_agent_summary` | Optional minimized device hint |
 | `ip_prefix_hash` | Optional privacy-preserving abuse signal, subject to retention policy |
