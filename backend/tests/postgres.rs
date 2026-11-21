@@ -1722,20 +1722,22 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
     );
 }
 
-
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
-    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL")
-        .expect("CI must provide a disposable target-database DBA connection for privilege bootstrap tests");
+    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL").expect(
+        "CI must provide a disposable target-database DBA connection for privilege bootstrap tests",
+    );
     let admin_pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&admin_url)
         .await
         .expect("disposable DBA connection should succeed");
 
-    raw_sql(include_str!("../database/bootstrap/002_identity_core_grants.sql"))
-        .execute(&admin_pool)
-        .await
-        .expect("guarded Identity Core grants should apply after migrations");
+    raw_sql(include_str!(
+        "../database/bootstrap/002_identity_core_grants.sql"
+    ))
+    .execute(&admin_pool)
+    .await
+    .expect("guarded Identity Core grants should apply after migrations");
 
     let app_url = std::env::var("APP_DATABASE_URL")
         .expect("CI must provide a separate least-privilege application connection");
@@ -1809,18 +1811,17 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("function privileges should be queryable");
     assert_eq!(function_access, (true, true, false));
 
-    let created_user_id: String = sqlx::query_scalar(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
-    )
-    .bind("business_owner")
-    .bind("email")
-    .bind("principal-bootstrap@example.test")
-    .bind(Option::<String>::None)
-    .bind("test-only-encoded-password-hash")
-    .bind(Option::<String>::None)
-    .fetch_one(&app_pool)
-    .await
-    .expect("application may create a pending account through the guarded function");
+    let created_user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
+            .bind("business_owner")
+            .bind("email")
+            .bind("principal-bootstrap@example.test")
+            .bind(Option::<String>::None)
+            .bind("test-only-encoded-password-hash")
+            .bind(Option::<String>::None)
+            .fetch_one(&app_pool)
+            .await
+            .expect("application may create a pending account through the guarded function");
     assert!(!created_user_id.is_empty());
 
     sqlx::query(
