@@ -358,7 +358,8 @@ BEGIN
         SELECT status, requested_action, target_user_id
         INTO v_case_status, v_case_action, v_case_target_user_id
         FROM public.account_recovery_cases
-        WHERE id = NEW.recovery_case_id;
+        WHERE id = NEW.recovery_case_id
+        FOR SHARE;
 
         IF NOT FOUND OR v_case_status <> 'approved' OR v_case_action <> 'password_reset' OR v_case_target_user_id IS DISTINCT FROM NEW.user_id THEN
             RAISE EXCEPTION 'password reset token requires an approved recovery case for the same account'
@@ -413,6 +414,28 @@ BEGIN
             RAISE EXCEPTION 'consumed token cannot have a revocation reason'
                 USING ERRCODE = '23514';
         END IF;
+
+        SELECT status, target_user_id
+        INTO v_case_status, v_case_target_user_id
+        FROM public.account_recovery_cases
+        WHERE id = OLD.recovery_case_id
+        FOR SHARE;
+
+        IF NOT FOUND OR v_case_status <> 'approved' OR v_case_target_user_id IS DISTINCT FROM OLD.user_id THEN
+            RAISE EXCEPTION 'password reset token requires an approved recovery case at consumption'
+                USING ERRCODE = '23514';
+        END IF;
+
+        SELECT account_status INTO v_account_status
+        FROM public.users
+        WHERE id = OLD.user_id
+        FOR SHARE;
+
+        IF NOT FOUND OR v_account_status <> 'active' THEN
+            RAISE EXCEPTION 'password reset token cannot be consumed for an inactive account'
+                USING ERRCODE = '23514';
+        END IF;
+
         NEW.consumed_at := clock_timestamp();
     ELSE
         IF NEW.revoked_at IS NULL OR NEW.revocation_reason IS NULL THEN
@@ -429,3 +452,28 @@ $$;
 CREATE TRIGGER password_reset_tokens_10_guard
     BEFORE INSERT OR UPDATE ON public.password_reset_tokens
     FOR EACH ROW EXECUTE FUNCTION public.guard_password_reset_token();
+
+
+CREATE FUNCTION public.revoke_password_reset_tokens_when_account_inactive()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF NEW.account_status IS DISTINCT FROM OLD.account_status
+       AND NEW.account_status <> 'active' THEN
+        UPDATE public.password_reset_tokens
+        SET revoked_at = clock_timestamp(),
+            revocation_reason = 'account_status_changed'
+        WHERE user_id = NEW.id
+          AND consumed_at IS NULL
+          AND revoked_at IS NULL;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER users_95_revoke_password_reset_tokens
+    AFTER UPDATE OF account_status ON public.users
+    FOR EACH ROW EXECUTE FUNCTION public.revoke_password_reset_tokens_when_account_inactive();
