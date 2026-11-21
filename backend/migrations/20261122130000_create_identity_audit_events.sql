@@ -108,13 +108,13 @@ CREATE FUNCTION public.stamp_identity_audit_event()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
     NEW.id := gen_random_uuid();
     NEW.occurred_at := clock_timestamp();
     RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER identity_audit_events_05_stamp
     BEFORE INSERT ON public.identity_audit_events
