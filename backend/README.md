@@ -69,3 +69,16 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo build --workspace --locked
 ```
+
+## Akses runtime Identity Core
+
+Lapisan `usahapintar_api::identity` menyediakan dua operasi terbatas yang sudah sesuai dengan grant principal aplikasi:
+
+- `create_client_user` memanggil fungsi database `SECURITY DEFINER` yang hanya dapat membuat akun pending dengan role Business Owner atau Investor. Aplikasi tidak memperoleh hak INSERT langsung ke tabel `users` atau `user_identities`.
+- `append_audit_event` hanya menambahkan event ke tabel audit append-only. Principal aplikasi tetap tidak dapat membaca, mengubah, atau menghapus event audit.
+
+Gunakan tipe `ClientRole` dan `ContactChannel` agar nilai role/kanal berasal dari pilihan yang telah ditentukan, bukan string bebas. `ClientRegistration.password_hash` harus berisi hasil password hashing dari komponen yang telah ditinjau; jangan pernah mengirim password plaintext. Implementasi hashing, endpoint registrasi, OTP, aktivasi akun, login, dan session belum termasuk tahap ini.
+
+Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya (misalnya hasil autentikasi/middleware), bukan dari payload yang dikirim klien. Metadata harus hanya memuat key allowlist non-sensitif yang didukung database; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
+
+Operasi baca akun, pencarian kredensial login, perubahan lifecycle, verifikasi, recovery, session, dan pembacaan audit belum disediakan. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
