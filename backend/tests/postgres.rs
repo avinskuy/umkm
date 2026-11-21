@@ -547,7 +547,7 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
 
     sqlx::query(
         "INSERT INTO public.user_identities (user_id, provider, provider_subject) \
-         VALUES ($1::uuid, 'google', 'google-subject-terminal')"
+         VALUES ($1::uuid, 'google', 'google-subject-terminal')",
     )
     .bind(&terminal_user_id)
     .execute(&mut *setup_tx)
@@ -564,11 +564,13 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
         .await
         .expect("transaction should start for deletion processing");
 
-    sqlx::query("UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid")
-        .bind(&terminal_user_id)
-        .execute(&mut *processing_tx)
-        .await
-        .expect("deletion may enter processing after the waiting period");
+    sqlx::query(
+        "UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid",
+    )
+    .bind(&terminal_user_id)
+    .execute(&mut *processing_tx)
+    .await
+    .expect("deletion may enter processing after the waiting period");
 
     processing_tx
         .commit()
