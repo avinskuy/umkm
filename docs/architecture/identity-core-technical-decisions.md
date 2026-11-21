@@ -33,7 +33,7 @@ Kolom konseptual untuk sesi verifikasi dan relasi kontak pemulihan:
 - Akses dekripsi hanya diberikan pada komponen yang benar-benar perlu mengirim OTP atau memproses kontak. Admin operasional tidak memperoleh akses plaintext hanya karena memiliki role Admin.
 - HMAC hanya untuk pencocokan; HMAC tidak boleh dipakai sebagai bukti kepemilikan akun.
 - Normalisasi email dan nomor telepon dilakukan sebelum enkripsi dan HMAC. Untuk nomor telepon gunakan format E.164; normalisasi email harus konsisten dan tidak boleh menerapkan transformasi provider-specific yang mengubah identitas.
-- Rotasi key harus mendukung pembacaan versi lama selama masa transisi, penulisan dengan versi aktif, backfill terkontrol, verifikasi hasil, dan pencabutan versi lama setelah seluruh data relevan selesai. Rotasi HMAC memerlukan strategi dual-read/backfill agar pencarian dan deduplikasi tidak terputus.
+- Rotasi key harus mendukung pembacaan versi lama selama masa transisi, penulisan dengan versi aktif, backfill terkontrol, verifikasi hasil, dan pencabutan versi lama setelah seluruh data relevan selesai. Rotasi HMAC memerlukan strategi dual-read/backfill agar pencarian dan deduplikasi tidak terputus. Untuk rate limit, perubahan versi fingerprint tidak boleh membuka jendela bypass: selama transisi, transaksi harus mengunci dan menghitung fingerprint versi lama maupun aktif dalam urutan deterministik, atau memakai fingerprint lock yang stabil sampai seluruh event lama melewati jendela limit.
 
 Nilai kontak utama yang dibutuhkan untuk login tetap mengikuti model identitas akun dan perlindungan database/storage sesuai klasifikasi data. Keputusan ini terutama mengatur salinan tujuan sementara yang diperlukan untuk verifikasi/pengiriman dan kontak pemulihan yang perlu dicari lintas akun.
 
@@ -114,7 +114,7 @@ Baseline provisioning:
 
 - Operator yang berwenang membuat akun melalui prosedur internal/CLI atau workflow provisioning yang terautentikasi; bukan melalui payload registrasi publik.
 - Gunakan kredensial database/principal provisioning yang terpisah dan hanya tersedia pada lingkungan operator yang dikendalikan. Kredensial tersebut tidak boleh tersedia bagi frontend atau proses API publik.
-- Runtime principal aplikasi tidak boleh memiliki jalur umum untuk menaikkan role akun menjadi Admin. Role tidak dapat diubah setelah INSERT.
+- Runtime principal aplikasi tidak boleh memiliki jalur umum untuk menaikkan role akun menjadi Admin. Role tidak dapat diubah setelah INSERT. Pada tingkat database, hindari hak INSERT langsung yang memungkinkan runtime memilih sembarang role: gunakan fungsi pembuatan akun klien yang hanya menerima `business_owner`/`investor`, sedangkan provisioning Admin memakai principal/fungsi internal terpisah. Fungsi `SECURITY DEFINER` (jika dipakai) harus dimiliki role non-login, memakai `search_path` tetap, tidak memakai SQL dinamis, dan hak EXECUTE publik dicabut.
 - Provisioning mencatat aktor, alasan, waktu, identitas target, dan hasil ke audit trail.
 - Akun Admin tidak memperoleh akses istimewa sebelum menyelesaikan bootstrap keamanan yang diwajibkan, termasuk MFA. Mekanisme MFA dan penyedia final dipilih pada tahap implementasi Admin.
 - Undangan/bootstrap harus sekali pakai, kedaluwarsa, dan tidak memuat password atau OTP plaintext dalam log.
