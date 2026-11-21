@@ -83,7 +83,7 @@ Baseline implementasi:
 - Catat event gagal dan berhasil. Hanya outcome gagal mengonsumsi anggaran kegagalan; sesi tetap memiliki counter dan lock satu jam sendiri sesuai kebijakan OTP.
 - Penolakan karena sesi terkunci/kedaluwarsa/terminal atau rate limit tidak dihitung sebagai tebakan kode yang diproses.
 - Penghitungan event lintas sesi, penambahan counter sesi, dan konsumsi challenge harus konsisten dalam transaksi PostgreSQL.
-- Ambang numerik dan jendela lintas sesi belum ditetapkan dalam kebijakan produk. Nilai tersebut wajib ditentukan dan diuji sebelum runtime verifikasi OTP diaktifkan; migration tidak boleh mengarang ambang.
+- Batas lintas sesi ditetapkan maksimal **5 kegagalan per kontak dalam jendela bergulir 60 menit**, melintasi seluruh sesi dan purpose. Hanya event `failed` mengonsumsi anggaran; `succeeded` tetap dicatat. Runtime harus mengunci fingerprint kontak/kanal, menghitung event gagal pada jendela tersebut, lalu mencatat outcome dan memperbarui counter sesi dalam transaksi PostgreSQL yang sama. Migration hanya menyediakan tabel, constraint, dan indeks; enforcement baru aktif setelah runtime OTP diimplementasikan.
 
 Kontrak tabel dan tes ada pada [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md).
 
