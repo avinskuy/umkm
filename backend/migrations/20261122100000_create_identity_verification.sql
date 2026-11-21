@@ -409,7 +409,7 @@ BEGIN
     NEW.attempted_at := clock_timestamp();
     RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER otp_verification_attempt_events_10_guard
     BEFORE INSERT OR UPDATE ON public.otp_verification_attempt_events
