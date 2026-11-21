@@ -243,7 +243,6 @@ Migration 0001–0005 belum boleh dijalankan pada database produksi. Migration 0
 - [Kebijakan Keamanan Database dan Integritas Data](../security/database-security-data-integrity.md)
 - [Strategi Pengujian dan Quality Assurance](../engineering/testing-strategy-quality-assurance.md)
 
-
 ## 10. Status provisioning principal PostgreSQL
 
 Bootstrap principal dipisahkan dari schema migration karena role PostgreSQL berlaku pada tingkat cluster/database. Skrip `backend/database/bootstrap/001_create_principals.sql` membuat login aplikasi, migrator, backup, dan monitoring beserta role group; PUBLIC kehilangan CONNECT/TEMPORARY dan akses schema `public`. Skrip `002_identity_core_grants.sql` hanya memberikan hak pembuatan akun melalui fungsi `SECURITY DEFINER` yang ownership, privilege pemilik, dan `search_path`-nya telah diverifikasi; aplikasi mendapat INSERT audit tanpa hak SELECT/UPDATE/DELETE/TRUNCATE.
