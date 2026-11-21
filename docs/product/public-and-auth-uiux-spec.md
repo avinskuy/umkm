@@ -164,7 +164,7 @@ Content:
 
 ### Form fields and behavior
 
-- Login identifier behavior (email/password versus phone OTP) remains subject to the separate login-policy decision. Do not reuse registration verification copy as login-field requirements.
+- Login requires the account password. Email/WhatsApp registration codes only activate the account and are never a passwordless login method.
 - Password field with show/hide toggle.
 - Forgot password link.
 - Remember-device/session option only if the backend session policy supports it safely; do not imply permanent sessions.
@@ -218,7 +218,7 @@ Keep the visual layout consistent so the two pages feel like one product. Distin
 - Choose one contact method: email address OR phone number.
 - If email is chosen, send the verification code to that email address.
 - If phone is chosen, send the verification code through WhatsApp.
-- Password and confirmation only if required by the approved login model.
+- Required password and confirmation fields for every account, including Google-based registration.
 - Required acceptance of Terms and Privacy Policy.
 - Optional product updates consent, unchecked by default.
 
@@ -265,7 +265,7 @@ Ask for only the fields relevant to the selected stage:
 - Optional product updates consent, unchecked by default.
 
 **Step 2 — Contact verification**
-- Same mutually exclusive Email or Phone/WhatsApp choice and verification pattern as Owner registration.
+- Same mutually exclusive Email or Phone/WhatsApp choice and verification pattern as Owner registration. A password and confirmation are mandatory.
 
 **Step 3 — Investor profile**
 - Investor type/profile description, using approved non-sensitive categories.
@@ -284,7 +284,7 @@ Ask for only the fields relevant to the selected stage:
 
 - Google OAuth remains available for sign-in and registration.
 - The user must choose Owner or Investor before starting a new Google registration flow. Role context is protected by server-side OAuth state.
-- A new Google identity must still complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
+- A new Google identity must still set a local password and complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
 - Existing linked Google identities sign in only to their existing account. The account's primary role remains immutable and determines the correct portal.
 - Never auto-link based only on matching email. Linking requires fresh proof of control of both identities.
 - Admin registration is never available through public Google OAuth.
@@ -294,7 +294,7 @@ Ask for only the fields relevant to the selected stage:
 
 ### Request page — `/lupa-kata-sandi`
 
-- Accept email or phone.
+- Accept the account's verified email or phone as the recovery destination, with a separate recovery challenge. Registration activation codes cannot be reused.
 - Use a neutral confirmation message regardless of whether the account exists.
 - Apply rate limits and abuse monitoring.
 - Do not reveal account existence.
