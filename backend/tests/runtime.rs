@@ -69,18 +69,10 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
         google_subject: None,
     };
 
-    let user_id = create_client_user(&pool, &registration)
+    let mut transaction = pool.begin().await.expect("application may start a transaction");
+    let user_id = create_client_user(&mut transaction, &registration)
         .await
         .expect("application may create a pending account through the guarded database function");
-
-    assert!(
-        sqlx::query("SELECT id FROM public.users WHERE id = $1::uuid")
-            .bind(&user_id)
-            .fetch_one(&pool)
-            .await
-            .is_err(),
-        "application must not read account rows directly"
-    );
 
     let audit_event = AuditEvent {
         actor_type: AuditActorType::System,
@@ -96,10 +88,24 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
         }),
     };
 
-    let event_id = append_audit_event(&pool, &audit_event)
+    let event_id = append_audit_event(&mut transaction, &audit_event)
         .await
         .expect("application may append a validated audit event");
+
+    transaction
+        .commit()
+        .await
+        .expect("account creation and its audit event should commit atomically");
     assert!(!event_id.is_empty());
+
+    assert!(
+        sqlx::query("SELECT id FROM public.users WHERE id = $1::uuid")
+            .bind(&user_id)
+            .fetch_one(&pool)
+            .await
+            .is_err(),
+        "application must not read account rows directly"
+    );
 
     assert!(
         sqlx::query("SELECT id FROM public.identity_audit_events WHERE id = $1::uuid")
