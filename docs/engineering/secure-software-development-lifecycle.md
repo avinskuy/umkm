@@ -1,4 +1,4 @@
-# Secure Software Development Lifecycle (SSDLC)
+# Siklus Pengembangan Perangkat Lunak yang Aman (SSDLC)
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
@@ -70,7 +70,7 @@ Acuan digunakan sebagai praktik dasar dan kerangka peningkatan bertahap. Penerap
 - Ikuti proses pelaporan kerentanan dan incident response.
 - Perbarui dokumentasi dan test setelah perbaikan.
 
-## 4. Repository publik dan open-source readiness
+## 4. Kesiapan repositori publik dan sumber terbuka
 
 Repository publik boleh memuat source code, dokumentasi arsitektur yang disanitasi, schema/migration aman, API spec tanpa kredensial, synthetic test data, dan workflow yang aman.
 
