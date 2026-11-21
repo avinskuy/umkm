@@ -1,6 +1,6 @@
-# Kebijakan Keamanan & Perlindungan Data
+# Kebijakan Keamanan, Privasi & Perlindungan Data
 
-Dokumen dalam direktori ini merangkum baseline keamanan USahapintar yang telah disetujui pada 21 November 2026. Kebijakan mengadopsi praktik dari standar dan panduan industri yang relevan, lalu menerapkannya secara proporsional terhadap tahap proyek, arsitektur modular monolith, risiko, dan kapasitas operasional.
+Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelola data USahapintar yang telah disetujui pada 21 November 2026. Kebijakan mengadopsi praktik dari standar dan panduan industri yang relevan, lalu menerapkannya secara proporsional terhadap tahap proyek, arsitektur modular monolith, risiko, dan kapasitas operasional.
 
 ## Status dan cara membaca
 
@@ -21,17 +21,23 @@ Dokumen dalam direktori ini merangkum baseline keamanan USahapintar yang telah d
 | [API & Integration Security](api-integration-security.md) | Keamanan endpoint, validasi, OAuth, webhook, dan integrasi eksternal |
 | [Database Security & Data Integrity](database-security-data-integrity.md) | PostgreSQL, SQLx, privilege, transaksi, migration, backup, dan integritas |
 | [Infrastructure & Deployment Security](infrastructure-deployment-security.md) | Hardening server, jaringan, environment, CI/CD, release, dan recovery |
-| [Dependency & Third-Party Component Security](dependency-third-party-security.md) | Inventaris dependency, supply chain, advisori, SDK, dan vendor |
+| [Dependency & Third-Party Component Security](dependency-third-party-security.md) | Inventaris dependency, supply chain, advisori, SDK, dan komponen vendor |
+| [Privacy & Data Control](privacy-data-control.md) | Default privasi, visibilitas profil/postingan, persetujuan berbagi, dan kendali pengguna |
+| [Consent & Data Processing](consent-data-processing.md) | Tujuan dan dasar pemrosesan, persetujuan opsional, perubahan tujuan, dan pencabutan |
+| [Account Lifecycle & Data Retention](account-lifecycle-data-retention.md) | Penonaktifan, penghapusan 30 hari, retensi, backup, restore, dan pelepasan kontak |
+| [Third-Party Data Sharing & Vendor Protection](third-party-data-sharing-vendor-protection.md) | Kategori penerima, pembagian data, kewajiban vendor, subprocessor, dan transfer data |
 
 ## Hubungan dengan dokumen lain
 
 - [Standar Engineering](../engineering/standards.md)
 - [Gambaran Arsitektur](../architecture/overview.md)
 - [Rancangan Skema Database PostgreSQL](../architecture/database-schema-design.md)
+- [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md)
+- [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](../architecture/identity-core-shared-recovery-contacts.md)
 - [Authentication & Identity Security Design](../architecture/authentication-and-identity-security-design.md)
 - [Kebijakan Keamanan Repository](../../SECURITY.md)
 - [Panduan Kontribusi](../../CONTRIBUTING.md)
 
 ## Referensi utama
 
-Setiap kebijakan mencantumkan acuan yang relevan. Referensi digunakan sebagai dasar praktik, bukan pernyataan bahwa USahapintar telah diaudit atau memenuhi seluruh persyaratan suatu standar.
+Setiap kebijakan mencantumkan acuan yang relevan. Referensi digunakan sebagai dasar praktik, bukan pernyataan bahwa USahapintar telah diaudit atau memenuhi seluruh persyaratan suatu standar. Persyaratan hukum dan kontraktual harus ditinjau sesuai yurisdiksi serta layanan yang benar-benar digunakan.
