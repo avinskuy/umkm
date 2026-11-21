@@ -218,31 +218,43 @@ Do not implement all domains in one large initial migration. Introduce reviewed,
 
 Each migration must be immutable after application to a shared database. Include forward migration tests against a disposable PostgreSQL instance. Add rollback guidance where safe; do not promise down migrations for destructive or data-transforming changes without a recovery plan.
 
-## 8. Decisions required before the first schema migration
+## 8. Identity Core decisions and remaining schema decisions
 
-The following need explicit design/product review; do not infer them in SQL:
+### Approved Identity Core policy baseline
 
-- Whether email and phone are both mandatory at registration, and when each becomes unique/verified.
-- Resolved: Google-only accounts may exist without a local password; `password_hash` is nullable. Email/phone registrations still require a password. A future local-password setup flow for Google-only accounts is not yet specified.
-- Final account-status lifecycle and account-closure/identity-retention policy.
-- Owner and Investor profile fields and onboarding stage enumerations.
-- Business ownership cardinality and business verification lifecycle.
-- Exact consent scopes, expiry, revocation, and treatment of previously exported data.
-- Opportunity draft/edit/archive rules and final publication/moderation states.
-- Connection request expiry, cancellation, repeat-request cooldown, and block behavior.
-- Whether one accepted connection has exactly one conversation for its lifetime.
-- Message retention, attachment support, editing/deletion policy, and abuse-report evidence access.
-- Numeric Free/Premium quotas, quota period/reset, carry-over, and consumption/refund rules.
-- Subscription lifecycle, billing provider, price, refunds, tax, grace period, and cancellation behavior.
-- Admin permission granularity, MFA credential approach, and audit retention.
-- Data retention, deletion, backup, and privacy policy by data category.
+The first Identity Core migration must represent these approved policies:
+
+- Canonical immutable roles: `business_owner`, `investor`, and internally provisioned `admin`.
+- One selected initial registration contact (email or phone/WhatsApp); the other contact may be added and independently verified later.
+- Email/phone registration requires a local password; Google-only registration may have a nullable `password_hash` and still requires a separately selected and verified registration contact.
+- Pending registration expires after 30 minutes. Cleanup must be idempotent, concurrency-safe, release eligible pending reservations, and never delete an activated account.
+- OTP baseline: six-digit numeric code, 10-minute expiry, five failed attempts per verification session, one-hour lock after the fifth failure, 60-second resend cooldown, and at most five sends per destination per hour. A new code invalidates the prior code but does not clear failure lockout or rate limits. Additional adaptive IP/network/account/purpose limits are required.
+- Multiple sessions are allowed. Initial idle timeout is seven days and absolute timeout is 30 days. Remember-device persistence cannot bypass either limit or server-side revocation. Active-session listing, individual revocation, and logout-all are required.
+- Temporary deactivation and permanent deletion are separate. Permanent deletion has a 30-day cancellation/waiting period before deletion processing; retention and backup handling must be documented.
+- Recovery supports forgot-password and forgot-email through verified recovery contacts. Full primary email may be revealed only after successful verification of a linked recovery contact. If both primary and recovery contacts are lost, use risk-based alternative recovery with trusted-device/session evidence and escalation to specially authorized manual review. High-risk recovery may be delayed or rejected; all actions are audited and role never changes.
+- Recovery contacts are optional at registration, added after activation, and independently verified.
+
+### Remaining Identity Core schema decisions
+
+Resolve these in migration review rather than inventing them in SQL:
+
+- Exact table and state design for temporary deactivation, deletion request/cancellation, deletion processing, and retention/legal holds.
+- Contact reuse policy and uniqueness reservation behavior during pending registration, deactivation, deletion waiting period, and post-deletion retention.
+- Exact schema for recovery evidence, manual review assignments, reviewer scopes, audit events, and dual-control where required.
+- Provider configuration and delivery-attempt/outbox model for email and WhatsApp, including idempotency and failure handling.
+- Distributed rate-limit storage and how counters survive application restarts and multiple instances.
+- Exact password hashing parameters, retention schedules, Admin MFA/recovery, and Google-only local-password setup if later offered.
+
+### Deferred decisions outside the Identity Core slice
+
+Owner/Investor profile fields and onboarding stages; business ownership and verification lifecycle; consent scopes and exported-data treatment; opportunity draft/edit/archive rules; connection expiry/cancellation/repeat cooldown/block behavior; conversation cardinality and message retention/attachments/editing/deletion; numeric Free/Premium quotas and billing lifecycle; and broader moderation/Admin permission design. These do not block the Identity Core migration unless a concrete dependency is discovered.
 
 ## 9. Review and implementation gate
 
 Before creating `0001_*.sql`:
 
 1. Review this model against the product sitemap, authentication security design, membership policy, and engineering standards.
-2. Resolve the blocking decisions in Section 8 for the Identity Core slice only; later domains can remain deferred.
+2. Resolve the remaining Identity Core schema decisions in Section 8 for this slice only; deferred product domains can remain open.
 3. Confirm canonical role/status names and all ownership/consent invariants.
 4. Review exact PostgreSQL types, constraints, partial indexes, and SQLx migration naming.
 5. Add integration tests for uniqueness, immutable role, foreign keys, expiry/one-time use, and safe transaction behavior.
