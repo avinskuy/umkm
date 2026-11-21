@@ -67,14 +67,14 @@ pub trait KeyProvider: Send + Sync {
     ) -> Result<SecretKey, CryptoError>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EncryptedPayload {
     pub key_version: KeyVersion,
     pub nonce: [u8; NONCE_LEN],
     pub ciphertext: Vec<u8>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct KeyedDigest {
     pub key_version: KeyVersion,
     pub digest: [u8; DIGEST_LEN],
@@ -126,19 +126,19 @@ pub fn encrypt(
         .map_err(|_| CryptoError::InvalidKey)?;
     let key = aead::LessSafeKey::new(unbound_key);
     let nonce = random_bytes::<NONCE_LEN>()?;
-    let mut ciphertext = plaintext.to_vec();
+    let mut ciphertext = Zeroizing::new(plaintext.to_vec());
 
     key.seal_in_place_append_tag(
         aead::Nonce::assume_unique_for_key(nonce),
         aead::Aad::from(associated_data),
-        &mut ciphertext,
+        &mut ciphertext[..],
     )
     .map_err(|_| CryptoError::EncryptionFailed)?;
 
     Ok(EncryptedPayload {
         key_version: versioned_key.version,
         nonce,
-        ciphertext,
+        ciphertext: ciphertext.to_vec(),
     })
 }
 
@@ -177,7 +177,7 @@ pub fn contact_fingerprint(
         return Err(CryptoError::InvalidInput);
     }
 
-    let mut input = CONTACT_DOMAIN.to_vec();
+    let mut input = Zeroizing::new(CONTACT_DOMAIN.to_vec());
     append_field(&mut input, channel.as_bytes())?;
     append_field(&mut input, canonical_contact.as_bytes())?;
 
@@ -220,7 +220,7 @@ pub fn otp_digest(
         None => provider.active_key(KeyPurpose::OtpVerification)?,
     };
 
-    let mut input = OTP_DOMAIN.to_vec();
+    let mut input = Zeroizing::new(OTP_DOMAIN.to_vec());
     append_field(&mut input, challenge_id)?;
     append_field(&mut input, session_id)?;
     append_field(&mut input, purpose.as_bytes())?;
@@ -259,7 +259,7 @@ pub fn verify_otp_digest(
     }
 
     let key_material = provider.key(KeyPurpose::OtpVerification, version)?;
-    let mut input = OTP_DOMAIN.to_vec();
+    let mut input = Zeroizing::new(OTP_DOMAIN.to_vec());
     append_field(&mut input, challenge_id)?;
     append_field(&mut input, session_id)?;
     append_field(&mut input, purpose.as_bytes())?;
