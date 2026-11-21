@@ -1,6 +1,8 @@
 -- Jalankan hanya pada database khusus aplikasi menggunakan principal DBA.
 -- Skrip ini tidak mengatur password, membuat superuser, atau mengubah data aplikasi.
 
+BEGIN;
+
 DO $bootstrap$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'usahapintar_app') THEN
@@ -44,6 +46,14 @@ GRANT usahapintar_app TO usahapintar_app_login;
 GRANT usahapintar_backup TO usahapintar_backup_login;
 GRANT usahapintar_monitor TO usahapintar_monitor_login;
 
+-- Pastikan principal aplikasi tidak mewarisi role bawaan yang lebih luas.
+REVOKE pg_read_all_data, pg_write_all_data, pg_monitor,
+    pg_signal_backend, pg_read_server_files, pg_write_server_files,
+    pg_execute_server_program
+FROM usahapintar_app, usahapintar_app_login;
+REVOKE usahapintar_backup, usahapintar_monitor, usahapintar_migrator
+FROM usahapintar_app_login;
+
 -- Role bawaan PostgreSQL dibatasi pada tugas backup dan monitoring.
 -- pg_read_all_data tidak memiliki BYPASSRLS dan tidak memberi hak tulis.
 GRANT pg_read_all_data TO usahapintar_backup;
@@ -81,3 +91,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE usahapintar_migrator IN SCHEMA public
     REVOKE ALL ON SEQUENCES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE usahapintar_migrator IN SCHEMA public
     REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+COMMIT;
