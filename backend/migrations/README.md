@@ -3,7 +3,6 @@
 Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia:
 
 - `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
-
 Migration 0001 tidak membuat sesi login, OTP, recovery, audit Identity Core, profil, atau domain produk lain. Migration 0002 menambahkan sesi verifikasi kontak, challenge OTP, event percobaan verifikasi, dan event pengiriman. Migration 0002 hanya menyediakan skema; belum ada runtime OTP, provider, atau enforcement rate limit di backend. Tidak ada grant runtime atau provisioning Admin yang dibuka secara otomatis oleh migration ini; hak akses tiap principal harus disiapkan terpisah sesuai kebijakan least privilege.
 
 Migrasi dijalankan secara eksplisit melalui `database::migrations::run(&pool)`. HTTP server belum menjalankan migrasi atau menginisialisasi database pada startup. Migration ini belum dijalankan terhadap database produksi dan tidak boleh dianggap sebagai aktivasi fitur registrasi/login.
