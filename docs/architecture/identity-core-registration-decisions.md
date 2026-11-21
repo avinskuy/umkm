@@ -9,7 +9,7 @@
    - Email: a one-time code is delivered to the supplied email address.
    - Phone: a one-time code is delivered through WhatsApp.
 3. Email and phone are alternatives. Both are not required during initial registration.
-4. A password is mandatory for every account, including accounts whose registration begins with Google OAuth. Google OAuth does not replace the account password requirement.
+4. Email- or phone-based registration requires a password. Registration through Google OAuth does not require the user to create or enter a separate local password.
 5. The account remains pending verification until the selected channel's code is successfully verified. Verification is an account-activation and anti-bot control, not a passwordless login method.
 6. The selected contact is normalized and uniquely reserved. A contact already associated with another account cannot be reused to create or merge an account.
 7. The non-selected contact may be added later, but must be verified independently before being treated as verified or used for security-sensitive recovery.
@@ -47,7 +47,7 @@ Do not infer that the user supplied both contact methods. Do not create a migrat
 
 ### Google OAuth — retained
 
-Google OAuth remains part of the product for sign-in and registration. It is an identity-provider authentication option, not a replacement for mandatory registration contact verification.
+Google OAuth remains part of the product for sign-in and registration. A new user must explicitly choose Owner or Investor before starting Google registration; that choice is bound to server-side OAuth state. Google registration does not require a separate local password, but it does not replace mandatory email/WhatsApp contact verification.
 
 - The user must choose Owner or Investor before starting a Google-based registration flow.
 - Role context is bound to server-side OAuth state and cannot be changed by callback parameters or client input.
@@ -59,7 +59,7 @@ Google OAuth remains part of the product for sign-in and registration. It is an 
 - Validate OAuth state, nonce, issuer, audience, signature, expiry, and exact redirect URI. Reject duplicate provider subjects and replayed callbacks.
 
 ### Password and login model — decided
-A password is mandatory for every account, including accounts registered through Google OAuth. Email/WhatsApp codes are only for initial account activation/contact verification and are not login credentials or passwordless login. Normal credential login requires the account's password. Google OAuth remains an alternative identity-provider sign-in for an already linked identity, but does not waive the password requirement at account creation. Password recovery must use a separately verified contact and its own single-use recovery challenge; registration OTPs cannot be reused for recovery.
+Email- or phone-based registration requires a local password; normal password login uses the registered email or phone plus that password. Google OAuth registration does not require a separate local password and Google sign-in is used to authenticate that linked identity. A new Google registrant must choose Owner or Investor before OAuth begins; the selected role is bound to server-side state and cannot be supplied or changed by the callback. Email/WhatsApp codes are only for initial account activation/contact verification and anti-bot protection; they are not login credentials and remain required for new Google registrations. Registration OTPs cannot be reused for password recovery. A later local-password setup for a Google-only account is not yet specified.
 
 ### Account lifecycle
 Before migration, define pending-registration expiry and cleanup; suspension, closure, and deletion states; retention of identity/contact records and audit history after closure; whether and under what verified process a closed account's email/phone can ever be reused; and recovery when a user loses access to the selected contact channel.
@@ -72,4 +72,4 @@ Approve OTP lifetime, attempt cap, resend cooldown, rate-limit windows, pending-
 
 ## Implementation gate
 
-Identity Core migrations and runtime endpoints may begin only after pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Password is mandatory; phone/WhatsApp OTP is not a login method. Google OAuth is retained under the constraints in this document.
+Identity Core migrations and runtime endpoints may begin only after pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. Google OAuth is retained under the constraints in this document.
