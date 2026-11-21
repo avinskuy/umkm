@@ -118,7 +118,7 @@ Tabel append-only ini mencatat percobaan verifikasi kode yang benar-benar dipros
 - Event `succeeded` dicatat untuk jejak hasil, tetapi tidak mengonsumsi anggaran kegagalan.
 - Nilai tujuan disimpan hanya sebagai HMAC dan versi key; tidak ada OTP, plaintext tujuan, atau token yang disimpan.
 - Event bersifat append-only pada batas aplikasi. Penghapusan hanya melalui cleanup terkontrol setelah keluar dari jendela rate limit dan retensi operasional yang ditetapkan.
-- Ambang numerik dan jendela limit percobaan lintas sesi belum ditetapkan oleh kebijakan produk. Nilainya wajib ditetapkan pada konfigurasi backend sebelum verifikasi OTP diaktifkan; jangan mengarang angka pada migration.
+- Batas percobaan gagal lintas sesi ditetapkan maksimal **5 kegagalan per kontak dalam jendela bergulir 60 menit**, dihitung lintas seluruh sesi dan purpose. Hanya event `failed` yang mengonsumsi anggaran; event `succeeded` dicatat untuk jejak hasil. Runtime wajib menghitung dan mencatat event dalam transaksi PostgreSQL yang diserialisasi berdasarkan fingerprint kontak/kanal. Migration menyediakan penyimpanan dan indeks, tetapi belum menegakkan angka limit tanpa runtime verifikasi.
 - Selama rotasi HMAC, hitung dan kunci fingerprint dari semua versi aktif secara deterministik, konsisten dengan tabel delivery events.
 
 ## 5. Tabel `otp_delivery_events`
