@@ -1,4 +1,4 @@
-# Dependency & Third-Party Component Security Policy
+# Kebijakan Keamanan Dependency & Komponen Pihak Ketiga
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026

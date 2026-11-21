@@ -1,4 +1,4 @@
-# Infrastructure & Deployment Security Policy
+# Kebijakan Keamanan Infrastruktur & Deployment
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
@@ -32,7 +32,7 @@ Catat aset infrastruktur, server, layanan, domain, database, penyimpanan, integr
 
 Development, test, staging, dan production harus dipisahkan secara logis dan menggunakan kredensial/secret masing-masing. Data production tidak boleh disalin ke pengujian biasa tanpa dasar, minimisasi, dan perlindungan yang sesuai.
 
-## 5. Access dan secrets
+## 5. Akses dan secret
 
 - Terapkan least privilege pada akun server, repository, cloud/platform, dan pipeline.
 - Gunakan identitas terpisah untuk tugas berbeda bila memungkinkan.
