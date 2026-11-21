@@ -117,3 +117,28 @@ Setelah lima percobaan verifikasi gagal, sesi dikunci selama satu jam. Aturan pe
 - Pemeriksaan waktu dan reset penghitung dilakukan di server secara atomik. Request bersamaan pada batas akhir penguncian tidak boleh menghasilkan lebih dari satu reset yang tidak konsisten.
 
 Reset penghitung sesi setelah masa penguncian adalah keputusan kebijakan yang disetujui. Strategi penyimpanan counter dan rate limit terdistribusi tetap menjadi keputusan implementasi yang memerlukan review.
+
+## 9. Status siklus hidup dan kondisi penguncian sesi
+
+Status siklus hidup sesi verifikasi harus dipisahkan dari kondisi penguncian sementara. Jangan menambahkan `locked` sebagai status siklus hidup sesi.
+
+| Dimensi | Nilai baseline | Makna |
+| --- | --- | --- |
+| Status siklus hidup | `pending` | Sesi masih menunggu verifikasi yang sah. |
+| Status siklus hidup | `verified` | Tujuan verifikasi berhasil dipenuhi; terminal. |
+| Status siklus hidup | `expired` | Masa berlaku sesi berakhir; terminal. |
+| Status siklus hidup | `cancelled` | Sesi dibatalkan; terminal. |
+| Kondisi penguncian | `failed_attempt_count` dan `locked_until` | Menentukan apakah percobaan pada sesi pending untuk sementara harus ditolak. |
+
+Aturan perilaku:
+
+- Sesi `pending` yang tidak sedang terkunci dapat menerima percobaan verifikasi sesuai kebijakan OTP.
+- Sesi `pending` yang waktu `locked_until`-nya masih di masa depan tetap berstatus `pending`, tetapi semua percobaan verifikasi ditolak, termasuk menggunakan OTP baru.
+- Setelah waktu penguncian berakhir, server mereset penghitung kegagalan sesi secara atomik. Sesi `pending` yang sama dapat digunakan kembali.
+- Reset tersebut tidak menghapus batas pengiriman per kontak atau rate limit lintas sesi/instance.
+- Sesi `verified`, `expired`, dan `cancelled` bersifat terminal dan tidak dapat dibuka kembali hanya karena waktu penguncian telah berakhir.
+- Status challenge OTP individual tetap terpisah. Challenge yang kedaluwarsa, dibatalkan/digantikan, atau sudah digunakan tidak pernah diaktifkan kembali.
+- Pemeriksaan status, waktu penguncian, dan reset penghitung harus dilakukan di server dalam operasi yang aman terhadap request bersamaan.
+
+Status di atas merupakan baseline konseptual untuk desain. Nama kolom final, constraint, seluruh transisi, serta pemetaan status challenge perlu ditinjau bersama rancangan state machine sebelum migrasi SQL dibuat.
+
