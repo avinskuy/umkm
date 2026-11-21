@@ -226,8 +226,23 @@ CREATE FUNCTION public.guard_verification_challenge()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = pg_catalog
-AS $$
+AS $
+DECLARE
+    v_session_status TEXT;
+    v_session_expires_at TIMESTAMPTZ;
 BEGIN
+    IF TG_OP = 'INSERT' THEN
+        SELECT status, expires_at
+        INTO v_session_status, v_session_expires_at
+        FROM public.verification_sessions
+        WHERE id = NEW.verification_session_id;
+
+        IF NOT FOUND OR v_session_status <> 'pending' OR NEW.expires_at > v_session_expires_at THEN
+            RAISE EXCEPTION 'challenge requires a pending session and cannot outlive it'
+                USING ERRCODE = '23514';
+        END IF;
+    END IF;
+
     IF TG_OP = 'UPDATE' THEN
         IF NEW.id IS DISTINCT FROM OLD.id
            OR NEW.verification_session_id IS DISTINCT FROM OLD.verification_session_id
@@ -334,7 +349,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER otp_verification_attempt_events_10_guard
     BEFORE INSERT OR UPDATE ON public.otp_verification_attempt_events
