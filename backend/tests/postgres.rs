@@ -216,14 +216,52 @@ async fn assert_user_constraints(pool: &PgPool) {
         "deletion-pending accounts must continue reserving their primary contact"
     );
 
-    let expired_id = insert_pending_email(
+    assert!(
+        sqlx::query(
+            "UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid"
+        )
+        .bind(&deletion_pending_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "permanent deletion cannot begin before the 30-day waiting period"
+    );
+
+    sqlx::query("UPDATE public.users SET account_status = 'active' WHERE id = $1::uuid")
+        .bind(&deletion_pending_id)
+        .execute(pool)
+        .await
+        .expect("a deletion request may be cancelled before processing");
+
+    let early_expiry_id = insert_pending_email(
         pool,
         "business_owner",
-        "released-contact@example.test",
+        "not-yet-expired@example.test",
         Some("temporary-hash"),
     )
     .await
     .expect("pending account should be created before expiry");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.users \
+             SET account_status = 'pending_expired', \
+                 email_normalized = NULL, \
+                 email_verified_at = NULL, \
+                 password_hash = NULL, \
+                 pending_expires_at = NULL \
+             WHERE id = $1::uuid"
+        )
+        .bind(&early_expiry_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "pending registration cannot release its contact before the 30-minute deadline"
+    );
+
+    let expired_id = insert_expired_pending_email(pool, "released-contact@example.test")
+        .await
+        .expect("expired pending account should be created for cleanup test");
 
     sqlx::query(
         "UPDATE public.users \
@@ -250,6 +288,22 @@ async fn assert_user_constraints(pool: &PgPool) {
     )
     .await
     .expect("released contact may be reserved by a new registration");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.users \
+             SET account_status = 'pending_verification', \
+                 email_normalized = 'resurrected-contact@example.test', \
+                 password_hash = 'new-hash', \
+                 pending_expires_at = now() + INTERVAL '30 minutes' \
+             WHERE id = $1::uuid"
+        )
+        .bind(&expired_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "pending_expired accounts cannot be reopened"
+    );
 
     let _ = pending_email;
     let _ = pending_phone;
@@ -455,10 +509,59 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
         "a Google-only client cannot unlink its last authentication method"
     );
 
+    let mut setup_tx = pool
+        .begin()
+        .await
+        .expect("transaction should start for deletion lifecycle fixture");
+
+    let terminal_user_id: String = sqlx::query_scalar(
+        "INSERT INTO public.users ( \
+             primary_role, account_status, email_normalized, initial_contact_channel, \
+             email_verified_at, initial_contact_verified_at, status_changed_at \
+         ) \
+         VALUES ( \
+             'business_owner', 'deletion_pending', 'terminal-google@example.test', 'email', \
+             now(), now(), now() - INTERVAL '31 days' \
+         ) \
+         RETURNING id::text",
+    )
+    .fetch_one(&mut *setup_tx)
+    .await
+    .expect("a deletion-pending account with a past waiting period should be created");
+
+    sqlx::query(
+        "INSERT INTO public.user_identities (user_id, provider, provider_subject) \
+         VALUES ($1::uuid, 'google', 'google-subject-terminal')"
+    )
+    .bind(&terminal_user_id)
+    .execute(&mut *setup_tx)
+    .await
+    .expect("terminal fixture should retain its Google identity before deletion completes");
+
+    setup_tx
+        .commit()
+        .await
+        .expect("deletion-pending Google-only account should satisfy auth method invariant");
+
+    assert!(
+        sqlx::query("UPDATE public.users SET account_status = 'active' WHERE id = $1::uuid")
+            .bind(&terminal_user_id)
+            .execute(pool)
+            .await
+            .is_err(),
+        "deletion processing cannot be cancelled after it starts"
+    );
+
     let mut tx = pool
         .begin()
         .await
         .expect("transaction should start for terminal account cleanup");
+
+    sqlx::query("UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid")
+        .bind(&terminal_user_id)
+        .execute(&mut *tx)
+        .await
+        .expect("deletion may enter processing after the waiting period");
 
     sqlx::query(
         "UPDATE public.users \
@@ -472,13 +575,13 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
              pending_expires_at = NULL \
          WHERE id = $1::uuid",
     )
-    .bind(&google_user_id)
+    .bind(&terminal_user_id)
     .execute(&mut *tx)
     .await
     .expect("completed deletion may clear personal account fields");
 
     sqlx::query("DELETE FROM public.user_identities WHERE user_id = $1::uuid")
-        .bind(&google_user_id)
+        .bind(&terminal_user_id)
         .execute(&mut *tx)
         .await
         .expect("completed deletion may release provider identity");
@@ -486,6 +589,22 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
     tx.commit()
         .await
         .expect("terminal account must not retain an external identity");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.users \
+             SET account_status = 'pending_verification', \
+                 email_normalized = 'reopened-terminal@example.test', \
+                 password_hash = 'new-hash', \
+                 pending_expires_at = now() + INTERVAL '30 minutes' \
+             WHERE id = $1::uuid"
+        )
+        .bind(&terminal_user_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "closed accounts cannot be reopened"
+    );
 }
 
 async fn assert_client_creation_function(pool: &PgPool) {
@@ -555,6 +674,22 @@ async fn insert_pending_email(
     .bind(role)
     .bind(email)
     .bind(password_hash)
+    .fetch_one(pool)
+    .await
+}
+
+async fn insert_expired_pending_email(pool: &PgPool, email: &str) -> Result<String, sqlx::Error> {
+    sqlx::query_scalar(
+        "INSERT INTO public.users ( \
+             primary_role, account_status, email_normalized, phone_e164, \
+             initial_contact_channel, password_hash, pending_expires_at \
+         ) \
+         VALUES ($1, 'pending_verification', $2, NULL, 'email', $3, now() - INTERVAL '1 second') \
+         RETURNING id::text",
+    )
+    .bind("business_owner")
+    .bind(email)
+    .bind(Some("expired-password-hash"))
     .fetch_one(pool)
     .await
 }
