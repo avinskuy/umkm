@@ -1,10 +1,10 @@
 # Tinjauan Teknis Skema Identity Core
 
 > Status: migration akun 0001 dan verifikasi 0002 telah di-merge; migration sesi 0003 sedang ditinjau pada branch implementasi
-> Tanggal: 21 November 2026
+> Tanggal: 22 November 2026
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
-Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun 0001 dan migration verifikasi 0002 tersedia pada repository dan diuji melalui CI PostgreSQL. Keduanya belum dijalankan pada database produksi; dokumen ini tidak mengaktifkan database pada HTTP startup.
+Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun 0001 dan verifikasi 0002 telah di-merge; migration sesi 0003 sedang ditinjau pada branch PR. Seluruh migration belum dijalankan pada database produksi; HTTP startup tetap tidak menginisialisasi database.
 
 ## 1. Hasil pemeriksaan repository
 
@@ -225,7 +225,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Migration 0002 tersedia pada branch implementasi dan telah lulus quality checks serta tes integrasi PostgreSQL CI pada head yang diperiksa. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
+Migration 0002 telah di-merge ke main dan lulus quality checks serta tes integrasi PostgreSQL CI. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
 Migration 0001–0003 belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
