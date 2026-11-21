@@ -49,8 +49,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 | --- | --- | --- |
 | `users` | Account identity, immutable primary role, account status, normalized contact values, optional password hash | Unique non-null normalized email and phone; role check; status check; role immutable after insert |
 | `user_identities` | External provider identities such as Google | Unique (`provider`, `provider_subject`); FK to user; never auto-link by matching email |
-| `sessions` | Opaque revocable server sessions | Unique token hash; expiry after creation; revocation timestamp; FK to user |
-| `verification_challenges` | Email/phone verification and approved OTP flows | Store keyed hash, purpose, expiry, attempt count and consumed timestamp; one-time use |
+| `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
+| `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; status jeda pengiriman tersimpan secara persisten |
+| `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
+| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi |
+| `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | Tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
 
@@ -62,6 +65,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 - Provider identity is keyed by the provider's stable subject, not email text.
 - Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
 - Verification challenges must support rate limiting, attempt caps, short expiry, resend cooldown, and invalidation of superseded challenges. OTP hashing must use a keyed construction suitable for short numeric codes.
+- Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
+- Pendaftaran tertunda kedaluwarsa setelah 30 menit. Proses pembersihan harus idempotent, aman terhadap proses bersamaan, dan tidak boleh menghapus akun yang sudah aktif.
+- Data sesi harus mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut, fitur “Ingat perangkat ini” tanpa melewati kedua batas, pencabutan sesi individual, dan logout dari semua perangkat.
+- Kontak pemulihan bersifat opsional setelah aktivasi dan diverifikasi secara terpisah. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Kasus pemulihan alternatif harus mempertimbangkan sinyal perangkat/sesi tepercaya dan pemeriksaan manual oleh petugas berwenang khusus jika bukti otomatis belum cukup.
+- Rancangan status akun harus membedakan penonaktifan sementara dan penghapusan permanen. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus ditetapkan berdasarkan kategori data.
 
 ### B. Profiles and business information
 
@@ -140,7 +148,10 @@ Moderation status is not publication status. An opportunity can be published and
 erDiagram
     USERS ||--o{ USER_IDENTITIES : links
     USERS ||--o{ SESSIONS : owns
-    USERS ||--o{ VERIFICATION_CHALLENGES : verifies
+    USERS ||--o{ VERIFICATION_SESSIONS : starts
+    VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
+    USERS ||--o{ RECOVERY_CONTACTS : owns
+    USERS ||--o{ ACCOUNT_RECOVERY_CASES : requests
     USERS ||--o{ PASSWORD_RESET_TOKENS : resets
     USERS ||--o| OWNER_PROFILES : has
     USERS ||--o| INVESTOR_PROFILES : has
@@ -176,7 +187,10 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `users(email_normalized)` and `users(phone_e164)`: unique partial indexes where values are not null.
 - `user_identities(provider, provider_subject)`: unique.
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
-- `verification_challenges(user_id, purpose, created_at)`; destination hash and active/expiry lookup as required by the chosen challenge lifecycle.
+- `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
+- `recovery_contacts(user_id, status, created_at)` dan indeks unik parsial pada nilai kontak yang sudah dinormalisasi sesuai kebijakan keunikan yang disetujui.
+- `account_recovery_cases(user_id, status, created_at)` serta indeks untuk antrean pemeriksaan petugas berdasarkan status dan waktu penugasan.
+- `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
 - `business_data_shares(business_id, investor_user_id, revoked_at)`.
 - `opportunities(publication_status, moderation_status, published_at)` for eligible discovery; validate with actual feed queries.
@@ -209,7 +223,7 @@ Do not add broad GIN/full-text indexes, geospatial extensions, or analytics-spec
 
 Do not implement all domains in one large initial migration. Introduce reviewed, incremental migrations aligned with working feature slices:
 
-1. **Identity core:** users, provider identities, sessions, verification challenges, password reset tokens. Add role and identity constraints first.
+1. **Identity Core:** users, identitas penyedia, sessions, verification sessions, verification challenges, recovery contacts, account recovery cases, password reset tokens, dan audit log yang diperlukan. Mulai dari batasan role dan identitas, lalu tambahkan alur verifikasi serta pemulihan akun secara bertahap.
 2. **Profiles and businesses:** role-specific profiles, businesses, explicit data-sharing grants, verification history.
 3. **Opportunities:** common parent, role-specific detail tables, media metadata, reports, publication/moderation state.
 4. **Connections and messaging:** request lifecycle, canonical accepted pair, conversation participants, messages.
@@ -218,31 +232,43 @@ Do not implement all domains in one large initial migration. Introduce reviewed,
 
 Each migration must be immutable after application to a shared database. Include forward migration tests against a disposable PostgreSQL instance. Add rollback guidance where safe; do not promise down migrations for destructive or data-transforming changes without a recovery plan.
 
-## 8. Decisions required before the first schema migration
+## 8. Keputusan Identity Core dan keputusan skema yang masih tersisa
 
-The following need explicit design/product review; do not infer them in SQL:
+### Batas awal kebijakan Identity Core yang telah disetujui
 
-- Whether email and phone are both mandatory at registration, and when each becomes unique/verified.
-- Resolved: Google-only accounts may exist without a local password; `password_hash` is nullable. Email/phone registrations still require a password. A future local-password setup flow for Google-only accounts is not yet specified.
-- Final account-status lifecycle and account-closure/identity-retention policy.
-- Owner and Investor profile fields and onboarding stage enumerations.
-- Business ownership cardinality and business verification lifecycle.
-- Exact consent scopes, expiry, revocation, and treatment of previously exported data.
-- Opportunity draft/edit/archive rules and final publication/moderation states.
-- Connection request expiry, cancellation, repeat-request cooldown, and block behavior.
-- Whether one accepted connection has exactly one conversation for its lifetime.
-- Message retention, attachment support, editing/deletion policy, and abuse-report evidence access.
-- Numeric Free/Premium quotas, quota period/reset, carry-over, and consumption/refund rules.
-- Subscription lifecycle, billing provider, price, refunds, tax, grace period, and cancellation behavior.
-- Admin permission granularity, MFA credential approach, and audit retention.
-- Data retention, deletion, backup, and privacy policy by data category.
+Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui berikut:
+
+- Role kanonis yang tidak dapat diubah: `business_owner`, `investor`, dan `admin` yang dibuat melalui proses internal.
+- Satu kontak dipilih saat pendaftaran awal (email atau nomor HP/WhatsApp); kontak lainnya dapat ditambahkan dan diverifikasi secara terpisah setelah akun aktif.
+- Pendaftaran menggunakan email/nomor HP wajib memiliki kata sandi lokal. Pendaftaran yang hanya menggunakan Google boleh memiliki `password_hash` bernilai null, tetapi tetap wajib memilih dan memverifikasi kontak pendaftaran secara terpisah.
+- Pendaftaran tertunda kedaluwarsa setelah 30 menit. Proses pembersihan harus idempotent, aman terhadap proses bersamaan, melepaskan reservasi tertunda yang memenuhi syarat, dan tidak pernah menghapus akun yang sudah aktif.
+- Baseline OTP: kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, maksimal lima percobaan gagal per sesi verifikasi, terkunci satu jam setelah kegagalan kelima, jeda kirim ulang 60 detik, dan maksimal lima pengiriman per alamat tujuan dalam satu jam. Kode baru membatalkan kode sebelumnya, tetapi tidak menghapus status penguncian atau batas pengiriman. Batas tambahan berdasarkan IP/jaringan/akun/tujuan tetap diperlukan.
+- Beberapa sesi aktif diperbolehkan. Batas awal tanpa aktivitas adalah tujuh hari dan batas absolut adalah 30 hari. Sesi persisten melalui fitur Ingat perangkat tidak boleh melewati kedua batas atau pencabutan dari server. Sistem wajib menyediakan daftar sesi aktif, pencabutan individual, dan logout dari semua perangkat.
+- Penonaktifan sementara dan penghapusan permanen merupakan proses terpisah. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus didokumentasikan.
+- Pemulihan mendukung alur lupa kata sandi dan lupa email melalui kontak pemulihan yang sudah diverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Jika kontak utama dan pemulihan sama-sama tidak dapat diakses, gunakan pemulihan alternatif berbasis risiko dengan bukti perangkat/sesi tepercaya dan eskalasi ke pemeriksaan manual oleh petugas berwenang khusus. Pemulihan berisiko tinggi dapat ditunda atau ditolak; seluruh tindakan diaudit dan role tidak pernah berubah.
+- Kontak pemulihan bersifat opsional saat pendaftaran, ditambahkan setelah aktivasi, dan diverifikasi secara terpisah.
+
+### Keputusan skema Identity Core yang masih perlu ditetapkan
+
+Tetapkan hal-hal berikut saat peninjauan migrasi; jangan mengarang keputusan langsung di SQL:
+
+- Rancangan tabel dan status yang tepat untuk penonaktifan sementara, permintaan/pembatalan penghapusan, proses penghapusan, serta penahanan data untuk kebutuhan retensi/hukum.
+- Kebijakan penggunaan kembali kontak dan perilaku reservasi keunikan selama pendaftaran tertunda, penonaktifan, masa tunggu penghapusan, serta retensi setelah penghapusan.
+- Skema untuk bukti pemulihan, penugasan pemeriksaan manual, cakupan kewenangan pemeriksa, peristiwa audit, dan persetujuan dua pihak jika diperlukan.
+- Konfigurasi penyedia layanan dan model antrean/outbox serta percobaan pengiriman email dan WhatsApp, termasuk idempotensi dan penanganan kegagalan.
+- Penyimpanan pembatasan permintaan terdistribusi serta cara mempertahankan penghitung setelah aplikasi dimulai ulang dan saat berjalan di beberapa instance.
+- Parameter hashing kata sandi, jadwal retensi, MFA/pemulihan Admin, dan pengaturan kata sandi lokal untuk akun yang hanya menggunakan Google jika kelak disediakan.
+
+### Keputusan di luar cakupan Identity Core yang ditunda
+
+Kolom profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; cakupan persetujuan serta penanganan ekspor data; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta rancangan izin moderasi/Admin yang lebih luas. Hal-hal ini tidak menghalangi migrasi Identity Core kecuali ditemukan ketergantungan yang nyata.
 
 ## 9. Review and implementation gate
 
 Before creating `0001_*.sql`:
 
 1. Review this model against the product sitemap, authentication security design, membership policy, and engineering standards.
-2. Resolve the blocking decisions in Section 8 for the Identity Core slice only; later domains can remain deferred.
+2. Tetapkan keputusan skema Identity Core yang masih tersisa pada Bagian 8 untuk cakupan ini saja; keputusan domain produk yang ditunda boleh tetap terbuka.
 3. Confirm canonical role/status names and all ownership/consent invariants.
 4. Review exact PostgreSQL types, constraints, partial indexes, and SQLx migration naming.
 5. Add integration tests for uniqueness, immutable role, foreign keys, expiry/one-time use, and safe transaction behavior.

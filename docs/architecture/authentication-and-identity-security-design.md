@@ -12,7 +12,7 @@ This document defines the first authentication architecture for USahapintar. It 
 ### In scope
 
 - Public registration for Business Owner and Investor only.
-- Exactly one immutable primary client role (`owner` or `investor`) per account.
+- Exactly one immutable primary client role (`business_owner` or `investor`) per account.
 - Separate Owner and Investor login entry points.
 - Email/phone registrations require password-based login. Google OAuth registrations do not require a separate local password and authenticate through the linked Google identity. Email/WhatsApp verification codes are only for account activation/contact verification and never replace a password or Google authentication at login.
 - Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
@@ -56,7 +56,7 @@ Membership is a separate entitlement dimension and never changes the immutable p
 
 Use a single primary role for the MVP:
 
-- `owner`
+- `business_owner`
 - `investor`
 - `admin`
 
@@ -90,12 +90,15 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
 | `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
-| `primary_role` | Owner, Investor, or Admin |
-| `account_status` | Pending verification, active, suspended, or closed |
+| `primary_role` | Role kanonis yang disimpan: `business_owner`, `investor`, atau `admin` |
+| `account_status` | Menunggu verifikasi, aktif, ditangguhkan, dinonaktifkan, menunggu penghapusan, proses penghapusan, atau ditutup; setiap perubahan status harus eksplisit dan diaudit |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
 | `email_verified_at` | Verification timestamp, independently nullable |
 | `phone_verified_at` | Verification timestamp, independently nullable |
 | `created_at`, `updated_at` | Audit timestamps |
+| `pending_expires_at` | Masa berlaku 30 menit untuk pendaftaran yang belum diaktifkan |
+| `deactivated_at` | Waktu penonaktifan sementara, jika berlaku |
+| `deletion_requested_at`, `deletion_due_at` | Waktu permintaan dan batas akhir masa tunggu penghapusan 30 hari |
 | `closed_at` | Account closure timestamp, if applicable |
 
 Constraints:
@@ -133,8 +136,10 @@ Opaque, server-managed sessions.
 | `id` | UUID primary key |
 | `user_id` | Session owner |
 | `token_hash` | Hash of a high-entropy opaque session token |
-| `created_at`, `last_seen_at` | Activity timestamps |
-| `expires_at` | Absolute expiry |
+| `created_at` | Waktu pembuatan sesi |
+| `last_seen_at` | Waktu aktivitas terakhir yang diperbarui server untuk menegakkan batas 7 hari tanpa aktivitas |
+| `expires_at` | Waktu kedaluwarsa absolut (30 hari sejak sesi dibuat pada batas awal) |
+| `remember_device` | Penanda apakah sesi browser menggunakan cookie persisten; tidak boleh melewati batas idle maupun absolut |
 | `revoked_at` | Revocation timestamp |
 | `user_agent_summary` | Optional minimized device hint |
 | `ip_prefix_hash` | Optional privacy-preserving abuse signal, subject to retention policy |
@@ -157,17 +162,29 @@ Supports email and WhatsApp-delivered phone verification for account activation/
 | `destination_hash` | Hash or protected reference to destination |
 | `code_hash` | Hash of a high-entropy one-time code |
 | `purpose` | Registration verification or contact change |
-| `attempt_count` | Failed attempts |
-| `expires_at` | Short expiry |
+| `verification_session_id` | Alur verifikasi induk; jumlah kegagalan dan penguncian tetap berlaku setelah OTP dikirim ulang |
+| `attempt_count` | Jumlah percobaan gagal untuk challenge ini |
+| `expires_at` | Masa berlaku 10 menit |
+| `superseded_at` | Diisi ketika OTP pengganti membatalkan kode ini |
 | `consumed_at` | One-time use marker |
 | `created_at` | Creation timestamp |
 
 Controls:
+- Catatan sesi verifikasi terpisah harus menyimpan akumulasi batas lima kegagalan dan penguncian satu jam. Pembuatan challenge baru tidak boleh mengatur ulang batas tersebut.
+- Simpan atau tegakkan secara persisten jeda pengiriman ulang 60 detik dan batas lima pengiriman per jam untuk setiap alamat tujuan di seluruh instance aplikasi.
 - Short expiry, one-time consumption, attempt caps, resend cooldown, and destination/account/IP rate limits.
 - Use a keyed hash/HMAC for short numeric OTPs so database disclosure alone does not make offline guessing trivial.
 - Never log code values or include them in analytics.
 - Invalidate older active challenges when a new challenge is issued for the same purpose/destination.
 - Provider delivery failures must not mark a destination as verified.
+
+### Kontak pemulihan dan kasus pemulihan akun
+
+Kontak pemulihan bersifat opsional dan ditambahkan setelah akun aktif. Simpan kontak ini terpisah dari kontak utama untuk login agar masing-masing dapat diverifikasi, diberi notifikasi, dan dicabut secara terpisah. Setiap kontak pemulihan perlu memiliki nilai yang sudah dinormalisasi, jenis kanal, waktu verifikasi, status, dan relasi ke pemilik akun. Terapkan aturan keunikan serta pencegahan penyalahgunaan tanpa membocorkan hubungan kontak dengan akun.
+
+Pemulihan akun memerlukan alur kasus dan verifikasi yang tercatat, bukan sekadar penanda benar/salah. Catat tujuan (lupa kata sandi, lupa email, atau pemulihan alternatif), status, waktu pembuatan/kedaluwarsa/peninjauan, hasil penilaian risiko, dan referensi audit secukupnya. Jangan simpan rahasia yang dikirim pengguna atau bukti identitas berlebihan di log umum. Penugasan pemeriksaan manual harus mengacu pada petugas support dengan kewenangan khusus, dan setiap pemeriksaan dicatat dalam riwayat yang tidak dapat diubah sembarangan. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang sudah terhubung ke akun berhasil diverifikasi.
+
+Jika kontak utama dan seluruh kontak pemulihan tidak dapat diakses, alur pemulihan alternatif harus memeriksa perangkat tepercaya, riwayat sesi, dan bukti kepemilikan lainnya. Jika pemeriksaan otomatis belum cukup, kasus dapat diteruskan kepada petugas yang berwenang. Permintaan berisiko tinggi dapat ditunda atau ditolak. Proses pemulihan tidak boleh mengubah role utama akun.
 
 ### `password_reset_tokens`
 
@@ -191,6 +208,35 @@ Controls:
 - `user_consents` for versioned Terms/Privacy consent records.
 
 Avoid creating unused tables before a concrete feature requires them.
+
+## Kebijakan awal Identity Core yang telah disetujui
+
+Nilai kebijakan produk berikut merupakan batas awal yang telah disepakati dan harus ditegakkan oleh backend. Nilai ini dapat ditinjau ulang melalui evaluasi keamanan dan bukan jaminan dari penyedia layanan.
+
+### OTP dan pendaftaran tertunda
+
+- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode berlaku selama 10 menit, disimpan sebagai keyed hash, terikat pada tujuan dan alamat penerima, hanya dapat digunakan satu kali secara atomik, serta tidak boleh dicatat dalam log sebagai teks asli.
+- Maksimal lima percobaan gagal untuk setiap sesi verifikasi. Kegagalan kelima mengunci sesi tersebut selama satu jam. Pengiriman kode pengganti tidak boleh menghapus atau melewati penguncian.
+- Jeda sebelum pengiriman ulang adalah 60 detik. Maksimal lima pengiriman per jam untuk setiap alamat kontak. Terapkan pembatasan tambahan yang menyesuaikan IP/jaringan, akun, tujuan, dan pola aktivitas mencurigakan.
+- Kode baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama. Kegagalan pengiriman tidak boleh dianggap sebagai keberhasilan verifikasi.
+- Pendaftaran yang belum selesai kedaluwarsa setelah 30 menit, terpisah dari masa berlaku OTP. Pembersihan harus aman dijalankan berulang kali dan saat terjadi proses bersamaan, serta tidak boleh menghapus akun yang sudah aktif.
+
+### Sesi
+
+- Pengguna boleh memiliki beberapa sesi aktif sekaligus. Pengguna dapat melihat daftar sesi, mencabut satu sesi, atau mengakhiri semua sesi.
+- Batas awal sesi adalah 7 hari tanpa aktivitas dan maksimal 30 hari sejak sesi dibuat.
+- Fitur “Ingat perangkat ini” hanya membuat sesi browser bertahan. Fitur ini tidak boleh melewati kedua batas waktu atau pencabutan sesi dari server. Menutup browser tidak otomatis mengakhiri sesi yang memang dibuat persisten.
+- Pencabutan sesi dari server berlaku segera. Gunakan cookie `Secure` dan `HttpOnly`, pengaturan `SameSite`, serta perlindungan CSRF dan pemeriksaan origin. Tindakan sensitif dapat meminta verifikasi ulang.
+
+### Siklus hidup akun
+
+Penonaktifan sementara berbeda dari penghapusan permanen. Saat dinonaktifkan, profil publik disembunyikan dan akses normal dibatasi, tetapi data serta role tetap disimpan. Untuk mengaktifkan kembali akun, pengguna harus login dan melewati pemeriksaan keamanan. Penghapusan permanen memerlukan konfirmasi dan autentikasi ulang, lalu masa tunggu 30 hari. Selama masa tunggu, akun disembunyikan atau dibatasi dan permintaan penghapusan dapat dibatalkan melalui pemeriksaan keamanan. Setelah itu, proses penghapusan mengikuti aturan retensi data dan penanganan cadangan yang telah didokumentasikan. Kontak tidak boleh otomatis digunakan kembali.
+
+### Pemulihan akun
+
+Kontak pemulihan tidak wajib saat pendaftaran. Kontak ini dapat ditambahkan setelah akun aktif dan harus diverifikasi secara terpisah. Alur lupa kata sandi dan lupa email menggunakan email atau nomor HP pemulihan yang sudah terverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan berhasil diverifikasi dan terbukti terhubung ke akun.
+
+Jika kontak utama dan seluruh kontak pemulihan sama-sama tidak dapat diakses, gunakan proses pemulihan alternatif berlapis. Periksa perangkat tepercaya, sesi sebelumnya, dan sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, teruskan kasus kepada petugas support dengan kewenangan khusus. Permintaan berisiko tinggi dapat ditunda atau ditolak. Terapkan hak akses minimum, kriteria pemeriksaan yang terdokumentasi, audit log, dan notifikasi yang sesuai. Pemulihan tidak boleh mengubah role utama. Pencabutan sesi dan perlindungan tambahan setelah pemulihan ditentukan berdasarkan tingkat risiko.
 
 ## 4. API contract (proposed)
 
@@ -471,17 +517,16 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 
 Implement each step as a small pull request. Do not merge until CI, focused integration tests, and the relevant security checks pass.
 
-## 14. Open decisions before implementation
+## 14. Keputusan tersisa sebelum implementasi
 
-- PostgreSQL hosting and backup/restore approach.
-- Email delivery provider and sender/domain verification.
-- WhatsApp Business/API provider for phone verification, cost limits, and Indonesia delivery reliability.
-- Google OAuth client setup and production callback origins.
-- Exact password and session timeout policy.
-- Password recovery contact and verification workflow details.
-- Admin MFA method and recovery procedure.
-- Consent versioning and retention periods.
-- Account closure, data export, and deletion workflow.
-- Phone/WhatsApp OTP is only a registration/contact-verification channel, not a login method.
+Hal-hal berikut harus ditetapkan sebelum sistem siap digunakan di lingkungan produksi:
 
-Do not invent provider credentials or put secrets in chat, repository files, screenshots, or frontend environment variables. Use server-side environment/secret management and test with non-production credentials.
+- Pemilihan penyedia email dan WhatsApp Business/API, persyaratan pengirim/template, keandalan pengiriman di Indonesia, percobaan ulang, pemantauan, batas biaya, dan penanggung jawab operasional.
+- Konfigurasi klien Google OAuth, alamat callback produksi, dan pengelolaan rahasia.
+- Parameter hashing kata sandi yang tepat dan perilaku pemulihan kredensial untuk akun yang hanya menggunakan Google jika pengaturan kata sandi lokal kelak disediakan.
+- Masa retensi berdasarkan kategori data, penanganan penghapusan/cadangan, dan penggunaan kembali kontak setelah akun ditutup.
+- Metode MFA Admin, proses pemulihan, dan kewenangan petugas yang meninjau pemulihan akun secara manual.
+- Penyimpanan pembatasan permintaan terdistribusi dan ambang operasional; penegakannya harus berlaku di seluruh instance aplikasi.
+- Kriteria bukti pemulihan yang terperinci, kendali eskalasi, dan persyaratan persetujuan dua pihak untuk kasus berisiko tinggi.
+
+Batas awal produk yang telah disetujui (OTP, masa berlaku pendaftaran tertunda, durasi sesi, masa tunggu penonaktifan/penghapusan, dan perilaku pemulihan) sudah didokumentasikan di atas dan bukan lagi keputusan yang belum ditetapkan.
