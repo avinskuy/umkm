@@ -14,13 +14,21 @@ CREATE TABLE public.sessions (
     revocation_reason TEXT,
     user_agent_summary TEXT,
     ip_prefix_hash BYTEA,
+    ip_prefix_hmac_key_version TEXT,
 
     CONSTRAINT sessions_user_fk
         FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE RESTRICT,
     CONSTRAINT sessions_token_hash_check
         CHECK (octet_length(token_hash) = 32),
     CONSTRAINT sessions_ip_prefix_hash_check
-        CHECK (ip_prefix_hash IS NULL OR octet_length(ip_prefix_hash) = 32),
+        CHECK (
+            (ip_prefix_hash IS NULL AND ip_prefix_hmac_key_version IS NULL)
+            OR (
+                octet_length(ip_prefix_hash) = 32
+                AND ip_prefix_hmac_key_version IS NOT NULL
+                AND length(btrim(ip_prefix_hmac_key_version)) > 0
+            )
+        ),
     CONSTRAINT sessions_user_agent_summary_check
         CHECK (
             user_agent_summary IS NULL
@@ -103,7 +111,8 @@ BEGIN
        OR NEW.expires_at IS DISTINCT FROM OLD.expires_at
        OR NEW.remember_device IS DISTINCT FROM OLD.remember_device
        OR NEW.user_agent_summary IS DISTINCT FROM OLD.user_agent_summary
-       OR NEW.ip_prefix_hash IS DISTINCT FROM OLD.ip_prefix_hash THEN
+       OR NEW.ip_prefix_hash IS DISTINCT FROM OLD.ip_prefix_hash
+       OR NEW.ip_prefix_hmac_key_version IS DISTINCT FROM OLD.ip_prefix_hmac_key_version THEN
         RAISE EXCEPTION 'session identity, lifetime and device metadata are immutable'
             USING ERRCODE = '23514';
     END IF;
