@@ -1105,7 +1105,6 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     );
 }
 
-
 async fn assert_authentication_session_invariants(pool: &PgPool) {
     let user_id = insert_active_email(pool, "session-schema-owner@example.test").await;
     let pending_user_id = insert_pending_email(
@@ -1141,38 +1140,32 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
     assert_eq!(session_timestamps.2.as_deref(), Some("Chrome on Android"));
 
     assert!(
-        sqlx::query(
-            "INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
-        )
-        .bind(&pending_user_id)
-        .bind(vec![2_u8; 32])
-        .execute(pool)
-        .await
-        .is_err(),
+        sqlx::query("INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",)
+            .bind(&pending_user_id)
+            .bind(vec![2_u8; 32])
+            .execute(pool)
+            .await
+            .is_err(),
         "pending accounts cannot create authentication sessions"
     );
 
     assert!(
-        sqlx::query(
-            "INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
-        )
-        .bind(&user_id)
-        .bind(vec![1_u8; 32])
-        .execute(pool)
-        .await
-        .is_err(),
+        sqlx::query("INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",)
+            .bind(&user_id)
+            .bind(vec![1_u8; 32])
+            .execute(pool)
+            .await
+            .is_err(),
         "session token hashes must be globally unique"
     );
 
     assert!(
-        sqlx::query(
-            "INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
-        )
-        .bind(&user_id)
-        .bind(vec![3_u8; 31])
-        .execute(pool)
-        .await
-        .is_err(),
+        sqlx::query("INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",)
+            .bind(&user_id)
+            .bind(vec![3_u8; 31])
+            .execute(pool)
+            .await
+            .is_err(),
         "session token hash must be a 32-byte SHA-256 digest"
     );
 
@@ -1227,13 +1220,12 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
     .await
     .expect("user may revoke an individual session");
 
-    let revoked_reason: Option<String> = sqlx::query_scalar(
-        "SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid",
-    )
-    .bind(&session_id)
-    .fetch_one(pool)
-    .await
-    .expect("revocation reason should be recorded");
+    let revoked_reason: Option<String> =
+        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid")
+            .bind(&session_id)
+            .fetch_one(pool)
+            .await
+            .expect("revocation reason should be recorded");
     assert_eq!(revoked_reason.as_deref(), Some("user_revoked"));
 
     assert!(
@@ -1248,14 +1240,12 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
     );
 
     assert!(
-        sqlx::query(
-            "UPDATE public.sessions SET token_hash = $2 WHERE id = $1::uuid",
-        )
-        .bind(&session_id)
-        .bind(vec![5_u8; 32])
-        .execute(pool)
-        .await
-        .is_err(),
+        sqlx::query("UPDATE public.sessions SET token_hash = $2 WHERE id = $1::uuid",)
+            .bind(&session_id)
+            .bind(vec![5_u8; 32])
+            .execute(pool)
+            .await
+            .is_err(),
         "revoked sessions cannot rotate tokens"
     );
 
@@ -1283,7 +1273,10 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
     .await
     .expect("session should remain available as a revoked record");
     assert!(second_session_revocation.0.is_some());
-    assert_eq!(second_session_revocation.1.as_deref(), Some("account_status_changed"));
+    assert_eq!(
+        second_session_revocation.1.as_deref(),
+        Some("account_status_changed")
+    );
 
     assert!(
         sqlx::query("INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)")
