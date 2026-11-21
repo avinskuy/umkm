@@ -70,3 +70,9 @@ Jalankan pemeriksaan yang relevan sebelum membuka pull request:
 - Tinjau perubahan dependency dan lockfile yang dihasilkan.
 - Seluruh CI harus berstatus hijau sebelum merge.
 - Fitur yang menyentuh alur utama pengguna harus memiliki bukti pengujian usability yang relevan atau mencatat keterbatasan serta rencana pengujian lanjutan.
+
+## Standar keamanan
+
+Kebijakan keamanan dan perlindungan data yang telah disetujui dirangkum dalam [Indeks Kebijakan Keamanan](../security/README.md). Dokumen tersebut mencakup kontrol akses, klasifikasi data, enkripsi, logging dan audit, keamanan API dan integrasi, keamanan database, serta infrastruktur dan deployment.
+
+Persetujuan kebijakan merupakan baseline desain dan implementasi; hal tersebut tidak otomatis membuktikan kontrol telah diterapkan, diuji, atau tersertifikasi. Setiap perubahan harus mengikuti ruang lingkup, prioritas risiko, dan bukti penerapan yang relevan.
