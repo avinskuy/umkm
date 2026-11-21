@@ -6,7 +6,7 @@
 
 This document translates the approved USahapintar product and authentication policies into a relational model. The first Identity Core account slice has been implemented as a SQLx migration and verified in CI; the remaining domain schemas are still design proposals. The migration has not been applied to production and does not activate runtime registration or authentication.
 
-The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions. The account-slice contract is documented in [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md) and implemented by `backend/migrations/20261121170000_create_identity_accounts.sql`.
+The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions. The account-slice contract is documented in [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md) and implemented by `backend/migrations/20261121170000_create_identity_accounts.sql`. The next verification slice is specified separately in [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md); it remains a review draft and is not yet implemented.
 
 ## 1. Design principles
 
