@@ -26,6 +26,10 @@ Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelol
 | [Consent & Data Processing](consent-data-processing.md) | Tujuan dan dasar pemrosesan, persetujuan opsional, perubahan tujuan, dan pencabutan |
 | [Account Lifecycle & Data Retention](account-lifecycle-data-retention.md) | Penonaktifan, penghapusan 30 hari, retensi, backup, restore, dan pelepasan kontak |
 | [Third-Party Data Sharing & Vendor Protection](third-party-data-sharing-vendor-protection.md) | Kategori penerima, pembagian data, kewajiban vendor, subprocessor, dan transfer data |
+| [Security Notifications & Alerts](security-notifications-alerts.md) | Notifikasi peristiwa keamanan, kanal, isi minimum, dan perlindungan informasi |
+| [Admin Enforcement](admin-enforcement-policy.md) | Kewenangan Admin, peringatan, pembatasan fitur, suspensi, dan pemulihan |
+| [Moderation & Appeals](moderation-appeals-policy.md) | Peninjauan konten/laporan, banding, hasil, dan pencatatan keputusan |
+| [Account Activity History](account-activity-history.md) | Riwayat tindakan moderasi yang dapat dilihat pemilik akun |
 
 ## Hubungan dengan dokumen lain
 
@@ -35,6 +39,7 @@ Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelol
 - [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md)
 - [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](../architecture/identity-core-shared-recovery-contacts.md)
 - [Authentication & Identity Security Design](../architecture/authentication-and-identity-security-design.md)
+- [Prinsip Pengalaman Pengguna yang Inklusif](../product/prinsip-pengalaman-pengguna.md)
 - [Kebijakan Keamanan Repository](../../SECURITY.md)
 - [Panduan Kontribusi](../../CONTRIBUTING.md)
 
