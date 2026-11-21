@@ -49,7 +49,7 @@ Alert harus memiliki tingkat prioritas, pemilik respons, serta tindakan awal yan
 
 ## 6. Hubungan dengan operasi
 
-Log dan alert mendukung [Incident Response & Security Breach Policy] yang menjadi bagian dari standar operasional proyek. Setiap investigasi harus mengikuti prinsip minimisasi data dan pembatasan akses.
+Log dan alert mendukung proses [Incident Response](../operations/incident-response.md) dan [Observability & Monitoring](../operations/observability-monitoring.md). Setiap investigasi harus mengikuti prinsip minimisasi data dan pembatasan akses.
 
 ## 7. Pengujian
 
