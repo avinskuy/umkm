@@ -77,24 +77,23 @@ PostgreSQL advisory lock dipilih karena bersifat lintas koneksi dan lintas insta
 
 ### Keputusan
 
-Gunakan satu kolom lifecycle `account_status` dengan nilai terbatas berikut:
+Gunakan `account_status` hanya untuk siklus hidup akun. Pembatasan akses oleh Admin (misalnya suspend atau limit fitur) dicatat terpisah melalui moderation/enforcement records. Pemisahan ini memungkinkan akun yang sedang dibatasi tetap mengajukan penghapusan tanpa kehilangan riwayat atau mencampur dua state machine. Nilai lifecycle yang diizinkan:
 
 | Status | Arti dan aturan |
 | --- | --- |
 | `pending_verification` | Registrasi belum selesai; berlaku paling lama 30 menit dan kontak utama tetap direservasi. |
 | `active` | Akun aktif dan dapat memakai fitur sesuai role/entitlement. |
-| `suspended` | Akses dibatasi oleh tindakan Admin; kontak utama tetap direservasi. |
 | `deactivated` | Penonaktifan sementara oleh pengguna; profil disembunyikan, data dipertahankan, kontak tetap direservasi. |
 | `deletion_pending` | Permintaan penghapusan dalam masa tunggu pembatalan 30 hari; akun dibatasi dan kontak tetap direservasi. |
 | `deletion_processing` | Masa tunggu selesai dan proses penghapusan sedang berlangsung; kontak tetap direservasi sampai penghapusan benar-benar selesai. |
 | `pending_expired` | Registrasi tidak selesai dalam 30 menit; tidak dapat login dan kontak utama telah dilepas secara atomik. |
 | `closed` | Penghapusan telah selesai sesuai proses retensi; kontak utama telah dilepas dan data personal telah dihapus atau dianonimkan sesuai kebijakan. |
 
-Status lock verifikasi, lock keamanan sementara, dan status OTP tidak boleh dimasukkan ke `account_status`. Status moderasi konten juga bukan status akun.
+Status suspend/limit fitur, lock verifikasi, lock keamanan sementara, dan status OTP tidak boleh dimasukkan ke `account_status`. Enforcement aktif dapat membatasi akses meskipun lifecycle akun tetap `active` atau `deletion_pending`. Status moderasi konten juga bukan status lifecycle akun.
 
 ### Aturan reservasi
 
-Unique partial index kontak utama hanya mencakup akun yang masih memegang reservasi: `pending_verification`, `active`, `suspended`, `deactivated`, `deletion_pending`, dan `deletion_processing`.
+Unique partial index kontak utama hanya mencakup akun yang masih memegang reservasi: `pending_verification`, `active`, `deactivated`, `deletion_pending`, dan `deletion_processing`. Akun yang terkena suspend tetap berstatus lifecycle `active` (atau status lifecycle lain yang sah), sehingga reservasi tetap berlaku tanpa status `suspended` tersendiri.
 
 Kontak dilepas hanya dalam dua kondisi:
 - Registrasi pending telah kedaluwarsa dan transisi ke `pending_expired` selesai secara atomik.
@@ -102,7 +101,7 @@ Kontak dilepas hanya dalam dua kondisi:
 
 Saat pending expired, hapus nilai kontak dari kolom identitas aktif dalam transaksi yang sama atau pindahkan hanya ke data audit yang tidak dapat digunakan untuk autentikasi. Jangan mempertahankan nilai yang masih memblokir unique index tanpa alasan. Saat deletion processing, jangan melepas kontak hanya karena 30 hari telah berlalu.
 
-Transisi status harus dilakukan oleh operasi backend yang tervalidasi dan tercatat. CHECK constraint menjaga nilai status yang sah; partial unique index menjaga reservasi; tes transaksi membuktikan tidak ada race antara aktivasi, cleanup, pembatalan penghapusan, dan registrasi baru.
+Transisi status harus dilakukan oleh operasi backend yang tervalidasi dan tercatat. CHECK constraint menjaga nilai lifecycle yang sah; active moderation/enforcement records mengatur pembatasan akses; partial unique index menjaga reservasi; tes transaksi membuktikan tidak ada race antara aktivasi, cleanup, pembatalan penghapusan, dan registrasi baru.
 
 ## 4. Provisioning Admin
 
@@ -165,7 +164,7 @@ Append-only di sini berarti tidak dapat diubah oleh principal aplikasi normal; b
 Keputusan berikut mengikat rancangan migration yang relevan:
 
 1. `users.primary_role` hanya `business_owner`, `investor`, atau `admin`; tidak ada operasi update role.
-2. `account_status` memakai lifecycle pada Bagian 3. Temporary lock berada di tabel/sesi yang sesuai.
+2. `account_status` memakai lifecycle pada Bagian 3; suspend dan limit fitur berasal dari moderation/enforcement records, bukan lifecycle. Temporary lock berada di tabel/sesi yang sesuai.
 3. Kontak utama unik secara global selama reservasi. Recovery contact dapat dipakai bersama lintas akun, tetapi unique constraint per akun/channel/fingerprint mencegah duplikasi relasi.
 4. `verification_sessions.user_id` nullable hanya untuk recovery pra-pemilihan akun. Registration dan verifikasi account-specific wajib memiliki user ID.
 5. Satu verification session memiliki maksimal satu recovery case; setiap recovery case wajib memiliki satu verification session. Target user nullable sebelum account selection.
