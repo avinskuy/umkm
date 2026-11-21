@@ -41,8 +41,6 @@ Principal dan grant PostgreSQL disiapkan terpisah melalui `backend/database/boot
 
 Gunakan liveness untuk mengetahui apakah proses perlu dipulihkan dan readiness untuk menentukan apakah instance layak menerima traffic. Jangan gunakan endpoint liveness sebagai bukti bahwa database siap.
 
-Saat menerima SIGINT/Ctrl+C, server berhenti menerima koneksi baru melalui graceful shutdown dan menutup pool setelah server selesai.
-
 ## Menjalankan secara lokal
 
 Siapkan database lokal dan principal aplikasi terlebih dahulu, kemudian jalankan:
