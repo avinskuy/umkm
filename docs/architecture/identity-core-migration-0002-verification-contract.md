@@ -1,6 +1,6 @@
 # Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP
 
-> Status: kontrak skema diimplementasikan pada branch `feat/identity-verification-migration-0002`; menunggu pengujian PostgreSQL dan review PR
+> Status: migration 0002 telah lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL; siap digabung setelah review akhir
 
 Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, operasi enkripsi/HMAC, atau koneksi database pada HTTP startup.
 
