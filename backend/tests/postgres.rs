@@ -30,6 +30,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_verification_schema_invariants(&pool).await;
     assert_authentication_session_invariants(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
+    assert_identity_audit_event_invariants(&pool).await;
 
     pool.close().await;
     assert_pool_closed(&pool);
@@ -1623,4 +1624,99 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .execute(pool)
     .await
     .expect("approved recovery case may be completed");
+}
+
+async fn assert_identity_audit_event_invariants(pool: &PgPool) {
+    let subject_user_id = insert_active_email(pool, "identity-audit-subject@example.test").await;
+
+    let event_id: String = sqlx::query_scalar(
+        "INSERT INTO public.identity_audit_events (occurred_at, actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata) \
+         VALUES ('2000-01-01 00:00:00+00'::timestamptz, 'user', $1::uuid, $1::uuid, 'account.recovery.requested', 'success', 'contact_verified', gen_random_uuid(), jsonb_build_object('channel', 'email', 'purpose', 'account_recovery', 'risk_level', 'elevated')) \
+         RETURNING id::text",
+    )
+    .bind(&subject_user_id)
+    .fetch_one(pool)
+    .await
+    .expect("valid identity audit event should be accepted");
+
+    let timestamp_is_database_managed: bool = sqlx::query_scalar(
+        "SELECT occurred_at > clock_timestamp() - INTERVAL '1 minute' FROM public.identity_audit_events WHERE id = $1::uuid",
+    )
+    .bind(&event_id)
+    .fetch_one(pool)
+    .await
+    .expect("audit event timestamp should be queryable");
+    assert!(timestamp_is_database_managed);
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome, metadata) \
+             VALUES ('system', 'account.password.changed', 'success', jsonb_build_object('password', 'must-not-be-stored'))",
+        )
+        .execute(pool)
+        .await
+        .is_err(),
+        "audit metadata must reject sensitive or unapproved keys"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome, metadata) \
+             VALUES ('system', 'account.recovery.requested', 'success', jsonb_build_object('resource_type', jsonb_build_object('nested', 'value')))",
+        )
+        .execute(pool)
+        .await
+        .is_err(),
+        "audit metadata must reject nested payloads"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome) \
+             VALUES ('system', 'Invalid Action', 'success')",
+        )
+        .execute(pool)
+        .await
+        .is_err(),
+        "audit action codes must use the normalized identifier format"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome) \
+             VALUES ('system', 'account.recovery.requested', 'pending')",
+        )
+        .execute(pool)
+        .await
+        .is_err(),
+        "audit outcomes must use the supported result vocabulary"
+    );
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.identity_audit_events SET outcome = 'failure' WHERE id = $1::uuid",
+        )
+        .bind(&event_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "identity audit events must reject updates"
+    );
+
+    assert!(
+        sqlx::query("DELETE FROM public.identity_audit_events WHERE id = $1::uuid")
+            .bind(&event_id)
+            .execute(pool)
+            .await
+            .is_err(),
+        "identity audit events must reject deletes"
+    );
+
+    assert!(
+        sqlx::query("TRUNCATE TABLE public.identity_audit_events")
+            .execute(pool)
+            .await
+            .is_err(),
+        "identity audit events must reject truncation"
+    );
 }
