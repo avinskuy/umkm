@@ -15,8 +15,8 @@ CREATE TABLE public.users (
     password_hash TEXT,
     pending_expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    status_changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    status_changed_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
 
     CONSTRAINT users_primary_role_check
         CHECK (primary_role IN ('business_owner', 'investor', 'admin')),
@@ -199,11 +199,16 @@ BEGIN
         CASE OLD.account_status
             WHEN 'pending_verification' THEN
                 IF NEW.account_status = 'pending_expired' THEN
-                    IF OLD.pending_expires_at > now() THEN
+                    IF OLD.pending_expires_at > clock_timestamp() THEN
                         RAISE EXCEPTION 'pending registration cannot expire before its deadline'
                             USING ERRCODE = '23514';
                     END IF;
-                ELSIF NEW.account_status <> 'active' THEN
+                ELSIF NEW.account_status = 'active' THEN
+                    IF OLD.pending_expires_at <= clock_timestamp() THEN
+                        RAISE EXCEPTION 'expired pending registration cannot be activated'
+                            USING ERRCODE = '23514';
+                    END IF;
+                ELSE
                     RAISE EXCEPTION 'invalid transition from pending_verification'
                         USING ERRCODE = '23514';
                 END IF;
@@ -219,7 +224,7 @@ BEGIN
                 END IF;
             WHEN 'deletion_pending' THEN
                 IF NEW.account_status = 'deletion_processing' THEN
-                    IF OLD.status_changed_at > now() - INTERVAL '30 days' THEN
+                    IF OLD.status_changed_at > clock_timestamp() - INTERVAL '30 days' THEN
                         RAISE EXCEPTION 'permanent deletion cannot start before the 30-day waiting period'
                             USING ERRCODE = '23514';
                     END IF;
@@ -302,10 +307,10 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog
 AS $$
 BEGIN
-    NEW.updated_at := now();
+    NEW.updated_at := clock_timestamp();
 
     IF NEW.account_status IS DISTINCT FROM OLD.account_status THEN
-        NEW.status_changed_at := now();
+        NEW.status_changed_at := clock_timestamp();
     ELSE
         NEW.status_changed_at := OLD.status_changed_at;
     END IF;
@@ -496,7 +501,7 @@ BEGIN
         p_phone_e164,
         p_initial_contact_channel,
         p_password_hash,
-        now() + INTERVAL '30 minutes'
+        clock_timestamp() + INTERVAL '30 minutes'
     )
     RETURNING id INTO v_user_id;
 
