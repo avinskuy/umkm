@@ -13,8 +13,8 @@ pub struct DatabaseConfig {
 
 impl DatabaseConfig {
     pub fn from_env() -> Result<Self, DatabaseConfigError> {
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| DatabaseConfigError::MissingDatabaseUrl)?;
+        let database_url =
+            env::var("DATABASE_URL").map_err(|_| DatabaseConfigError::MissingDatabaseUrl)?;
         let max_connections = env::var("DATABASE_MAX_CONNECTIONS").ok();
 
         Self::from_values(&database_url, max_connections.as_deref())
