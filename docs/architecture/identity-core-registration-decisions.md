@@ -1,8 +1,8 @@
-# Identity Core — Registration Decisions
+# Identity Core — Keputusan Pendaftaran
 
 > Status: batas awal kebijakan produk Identity Core telah disetujui; rancangan teknis terperinci, pemilihan penyedia layanan, dan tinjauan keamanan tetap harus diselesaikan sebelum implementasi.
 
-## Approved registration policy
+## Kebijakan pendaftaran yang disetujui
 
 1. Public registration is available only for Business Owner and Investor.
 2. The registrant chooses one permanent primary role, then exactly one initial contact method:
@@ -17,7 +17,7 @@
 9. OTPs are never stored or logged in plaintext. Use keyed hashes, expiry, one-time use, bounded attempts, resend cooldown, and destination/account/network rate limits. Delivery failure never marks a contact verified.
 10. Registration and recovery responses must not reveal whether a contact is already associated with an account.
 
-## Role and identity invariants
+## Invariant role dan identitas
 
 - Setiap akun klien hanya memiliki satu role utama yang disimpan secara permanen dan tidak dapat diubah: `business_owner` atau `investor`.
 - A person who wants the other role must register a separate account using a different, eligible, unlinked contact identity.
@@ -25,7 +25,7 @@
 - Identity linking must prove control of both the existing account and the new identity. Matching email text alone is never sufficient.
 - No account merge or role mutation is permitted through registration, OAuth, support, or routine Admin operations.
 
-## Proposed registration lifecycle
+## Rancangan siklus pendaftaran
 
 1. User selects Owner or Investor.
 2. User selects Email or Phone/WhatsApp.
@@ -37,7 +37,7 @@
 
 Pendaftaran tertunda kedaluwarsa setelah **30 menit** jika verifikasi kontak yang diwajibkan belum selesai. Proses kedaluwarsa dan pembersihan harus atomik serta idempotent, melepaskan reservasi kontak tertunda yang memenuhi syarat dengan aman, dan tidak pernah menghapus akun yang sudah aktif. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
 
-## Data-model implications (verification and session slice proposal)
+## Implikasi model data (usulan tahap verifikasi dan sesi)
 
 The eventual schema should distinguish normalized email and E.164 phone values, the initial registration contact method, independent verification timestamps, challenge delivery channel (email or WhatsApp), challenge purpose and destination binding, keyed code hash, attempts, expiry, consumption, and pending-registration expiry.
 
@@ -143,7 +143,7 @@ Status lifecycle akun sudah diterapkan pada migration akun pertama. Daftar statu
 
 
 
-### State machine challenge OTP individual
+### Mesin status challenge OTP individual
 
 Challenge OTP individual memiliki siklus hidup terpisah dari sesi verifikasi. Baseline status:
 
