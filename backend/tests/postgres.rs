@@ -279,9 +279,9 @@ async fn assert_role_and_registration_provenance_are_immutable(pool: &PgPool) {
             "UPDATE public.users SET initial_contact_channel = 'phone' WHERE id = $1::uuid"
         )
         .bind(&pending_id)
-            .execute(pool)
-            .await
-            .is_err(),
+        .execute(pool)
+        .await
+        .is_err(),
         "initial contact channel must be immutable"
     );
 
@@ -386,7 +386,7 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
             .bind("google-subject-001")
             .fetch_one(pool)
             .await
-    .expect("Google-only registration should create user and provider identity atomically");
+            .expect("Google-only registration should create user and provider identity atomically");
 
     let local_user_id: String =
         sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
@@ -398,7 +398,7 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
             .bind(Option::<String>::None)
             .fetch_one(pool)
             .await
-    .expect("local-password registration should create a pending client account");
+            .expect("local-password registration should create a pending client account");
 
     assert!(
         sqlx::query(
