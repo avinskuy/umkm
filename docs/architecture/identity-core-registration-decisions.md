@@ -107,7 +107,7 @@ Migrasi Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan 
 
 ## Tambahan keputusan: kontak pemulihan bersama dan UX pemilihan akun
 
-- Satu alamat email atau nomor HP pemulihan yang sudah diverifikasi boleh digunakan oleh beberapa akun. Jangan menerapkan keunikan global pada kontak pemulihan. Aturan ini tidak mengubah keunikan dan reservasi kontak utama pendaftaran.
+- Satu nomor HP pemulihan yang sudah diverifikasi boleh digunakan oleh beberapa akun. Jangan menerapkan keunikan global pada nomor HP pemulihan. Kebijakan apakah alamat email pemulihan boleh digunakan oleh beberapa akun masih terbuka dan harus diputuskan sebelum migrasi final. Aturan ini tidak mengubah keunikan dan reservasi kontak utama pendaftaran.
 - Jika satu kontak pemulihan terhubung ke beberapa akun, gunakan pendekatan hybrid: verifikasi kontak terlebih dahulu, lalu tampilkan pilihan akun dengan petunjuk pembeda yang aman. Jangan mengungkap jumlah atau daftar akun sebelum verifikasi, dan jangan menampilkan data sensitif atau kontak lengkap.
 - Keberhasilan verifikasi kontak hanya membuktikan kendali atas kontak tersebut; bukan bukti tunggal kepemilikan semua akun yang terhubung. Akun yang dipilih tetap menjalani pemeriksaan kepemilikan dan risiko.
 - Kolom verification_sessions.user_id boleh NULL sementara hanya pada alur pemulihan sebelum akun tujuan dipilih. Untuk pendaftaran dan verifikasi akun tertentu, user_id wajib. Setelah akun dipilih dan pemeriksaan yang sesuai selesai, sesi/kasus dikaitkan ke akun tersebut secara atomik dan satu kali.
