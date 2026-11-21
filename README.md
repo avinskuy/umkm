@@ -1,17 +1,18 @@
 # USahapintar
 
-**Platform Promosi Bisnis, Intelijen, dan Jejaring Investor**
+**Temukan peluang. Bangun koneksi.**
 
-USahapintar menghubungkan pemilik usaha dengan investor melalui penemuan bisnis, peluang kemitraan, dan informasi bisnis berbasis data.
+Platform bisnis dan jejaring investor untuk menemukan peluang dan membangun koneksi.
 
 > Status proyek: tahap fondasi. Kebijakan produk, arsitektur, keamanan, dan operasional telah didokumentasikan; implementasi fitur produk berjalan bertahap.
 
 ## Status implementasi saat ini
 
 - Frontend React + TypeScript masih berupa shell awal proyek.
-- Backend Rust + Axum menyediakan endpoint health check `/api/v1/health`.
-- Fondasi koneksi PostgreSQL melalui SQLx, connection pool, dan migrator sudah tersedia.
-- Server HTTP belum menginisialisasi koneksi database saat startup. Migration Identity Core pertama untuk akun dan identitas Google sudah ditambahkan serta diuji di CI; domain verifikasi, sesi, recovery, audit, dan fitur produk lain belum dimigrasikan.
+- Backend Rust + Axum menyediakan liveness `/api/v1/health` dan readiness `/api/v1/readyz`.
+- Pool PostgreSQL melalui SQLx diinisialisasi saat startup menggunakan principal aplikasi dari `APP_DATABASE_URL`.
+- Migration Identity Core 0001–0005 sudah tersedia di repository dan diuji di CI. Server HTTP tidak menjalankan migration otomatis saat startup; penerapan ke database produksi merupakan proses terpisah.
+- Fondasi runtime Identity Core baru mencakup pembuatan akun pending dan penambahan audit event melalui akses database terbatas. Registrasi lengkap, OTP, aktivasi, login, cookie/session middleware, recovery, dan fitur produk belum tersedia.
 - Dokumen kebijakan adalah baseline keputusan, bukan bukti bahwa seluruh fitur/kontrol sudah diimplementasikan atau tersertifikasi.
 
 ## Struktur proyek
