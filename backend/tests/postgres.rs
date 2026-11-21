@@ -336,6 +336,17 @@ async fn assert_role_and_registration_provenance_are_immutable(pool: &PgPool) {
     .expect("pending account should be created");
 
     assert!(
+        sqlx::query(
+            "UPDATE public.users SET pending_expires_at = clock_timestamp() + INTERVAL '60 minutes' WHERE id = $1::uuid"
+        )
+        .bind(&pending_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "pending registration expiry must not be extended or reset"
+    );
+
+    assert!(
         sqlx::query("UPDATE public.users SET primary_role = 'investor' WHERE id = $1::uuid")
             .bind(&pending_id)
             .execute(pool)
