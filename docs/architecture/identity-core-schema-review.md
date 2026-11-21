@@ -233,7 +233,8 @@ Migration 0001–0004 belum boleh dijalankan pada database produksi. Migration 0
 
 - [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md)
 - [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md)
-- [Kontrak Skema Migration 0003 — Sesi Autentikasi](identity-core-migration-0003-session-contract.md)\n- [Kontrak Skema Migration 0004 — Pemulihan Akun](identity-core-migration-0004-account-recovery-contract.md)
+- [Kontrak Skema Migration 0003 — Sesi Autentikasi](identity-core-migration-0003-session-contract.md)
+- [Kontrak Skema Migration 0004 — Pemulihan Akun](identity-core-migration-0004-account-recovery-contract.md)
 - [Rancangan Skema Database](database-schema-design.md)
 - [Keputusan Registrasi Identity Core](identity-core-registration-decisions.md)
 - [Tinjauan Skema Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md)
