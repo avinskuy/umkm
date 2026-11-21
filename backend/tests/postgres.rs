@@ -1633,7 +1633,7 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
 
     let event_id: String = sqlx::query_scalar(
         "INSERT INTO public.identity_audit_events (actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata) \
-         VALUES ('user', $1::uuid, $1::uuid, 'account.recovery.requested', 'success', 'contact_verified', gen_random_uuid(), '{\\"channel\\":\\"email\\",\\"purpose\\":\\"account_recovery\\",\\"risk_level\\":\\"elevated\\"}'::jsonb) \
+         VALUES ('user', $1::uuid, $1::uuid, 'account.recovery.requested', 'success', 'contact_verified', gen_random_uuid(), jsonb_build_object('channel', 'email', 'purpose', 'account_recovery', 'risk_level', 'elevated')) \
          RETURNING id::text",
     )
     .bind(&subject_user_id)
@@ -1653,7 +1653,7 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
     assert!(
         sqlx::query(
             "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome, metadata) \
-             VALUES ('system', 'account.password.changed', 'success', '{\\"password\\":\\"must-not-be-stored\\"}'::jsonb)",
+             VALUES ('system', 'account.password.changed', 'success', jsonb_build_object('password', 'must-not-be-stored'))",
         )
         .execute(pool)
         .await
@@ -1664,7 +1664,7 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
     assert!(
         sqlx::query(
             "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome, metadata) \
-             VALUES ('system', 'account.recovery.requested', 'success', '{\\"resource_type\\":{\\"nested\\":\\"value\\"}}'::jsonb)",
+             VALUES ('system', 'account.recovery.requested', 'success', jsonb_build_object('resource_type', jsonb_build_object('nested', 'value')))",
         )
         .execute(pool)
         .await
