@@ -29,6 +29,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_client_creation_function(&pool).await;
     assert_verification_schema_invariants(&pool).await;
     assert_authentication_session_invariants(&pool).await;
+    assert_account_recovery_schema_invariants(&pool).await;
 
     pool.close().await;
     assert_pool_closed(&pool);
@@ -1312,4 +1313,281 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
             .is_err(),
         "deactivated accounts cannot create new sessions"
     );
+}
+
+
+async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
+    let first_user_id = insert_active_email(pool, "recovery-contact-first@example.test").await;
+    let second_user_id = insert_active_email(pool, "recovery-contact-second@example.test").await;
+
+    let first_contact_session: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+         VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
+    )
+    .bind(&first_user_id)
+    .bind(vec![1_u8])
+    .bind(vec![2_u8])
+    .bind(vec![31_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("account-bound recovery contact verification session should be created");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+             VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid)"
+        )
+        .bind(&first_user_id)
+        .bind(vec![3_u8])
+        .bind(vec![4_u8])
+        .bind(vec![31_u8; 32])
+        .bind(&first_contact_session)
+        .execute(pool)
+        .await
+        .is_err(),
+        "unverified recovery contact must not be stored"
+    );
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&first_contact_session)
+    .execute(pool)
+    .await
+    .expect("recovery contact verification session should be verified");
+
+    let first_contact_id: String = sqlx::query_scalar(
+        "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+         VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid) RETURNING id::text",
+    )
+    .bind(&first_user_id)
+    .bind(vec![3_u8])
+    .bind(vec![4_u8])
+    .bind(vec![31_u8; 32])
+    .bind(&first_contact_session)
+    .fetch_one(pool)
+    .await
+    .expect("verified recovery contact should be accepted");
+
+    let verified_at_exists: bool = sqlx::query_scalar(
+        "SELECT verified_at IS NOT NULL FROM public.recovery_contacts WHERE id = $1::uuid",
+    )
+    .bind(&first_contact_id)
+    .fetch_one(pool)
+    .await
+    .expect("recovery contact verification timestamp should exist");
+    assert!(verified_at_exists);
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.recovery_contacts SET contact_ciphertext = $2 WHERE id = $1::uuid"
+        )
+        .bind(&first_contact_id)
+        .bind(vec![9_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "verified recovery contact payload must be immutable"
+    );
+
+    let second_contact_session: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+         VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
+    )
+    .bind(&second_user_id)
+    .bind(vec![5_u8])
+    .bind(vec![6_u8])
+    .bind(vec![31_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("second account may verify the same shared contact");
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&second_contact_session)
+    .execute(pool)
+    .await
+    .expect("second account recovery contact session should be verified");
+
+    sqlx::query(
+        "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+         VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid)",
+    )
+    .bind(&second_user_id)
+    .bind(vec![7_u8])
+    .bind(vec![8_u8])
+    .bind(vec![31_u8; 32])
+    .bind(&second_contact_session)
+    .execute(pool)
+    .await
+    .expect("same optional recovery contact may belong to another account");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+             VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid)"
+        )
+        .bind(&first_user_id)
+        .bind(vec![9_u8])
+        .bind(vec![10_u8])
+        .bind(vec![31_u8; 32])
+        .bind(&first_contact_session)
+        .execute(pool)
+        .await
+        .is_err(),
+        "one account cannot register the same active recovery contact twice"
+    );
+
+    let recovery_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+         VALUES ('account_recovery', 'email', $1, $2, 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
+    )
+    .bind(vec![11_u8])
+    .bind(vec![12_u8])
+    .bind(vec![31_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("preselection account recovery session should be created");
+
+    let recovery_case_id: String = sqlx::query_scalar(
+        "INSERT INTO public.account_recovery_cases (verification_session_id, requested_action) \\
+         VALUES ($1::uuid, 'password_reset') RETURNING id::text",
+    )
+    .bind(&recovery_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("recovery case should start without a selected account");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.account_recovery_cases (verification_session_id, requested_action) VALUES ($1::uuid, 'forgot_email')"
+        )
+        .bind(&recovery_session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "one verification session may have only one recovery case"
+    );
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.account_recovery_cases SET status = 'account_selection_required' WHERE id = $1::uuid"
+        )
+        .bind(&recovery_case_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "recovery case cannot advance before contact verification"
+    );
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&recovery_session_id)
+    .execute(pool)
+    .await
+    .expect("recovery contact verification should complete");
+
+    sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
+        .bind(&recovery_session_id)
+        .bind(&first_user_id)
+        .execute(pool)
+        .await
+        .expect("verified recovery session may bind one selected account");
+
+    sqlx::query(
+        "UPDATE public.account_recovery_cases SET target_user_id = $2::uuid, status = 'under_review' WHERE id = $1::uuid",
+    )
+    .bind(&recovery_case_id)
+    .bind(&first_user_id)
+    .execute(pool)
+    .await
+    .expect("case may enter review after the verified account is selected");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.account_recovery_cases SET target_user_id = $2::uuid WHERE id = $1::uuid"
+        )
+        .bind(&recovery_case_id)
+        .bind(&second_user_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "selected recovery account cannot be changed"
+    );
+
+    sqlx::query(
+        "UPDATE public.account_recovery_cases SET status = 'approved' WHERE id = $1::uuid",
+    )
+    .bind(&recovery_case_id)
+    .execute(pool)
+    .await
+    .expect("reviewed recovery case may be approved");
+
+    let token_id: String = sqlx::query_scalar(
+        "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+         VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes') RETURNING id::text",
+    )
+    .bind(&recovery_case_id)
+    .bind(&first_user_id)
+    .bind(vec![41_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("approved case may issue an opaque password reset token hash");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+             VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes')"
+        )
+        .bind(&recovery_case_id)
+        .bind(&first_user_id)
+        .bind(vec![42_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "one recovery case cannot have multiple live reset tokens"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+             VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes')"
+        )
+        .bind(&recovery_case_id)
+        .bind(&second_user_id)
+        .bind(vec![43_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "reset token must be bound to the selected account"
+    );
+
+    sqlx::query(
+        "UPDATE public.password_reset_tokens SET consumed_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&token_id)
+    .execute(pool)
+    .await
+    .expect("unexpired reset token may be consumed once");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.password_reset_tokens SET consumed_at = clock_timestamp() WHERE id = $1::uuid"
+        )
+        .bind(&token_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "consumed reset token cannot be reused"
+    );
+
+    sqlx::query(
+        "UPDATE public.account_recovery_cases SET status = 'completed' WHERE id = $1::uuid",
+    )
+    .bind(&recovery_case_id)
+    .execute(pool)
+    .await
+    .expect("approved recovery case may be completed");
 }
