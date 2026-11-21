@@ -543,6 +543,22 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
         .await
         .expect("deletion-pending Google-only account should satisfy auth method invariant");
 
+    let mut processing_tx = pool
+        .begin()
+        .await
+        .expect("transaction should start for deletion processing");
+
+    sqlx::query("UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid")
+        .bind(&terminal_user_id)
+        .execute(&mut *processing_tx)
+        .await
+        .expect("deletion may enter processing after the waiting period");
+
+    processing_tx
+        .commit()
+        .await
+        .expect("deletion processing transition should commit");
+
     assert!(
         sqlx::query("UPDATE public.users SET account_status = 'active' WHERE id = $1::uuid")
             .bind(&terminal_user_id)
@@ -556,12 +572,6 @@ async fn assert_provider_identity_invariants(pool: &PgPool) {
         .begin()
         .await
         .expect("transaction should start for terminal account cleanup");
-
-    sqlx::query("UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid")
-        .bind(&terminal_user_id)
-        .execute(&mut *tx)
-        .await
-        .expect("deletion may enter processing after the waiting period");
 
     sqlx::query(
         "UPDATE public.users \
