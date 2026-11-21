@@ -1315,7 +1315,6 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
     );
 }
 
-
 async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     let first_user_id = insert_active_email(pool, "recovery-contact-first@example.test").await;
     let second_user_id = insert_active_email(pool, "recovery-contact-second@example.test").await;
@@ -1537,13 +1536,11 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         "selected recovery account cannot be changed"
     );
 
-    sqlx::query(
-        "UPDATE public.account_recovery_cases SET status = 'approved' WHERE id = $1::uuid",
-    )
-    .bind(&recovery_case_id)
-    .execute(pool)
-    .await
-    .expect("reviewed recovery case may be approved");
+    sqlx::query("UPDATE public.account_recovery_cases SET status = 'approved' WHERE id = $1::uuid")
+        .bind(&recovery_case_id)
+        .execute(pool)
+        .await
+        .expect("reviewed recovery case may be approved");
 
     let token_id: String = sqlx::query_scalar(
         "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
@@ -1627,7 +1624,10 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("revoked token reason should be queryable");
-    assert_eq!(revoked_token_reason.as_deref(), Some("account_status_changed"));
+    assert_eq!(
+        revoked_token_reason.as_deref(),
+        Some("account_status_changed")
+    );
 
     sqlx::query(
         "UPDATE public.account_recovery_cases SET status = 'completed' WHERE id = $1::uuid",
