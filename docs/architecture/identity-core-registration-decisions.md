@@ -57,11 +57,13 @@ Identitas Google yang sudah terhubung hanya dapat mengautentikasi akun yang suda
 
 - Masa berlaku OTP adalah **10 menit**.
 - Maksimal **5 percobaan gagal** untuk setiap sesi verifikasi.
-- Setelah kegagalan kelima, sesi verifikasi dikunci selama **1 jam**. Pengiriman ulang atau permintaan kode pengganti tidak boleh mengatur ulang atau melewati penguncian.
+- Setelah kegagalan kelima, sesi verifikasi dikunci selama **1 jam**. Selama penguncian, semua percobaan verifikasi pada sesi tersebut ditolak, termasuk dengan OTP baru.
+- Setelah satu jam berlalu, sesi yang sama boleh digunakan kembali dan penghitung kegagalan sesi direset. Reset hanya terjadi setelah masa penguncian benar-benar berakhir; permintaan atau pengiriman OTP baru tidak dapat mempercepatnya.
+- Batas pengiriman per kontak dan rate limit lintas sesi tetap berlaku setelah sesi dibuka kembali. Membuat sesi baru tidak boleh menghindari batas percobaan atau pengiriman yang berlaku pada konteks kontak/tujuan.
 - Jeda pengiriman ulang adalah **60 detik**.
 - Maksimal **5 pengiriman per jam untuk setiap alamat kontak**, ditambah pembatasan adaptif berdasarkan IP/jaringan, akun, tujuan, dan aktivitas mencurigakan.
 - Pengiriman OTP baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama.
-- Kode baru tidak menghapus status penguncian sesi verifikasi atau batas pengiriman.
+- Kode baru tidak menghapus status penguncian sesi verifikasi, tidak mereset penghitung kegagalan, dan tidak menghapus batas pengiriman.
 - Semua penghitung, masa berlaku, pembatalan, dan jeda harus ditegakkan di server serta aman terhadap proses bersamaan. Hitung mundur di sisi klien hanya untuk tampilan.
 - OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode dibuat menggunakan sumber acak kriptografis yang aman, disimpan sebagai keyed hash, tidak pernah dicatat dalam log sebagai teks asli, terikat pada tujuan dan alamat penerima, serta hanya dapat digunakan satu kali secara atomik.
 - Kegagalan pengiriman tidak pernah menandai kontak sebagai terverifikasi. Respons tidak boleh mengungkap apakah kontak sudah terdaftar.
