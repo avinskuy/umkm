@@ -351,7 +351,7 @@ Collect only events needed to understand product usability and operational relia
 - Login success/failure category.
 - Password recovery requested/completed.
 
-Do not send passwords, OTP values, raw phone/email, tokens, or sensitive form contents to analytics. Avoid third-party tracking before the consent/legal policy is defined.
+Do not send passwords, OTP values, raw phone/email, tokens, or sensitive form contents to analytics. Use third-party analytics or tracking only for a documented purpose and appropriate lawful basis. Optional marketing/analytics consent must remain separate from core service terms, and data sent to analytics must be minimized and must not include sensitive form contents.
 
 ## 14. Acceptance checklist before implementation
 
