@@ -1724,8 +1724,8 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
 
 
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
-    let admin_url = std::env::var("CI_ADMIN_DATABASE_URL")
-        .expect("CI must provide a disposable DBA connection for privilege bootstrap tests");
+    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL")
+        .expect("CI must provide a disposable target-database DBA connection for privilege bootstrap tests");
     let admin_pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&admin_url)
