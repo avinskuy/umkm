@@ -1,4 +1,4 @@
-# API Security & Integration Security Policy
+# Kebijakan Keamanan API & Integrasi
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
@@ -13,7 +13,7 @@
 
 Referensi tersebut menjadi dasar pemilihan kontrol sesuai risiko dan tahap implementasi, bukan klaim sertifikasi.
 
-## 2. Authentication & session
+## 2. Autentikasi dan sesi
 
 - Endpoint privat wajib memerlukan autentikasi.
 - Sesi dan token harus memiliki masa berlaku, penyimpanan aman, dan mekanisme pencabutan.
@@ -22,7 +22,7 @@ Referensi tersebut menjadi dasar pemilihan kontrol sesuai risiko dan tahap imple
 - Jangan gunakan Implicit Grant atau Resource Owner Password Credentials Grant untuk rancangan baru.
 - Jangan membocorkan keberadaan akun melalui respons registrasi atau recovery.
 
-## 3. Authorization
+## 3. Otorisasi
 
 - Terapkan RBAC + ABAC pada setiap permintaan backend.
 - Periksa akses objek dan properti; jangan mengandalkan pemeriksaan frontend.

@@ -51,7 +51,7 @@ OTP tidak disimpan plaintext. Digest HMAC terikat pada challenge ID, session ID,
 
 Generator kode OTP dan jumlah digit belum diputuskan. `random_bytes` hanya menyediakan CSPRNG; kebijakan format dan rejection sampling harus ditetapkan saat OTP lifecycle dibangun.
 
-## 3. Key management
+## 3. Manajemen kunci
 
 `KeyProvider` adalah boundary yang harus dipenuhi implementasi runtime:
 

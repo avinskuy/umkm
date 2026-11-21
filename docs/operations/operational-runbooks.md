@@ -1,4 +1,4 @@
-# Operational Runbooks
+# Panduan Operasional (Runbook)
 
 - **Status:** Disetujui sebagai baseline.
 - **Cakupan:** Prosedur berulang untuk operasi, diagnosis, respons, pemulihan, dan pemeliharaan USahapintar.
