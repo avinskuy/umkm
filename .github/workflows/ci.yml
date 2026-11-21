@@ -40,20 +40,34 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: usahapintar_test
-          POSTGRES_PASSWORD: ci_test_only_password
-          POSTGRES_DB: usahapintar_test
+          POSTGRES_USER: usahapintar_ci_admin
+          POSTGRES_PASSWORD: ci_admin_only_password
+          POSTGRES_DB: usahapintar_ci_admin
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U usahapintar_test -d usahapintar_test"
+          --health-cmd "pg_isready -U usahapintar_ci_admin -d usahapintar_ci_admin"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://usahapintar_test:ci_test_only_password@localhost:5432/usahapintar_test
+      DATABASE_URL: postgres://usahapintar_migrator:ci_migrator_only_password@localhost:5432/usahapintar_test
+      APP_DATABASE_URL: postgres://usahapintar_app_login:ci_app_only_password@localhost:5432/usahapintar_test
+      CI_ADMIN_DATABASE_URL: postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_ci_admin
     steps:
       - uses: actions/checkout@v4
+      - name: Provision disposable PostgreSQL principals
+        run: |
+          psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE usahapintar_test OWNER usahapintar_ci_admin"
+          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \
+            -v ON_ERROR_STOP=1 -f backend/database/bootstrap/001_create_principals.sql
+          psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER ROLE usahapintar_migrator PASSWORD 'ci_migrator_only_password';
+          ALTER ROLE usahapintar_app_login PASSWORD 'ci_app_only_password';
+          ALTER ROLE usahapintar_backup_login PASSWORD 'ci_backup_only_password';
+          ALTER ROLE usahapintar_monitor_login PASSWORD 'ci_monitor_only_password';
+          SQL
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
