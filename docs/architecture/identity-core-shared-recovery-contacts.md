@@ -27,7 +27,7 @@ Ketentuan implementasi:
 - Pengaitan akun tujuan harus dilakukan secara atomik dan hanya sekali. Perubahan tujuan setelah pengaitan memerlukan alur baru atau prosedur terkontrol yang diaudit.
 - Challenge tetap terikat pada sesi, tujuan, kanal, dan alamat penerima yang sama. OTP tidak boleh berlaku untuk tujuan lain.
 - Sesi yang kedaluwarsa, dibatalkan, atau dikunci tidak boleh digunakan untuk memilih atau memulihkan akun.
-- account_recovery_cases dibuat sejak awal proses dan tetap menjadi catatan audit. `target_user_id` boleh NULL sampai pengguna memilih akun tujuan; kasus harus terhubung ke sesi verifikasi yang mendasarinya. Setelah akun dipilih dan pemeriksaan yang sesuai selesai, pengaitan `target_user_id` dilakukan secara atomik dan hanya sekali. Kasus tanpa target tetap dapat diproses melalui antrean berdasarkan status dan waktu, tanpa mengungkap identitas akun.
+- account_recovery_cases dibuat sejak awal proses dan tetap menjadi catatan audit. Setiap kasus wajib terhubung ke tepat satu `verification_session_id`, dan satu sesi verifikasi hanya boleh memiliki maksimal satu kasus pemulihan (foreign key wajib dengan unique constraint). Pengiriman ulang OTP menggunakan sesi dan kasus yang sama; percobaan pemulihan baru membuat sesi serta kasus baru. `target_user_id` boleh NULL sampai pengguna memilih akun tujuan. Setelah akun dipilih dan pemeriksaan yang sesuai selesai, pengaitan `target_user_id` dilakukan secara atomik dan hanya sekali. Kasus tanpa target tetap dapat diproses melalui antrean berdasarkan status dan waktu, tanpa mengungkap identitas akun.
 
 ## 3. Kontak pemulihan dapat digunakan bersama
 
@@ -86,7 +86,8 @@ Rancangan constraint dan indeks harus membedakan kontak utama pada users dari re
 ## 7. Checklist sebelum migrasi
 
 - [ ] verification_sessions.user_id nullable hanya untuk purpose pemulihan sebelum pemilihan akun.
-- [ ] account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; kasus tetap terhubung ke sesi verifikasi dan target dikaitkan atomik setelah pemeriksaan.
+- [ ] Setiap account_recovery_cases memiliki tepat satu verification_session_id yang wajib dan unique; satu sesi hanya memiliki maksimal satu kasus. OTP resend memakai kasus/sesi yang sama, percobaan baru membuat keduanya baru.
+- [ ] account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; target dikaitkan atomik setelah pemeriksaan.
 - [ ] Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
 - [ ] Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
 - [ ] Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
