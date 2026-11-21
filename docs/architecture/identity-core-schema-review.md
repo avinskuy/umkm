@@ -1,6 +1,6 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration akun 0001 terimplementasi; migration verifikasi 0002 tersedia pada branch implementasi dan menunggu CI/review
+> Status: migration akun 0001 dan migration verifikasi 0002 telah lulus CI; migration 0002 siap digabung
 > Tanggal: 21 November 2026
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
