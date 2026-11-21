@@ -6,7 +6,7 @@
 
 This document translates the approved USahapintar product and authentication policies into a proposed relational model. It is a design artifact, not a claim that these tables or features are implemented. No production migration should be created until the domain decisions and schema review are complete.
 
-The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions before creating the first identity migration.
+The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions before creating the first identity migration. The proposed account-slice contract is documented in [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md); it remains a review artifact, not an applied migration.
 
 ## 1. Design principles
 
