@@ -9,12 +9,13 @@
    - Email: a one-time code is delivered to the supplied email address.
    - Phone: a one-time code is delivered through WhatsApp.
 3. Email and phone are alternatives. Both are not required during initial registration.
-4. The account remains pending verification until the selected channel's code is successfully verified.
-5. The selected contact is normalized and uniquely reserved. A contact already associated with another account cannot be reused to create or merge an account.
-6. The non-selected contact may be added later, but must be verified independently before being treated as verified or used for security-sensitive recovery.
-7. Phone numbers use E.164 normalization. WhatsApp delivery is a server-side provider integration; credentials must never enter source control or frontend configuration.
-8. OTPs are never stored or logged in plaintext. Use keyed hashes, expiry, one-time use, bounded attempts, resend cooldown, and destination/account/network rate limits. Delivery failure never marks a contact verified.
-9. Registration and recovery responses must not reveal whether a contact is already associated with an account.
+4. A password is mandatory for every account, including accounts whose registration begins with Google OAuth. Google OAuth does not replace the account password requirement.
+5. The account remains pending verification until the selected channel's code is successfully verified. Verification is an account-activation and anti-bot control, not a passwordless login method.
+6. The selected contact is normalized and uniquely reserved. A contact already associated with another account cannot be reused to create or merge an account.
+7. The non-selected contact may be added later, but must be verified independently before being treated as verified or used for security-sensitive recovery.
+8. Phone numbers use E.164 normalization. WhatsApp delivery is a server-side provider integration; credentials must never enter source control or frontend configuration.
+9. OTPs are never stored or logged in plaintext. Use keyed hashes, expiry, one-time use, bounded attempts, resend cooldown, and destination/account/network rate limits. Delivery failure never marks a contact verified.
+10. Registration and recovery responses must not reveal whether a contact is already associated with an account.
 
 ## Role and identity invariants
 
@@ -30,7 +31,7 @@
 2. User selects Email or Phone/WhatsApp.
 3. Server validates and normalizes the contact, applies abuse limits, and creates a pending registration/challenge.
 4. Server sends a one-time code through the selected delivery channel.
-5. User submits the code; the server validates expiry, attempt budget, challenge state, purpose, and destination binding.
+5. User submits the code; the server validates expiry, attempt budget, challenge state, purpose, and destination binding. This verifies contact ownership and anti-bot eligibility; it does not authenticate a login session.
 6. In one transaction, consume the challenge, mark the selected contact verified, and activate the account only when all account-creation conditions are satisfied.
 7. User continues to role-specific onboarding.
 
@@ -57,8 +58,8 @@ Google OAuth remains part of the product for sign-in and registration. It is an 
 - Admin identities are never created through public Google OAuth.
 - Validate OAuth state, nonce, issuer, audience, signature, expiry, and exact redirect URI. Reject duplicate provider subjects and replayed callbacks.
 
-### Password and login model
-The existing design mentions email/password and phone OTP login. Confirm whether phone/WhatsApp is only a registration verification channel or also a passwordless login method. Password requirements and recovery behavior must match the chosen model.
+### Password and login model — decided
+A password is mandatory for every account, including accounts registered through Google OAuth. Email/WhatsApp codes are only for initial account activation/contact verification and are not login credentials or passwordless login. Normal credential login requires the account's password. Google OAuth remains an alternative identity-provider sign-in for an already linked identity, but does not waive the password requirement at account creation. Password recovery must use a separately verified contact and its own single-use recovery challenge; registration OTPs cannot be reused for recovery.
 
 ### Account lifecycle
 Before migration, define pending-registration expiry and cleanup; suspension, closure, and deletion states; retention of identity/contact records and audit history after closure; whether and under what verified process a closed account's email/phone can ever be reused; and recovery when a user loses access to the selected contact channel.
@@ -71,4 +72,4 @@ Approve OTP lifetime, attempt cap, resend cooldown, rate-limit windows, pending-
 
 ## Implementation gate
 
-Identity Core migrations and runtime endpoints may begin only after phone OTP login behavior, pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Google OAuth is retained under the constraints in this document.
+Identity Core migrations and runtime endpoints may begin only after pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Password is mandatory; phone/WhatsApp OTP is not a login method. Google OAuth is retained under the constraints in this document.
