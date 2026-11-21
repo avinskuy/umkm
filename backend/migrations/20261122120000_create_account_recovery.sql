@@ -42,6 +42,10 @@ CREATE INDEX recovery_contacts_verified_account_idx
     ON public.recovery_contacts (user_id, channel, verified_at DESC)
     WHERE revoked_at IS NULL;
 
+CREATE INDEX recovery_contacts_contact_lookup_idx
+    ON public.recovery_contacts (channel, contact_hmac, hmac_key_version)
+    WHERE revoked_at IS NULL;
+
 CREATE FUNCTION public.guard_recovery_contact()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -248,6 +252,11 @@ BEGIN
                 RAISE EXCEPTION 'recovery case cannot advance before contact verification'
                     USING ERRCODE = '23514';
             END IF;
+        END IF;
+
+        IF NEW.status = 'account_selection_required' AND NEW.target_user_id IS NOT NULL THEN
+            RAISE EXCEPTION 'account selection state cannot retain a selected account'
+                USING ERRCODE = '23514';
         END IF;
 
         IF NEW.status = 'approved' AND NEW.target_user_id IS NULL THEN
