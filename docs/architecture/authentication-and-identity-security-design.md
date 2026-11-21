@@ -90,8 +90,8 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
 | `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
-| `primary_role` | Canonical persisted role: `business_owner`, `investor`, or `admin` |
-| `account_status` | Pending verification, active, suspended, deactivated, deletion pending, deletion processing, or closed; transitions are explicit and audited |
+| `primary_role` | Role kanonis yang disimpan: `business_owner`, `investor`, atau `admin` |
+| `account_status` | Menunggu verifikasi, aktif, ditangguhkan, dinonaktifkan, menunggu penghapusan, proses penghapusan, atau ditutup; setiap perubahan status harus eksplisit dan diaudit |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
 | `email_verified_at` | Verification timestamp, independently nullable |
 | `phone_verified_at` | Verification timestamp, independently nullable |
