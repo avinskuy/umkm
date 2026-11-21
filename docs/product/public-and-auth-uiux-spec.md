@@ -218,7 +218,7 @@ Keep the visual layout consistent so the two pages feel like one product. Distin
 - Choose one contact method: email address OR phone number.
 - If email is chosen, send the verification code to that email address.
 - If phone is chosen, send the verification code through WhatsApp.
-- Required password and confirmation fields for every account, including Google-based registration.
+- Required password and confirmation for email/phone registration. Google registration does not ask for a separate local password.
 - Required acceptance of Terms and Privacy Policy.
 - Optional product updates consent, unchecked by default.
 
@@ -260,12 +260,12 @@ Ask for only the fields relevant to the selected stage:
 - Choose one contact method: email address OR phone number.
 - If email is chosen, send the verification code to that email address.
 - If phone is chosen, send the verification code through WhatsApp.
-- Required password and confirmation fields for every account.
+- Required password and confirmation fields for email/phone registration.
 - Required Terms and Privacy Policy acceptance.
 - Optional product updates consent, unchecked by default.
 
 **Step 2 — Contact verification**
-- Same mutually exclusive Email or Phone/WhatsApp choice and verification pattern as Owner registration. A password and confirmation are mandatory.
+- Same mutually exclusive Email or Phone/WhatsApp choice and verification pattern as Owner registration. A password and confirmation are mandatory for this email/phone registration path.
 
 **Step 3 — Investor profile**
 - Investor type/profile description, using approved non-sensitive categories.
@@ -284,7 +284,8 @@ Ask for only the fields relevant to the selected stage:
 
 - Google OAuth remains available for sign-in and registration.
 - The user must choose Owner or Investor before starting a new Google registration flow. Role context is protected by server-side OAuth state.
-- A new Google identity must still set a local password and complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
+- Before starting Google registration, the user must explicitly choose Owner or Investor; the choice is bound to server-side OAuth state. Google registration does not ask for a separate local password.
+- A new Google identity must still complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
 - Existing linked Google identities sign in only to their existing account. The account's primary role remains immutable and determines the correct portal.
 - Never auto-link based only on matching email. Linking requires fresh proof of control of both identities.
 - Admin registration is never available through public Google OAuth.
@@ -368,7 +369,7 @@ Do not send passwords, OTP values, raw phone/email, tokens, or sensitive form co
 - [ ] Shared form behavior is consistent.
 - [ ] Role mismatch is handled by the backend and gives a safe next step.
 - [ ] Password visibility, forgot password, loading, error, and rate-limit states are designed.
-- [ ] Google OAuth preserves role-bound registration, separate contact verification, and safe identity linking.
+- [ ] Google OAuth preserves mandatory role selection before new registration, separate contact verification, no separate local-password requirement, and safe identity linking.
 
 ### Registration and verification
 - [ ] Only Owner and Investor can register publicly.
