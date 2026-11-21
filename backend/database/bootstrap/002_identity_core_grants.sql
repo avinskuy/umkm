@@ -8,16 +8,20 @@ DECLARE
     v_audit_owner TEXT;
     v_owner_is_privileged BOOLEAN;
     v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
 BEGIN
-    SELECT pg_catalog.pg_get_userbyid(p.proowner), p.prosecdef
-      INTO v_function_owner, v_is_security_definer
+    SELECT pg_catalog.pg_get_userbyid(p.proowner),
+           p.prosecdef,
+           COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+      INTO v_function_owner, v_is_security_definer, v_has_safe_search_path
       FROM pg_catalog.pg_proc AS p
      WHERE p.oid = pg_catalog.to_regprocedure(
          'public.create_client_user(text,text,text,text,text,text)'
      );
 
     IF v_function_owner IS DISTINCT FROM 'usahapintar_migrator'
-       OR v_is_security_definer IS DISTINCT FROM TRUE THEN
+       OR v_is_security_definer IS DISTINCT FROM TRUE
+       OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
         RAISE EXCEPTION
             'Refusing application grants: create_client_user must be SECURITY DEFINER owned by usahapintar_migrator';
     END IF;
@@ -46,6 +50,16 @@ BEGIN
     IF v_owner_is_privileged IS DISTINCT FROM FALSE THEN
         RAISE EXCEPTION
             'Refusing SECURITY DEFINER grant: migration owner has elevated cluster privileges';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+          FROM pg_catalog.pg_auth_members AS m
+          JOIN pg_catalog.pg_roles AS r ON r.oid = m.member
+         WHERE r.rolname = 'usahapintar_migrator'
+    ) THEN
+        RAISE EXCEPTION
+            'Refusing SECURITY DEFINER grant: migration owner must not inherit or assume other roles';
     END IF;
 END;
 $ownership_guard$;
