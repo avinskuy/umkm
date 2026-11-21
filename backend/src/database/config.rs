@@ -75,7 +75,10 @@ impl fmt::Display for DatabaseConfigError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingAppDatabaseUrl => {
-                write!(formatter, "APP_DATABASE_URL environment variable is required")
+                write!(
+                    formatter,
+                    "APP_DATABASE_URL environment variable is required"
+                )
             }
             Self::MissingDatabaseUrl => {
                 write!(formatter, "DATABASE_URL environment variable is required")
