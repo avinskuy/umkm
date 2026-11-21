@@ -55,7 +55,7 @@ pub struct AuditEvent<'a> {
 pub async fn append_audit_event(
     connection: &mut PgConnection,
     event: &AuditEvent<'_>,
-) -> Result<String, sqlx::Error> {
+) -> Result<(), sqlx::Error> {
     let metadata = event.metadata.to_string();
 
     sqlx::query_scalar::<_, String>(
@@ -69,6 +69,7 @@ pub async fn append_audit_event(
     .bind(event.reason_code)
     .bind(event.request_id)
     .bind(metadata)
-    .fetch_one(connection)
+    .execute(connection)
     .await
+    .map(|_| ())
 }
