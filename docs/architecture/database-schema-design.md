@@ -261,7 +261,7 @@ Tetapkan hal-hal berikut saat peninjauan migrasi; jangan mengarang keputusan lan
 
 ### Keputusan di luar cakupan Identity Core yang ditunda
 
-Kolom profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; cakupan persetujuan serta penanganan ekspor data; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/k jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta rancangan izin moderasi/Admin yang lebih luas. Hal-hal ini tidak menghalangi migrasi Identity Core kecuali ditemukan ketergantungan yang nyata.
+Kolom profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; cakupan persetujuan serta penanganan ekspor data; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta rancangan izin moderasi/Admin yang lebih luas. Hal-hal ini tidak menghalangi migrasi Identity Core kecuali ditemukan ketergantungan yang nyata.
 
 ## 9. Review and implementation gate
 
