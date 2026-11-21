@@ -141,3 +141,44 @@ Konsekuensinya:
 
 Daftar status ini adalah baseline konseptual. Nama kolom, constraint, transisi lengkap, serta pemetaan status challenge masih harus difinalisasi dalam rancangan state machine dan tinjauan skema sebelum migrasi.
 
+
+
+### State machine challenge OTP individual
+
+Challenge OTP individual memiliki siklus hidup terpisah dari sesi verifikasi. Baseline status:
+
+- `pending`: challenge masih aktif dan dapat diverifikasi selama sesi induk mengizinkan.
+- `consumed`: kode berhasil diverifikasi dan hanya dapat digunakan satu kali.
+- `expired`: masa berlaku challenge berakhir.
+- `superseded`: challenge digantikan oleh challenge baru.
+- `cancelled`: sesi verifikasi induk dibatalkan sehingga challenge tidak lagi berlaku.
+
+Transisi yang diizinkan:
+- `pending` → `consumed` setelah verifikasi berhasil.
+- `pending` → `expired` setelah masa berlaku berakhir.
+- `pending` → `superseded` ketika challenge baru diterbitkan untuk sesi dan tujuan yang sama.
+- `pending` → `cancelled` ketika sesi induk dibatalkan.
+
+Semua status selain `pending` bersifat terminal. Satu sesi hanya boleh memiliki satu challenge aktif pada satu waktu. Kegagalan memasukkan kode dihitung pada sesi verifikasi, bukan dengan membuat challenge baru. Verifikasi berhasil harus mengonsumsi challenge dan menyelesaikan sesi secara atomik. Challenge terminal tidak boleh diaktifkan kembali.
+
+### Prinsip UX OTP yang diadopsi
+
+Gunakan pola yang familier dari alur verifikasi aplikasi yang telah digunakan luas, tanpa menyalin implementasi internal penyedia tertentu:
+
+- Tampilkan tujuan pengiriman dengan penyamaran yang cukup agar pengguna tahu ke mana kode dikirim.
+- Sediakan input kode yang mendukung autofill sistem operasi/browser jika tersedia, paste, dan input manual.
+- Tampilkan masa berlaku kode dan hitung mundur sebelum resend tersedia. Waktu di UI hanya informatif; server tetap menjadi sumber kebenaran.
+- Sediakan cara memperbaiki tujuan pengiriman jika pengguna salah memasukkan email/nomor.
+- Berikan umpan balik kesalahan yang jelas dan pertahankan input ketika aman, misalnya saat terjadi gangguan jaringan.
+- Saat sesi dikunci, jelaskan bahwa pengguna perlu menunggu dan tampilkan sisa waktu secara jelas. Jangan memberi kesan bahwa meminta kode baru dapat melewati penguncian.
+- Ingatkan pengguna agar tidak membagikan kode kepada siapa pun.
+- Jangan tampilkan status internal seperti `consumed` atau `superseded` kepada pengguna; gunakan bahasa tindakan yang sederhana.
+
+Panjang kode OTP tetap belum ditetapkan. Pilihan kanal alternatif, termasuk apakah tersedia metode pengiriman cadangan, juga belum ditetapkan. Penerapan autofill harus mengikuti kemampuan platform dan tidak boleh meminta izin luas untuk membaca SMS. Verifikasi kode selalu dilakukan di server.
+
+Acuan pola UX dan kemampuan platform:
+- WhatsApp Help Center, [Cara Mendaftarkan Nomor Telepon](https://faq.whatsapp.com/684051319521343/?cms_platform=android&locale=id_ID).
+- Google for Developers, [Automatic SMS Verification with the SMS Retriever API](https://developers.google.com/identity/sms-retriever/overview).
+- Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
+
+Keputusan operasional yang masih perlu dibahas terpisah: apakah penerbitan/resend challenge diperbolehkan selama sesi sedang terkunci satu jam. Apa pun pilihannya, challenge baru tidak boleh membuat sesi dapat diverifikasi sebelum penguncian berakhir.
