@@ -4,7 +4,7 @@
 > Tanggal: 21 November 2026
 > Cakupan: keputusan teknis lintas migration Identity Core
 
-Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau mengaktifkan koneksi database pada HTTP startup. Migration akun 0001 telah dibuat dan diuji; kontrak migration verifikasi 0002 disusun terpisah. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
+Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau mengaktifkan koneksi database pada HTTP startup. Migration 0001–0003 telah dibuat, diuji, dan di-merge; kontrak migration verifikasi, sesi, dan pemulihan disusun terpisah. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
 
 ## 1. Perlindungan tujuan pengiriman OTP
 
