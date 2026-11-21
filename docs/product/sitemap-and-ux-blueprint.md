@@ -16,10 +16,10 @@ It is **not** a goods marketplace or an investment transaction platform. The MVP
 ### Client roles
 
 - **Business Owner** — creates and manages business profiles, publishes business promotion/opportunity posts, uses Growth Advisor, and builds connections.
-- **Investor** — discovers business opportunities, publishes partnership-seeking posts where permitted, uses Investment Intelligence, and builds connections.
+- **Investor** — discovers business opportunities, creates and manages partnership-seeking posts using the Investor post format, uses Investment Intelligence, and builds connections.
 - **Admin** — internal operational role for verification, moderation, membership, reports, and platform governance. Admin accounts are provisioned internally and are not offered in public registration.
 
-Each client account has one primary role in the MVP. Owner and Investor experiences use separate login entry points and role-aware authorization. The backend remains the authority for role and resource access.
+Each client account has exactly one immutable primary client role: `owner` or `investor`. The role is selected during registration and cannot be changed later through profile settings, support requests, account migration, OAuth, or any other self-service or administrative workflow. Anyone who wants to use the other client role must register a separate new account with eligible, unlinked login identities. Owner and Investor experiences use separate login entry points and role-aware authorization. The backend is authoritative for role and resource access. Admin is a separately provisioned internal role and is not a client registration choice.
 
 ## 2. Global information architecture
 
@@ -115,8 +115,8 @@ Suggested route prefix: `/investor`.
 | `/investor/jelajah` | Opportunity discovery | Search and filter business opportunities |
 | `/investor/jelajah/:postId` | Opportunity detail | Owner-approved business information, evidence labels, and connection request |
 | `/investor/tersimpan` | Saved opportunities | Bookmarked opportunities and status changes |
-| `/investor/postingan` | My partnership posts | Manage partnership/partner-seeking posts, if enabled for the account |
-| `/investor/postingan/baru` | Create partnership post | Describe partnership intent, preferred sector, region, and collaboration scope |
+| `/investor/postingan` | My partnership posts | Create and manage partnership-seeking posts using the Investor-specific format, subject to membership quotas and moderation |
+| `/investor/postingan/baru` | Create partnership post | Create an Investor-format post describing partnership intent, preferred sector, region, and collaboration scope |
 | `/investor/koneksi` | Connection management | Requests, accepted connections, and introductions |
 | `/investor/pesan` | Messages | Chat with approved connections |
 | `/investor/investment-intelligence` | Investment Intelligence home | Guided analysis and saved reports |
@@ -158,7 +158,7 @@ Use least-privilege permissions, MFA, strict session expiry, rate limits, and ap
 ### Owner journey
 
 1. Public landing → choose Owner registration.
-2. Register with email, phone, or Google; verify required contact methods.
+2. Select Business Owner as the account's permanent primary role, register with email, phone, or Google, and verify required contact methods.
 3. Complete stage-aware business onboarding.
 4. Enter Owner dashboard and complete the business profile.
 5. Publish a promotion/opportunity post within membership limits.
@@ -169,7 +169,7 @@ Use least-privilege permissions, MFA, strict session expiry, rate limits, and ap
 ### Investor journey
 
 1. Public landing → choose Investor registration.
-2. Register and verify required contact methods.
+2. Select Investor as the account's permanent primary role, register, and verify required contact methods.
 3. Complete investor profile and discovery preferences.
 4. Enter Investor dashboard and explore opportunities.
 5. Review an opportunity and its data-source/verification labels.
