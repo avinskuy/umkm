@@ -1,5 +1,6 @@
 pub mod config;
 pub mod database;
+pub mod identity;
 
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
