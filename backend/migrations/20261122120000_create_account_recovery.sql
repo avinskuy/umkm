@@ -197,7 +197,7 @@ BEGIN
         FROM public.verification_sessions
         WHERE id = NEW.verification_session_id;
 
-        IF NOT FOUND OR v_session_purpose <> 'account_recovery' OR v_session_user_id IS NOT NULL THEN
+        IF NOT FOUND OR v_session_purpose <> 'account_recovery' OR v_session_status <> 'pending' OR v_session_user_id IS NOT NULL THEN
             RAISE EXCEPTION 'account recovery case requires an unbound account-recovery verification session'
                 USING ERRCODE = '23514';
         END IF;
@@ -240,6 +240,21 @@ BEGIN
     END IF;
 
     IF NEW.status IS DISTINCT FROM OLD.status THEN
+        IF OLD.status = 'pending_verification' AND NEW.status <> 'pending_verification' THEN
+            SELECT purpose, status INTO v_session_purpose, v_session_status
+            FROM public.verification_sessions
+            WHERE id = OLD.verification_session_id;
+            IF v_session_purpose <> 'account_recovery' OR v_session_status <> 'verified' THEN
+                RAISE EXCEPTION 'recovery case cannot advance before contact verification'
+                    USING ERRCODE = '23514';
+            END IF;
+        END IF;
+
+        IF NEW.status = 'approved' AND NEW.target_user_id IS NULL THEN
+            RAISE EXCEPTION 'recovery case cannot be approved without a selected account'
+                USING ERRCODE = '23514';
+        END IF;
+
         IF NOT (
             (OLD.status = 'pending_verification' AND NEW.status IN ('account_selection_required', 'under_review', 'rejected', 'cancelled', 'expired'))
             OR (OLD.status = 'account_selection_required' AND NEW.status IN ('under_review', 'rejected', 'cancelled', 'expired'))
