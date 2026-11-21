@@ -1,10 +1,10 @@
 # Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP
 
-> Status: rancangan teknis untuk review sebelum migration SQL dibuat
+> Status: migration 0002 telah lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL; patch final tetap melalui review sebelum merge
 
-Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Dokumen ini belum mengimplementasikan tabel, endpoint, provider OTP, enkripsi, atau koneksi database pada HTTP startup.
+Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, operasi enkripsi/HMAC, atau koneksi database pada HTTP startup.
 
-Migration 0002 hanya mencakup sesi verifikasi, challenge OTP, dan event pengiriman untuk rate limit kontak lintas sesi/instance. Recovery contacts, account recovery cases, password reset, login sessions, audit, dan notifikasi tetap berada pada slice terpisah.
+Migration 0002 mencakup sesi verifikasi, challenge OTP, event percobaan verifikasi lintas sesi, dan event pengiriman untuk rate limit kontak lintas sesi/instance. Recovery contacts, account recovery cases, password reset, login sessions, audit, dan notifikasi tetap berada pada slice terpisah.
 
 ## 1. Tujuan dan batas
 
@@ -118,7 +118,7 @@ Tabel append-only ini mencatat percobaan verifikasi kode yang benar-benar dipros
 - Event `succeeded` dicatat untuk jejak hasil, tetapi tidak mengonsumsi anggaran kegagalan.
 - Nilai tujuan disimpan hanya sebagai HMAC dan versi key; tidak ada OTP, plaintext tujuan, atau token yang disimpan.
 - Event bersifat append-only pada batas aplikasi. Penghapusan hanya melalui cleanup terkontrol setelah keluar dari jendela rate limit dan retensi operasional yang ditetapkan.
-- Ambang numerik dan jendela limit percobaan lintas sesi belum ditetapkan oleh kebijakan produk. Nilainya wajib ditetapkan pada konfigurasi backend sebelum verifikasi OTP diaktifkan; jangan mengarang angka pada migration.
+- Batas percobaan gagal lintas sesi ditetapkan maksimal **5 kegagalan per kontak dalam jendela bergulir 60 menit**, dihitung lintas seluruh sesi dan purpose. Hanya event `failed` yang mengonsumsi anggaran; event `succeeded` dicatat untuk jejak hasil. Runtime wajib menghitung dan mencatat event dalam transaksi PostgreSQL yang diserialisasi berdasarkan fingerprint kontak/kanal. Migration menyediakan penyimpanan dan indeks, tetapi belum menegakkan angka limit tanpa runtime verifikasi.
 - Selama rotasi HMAC, hitung dan kunci fingerprint dari semua versi aktif secara deterministik, konsisten dengan tabel delivery events.
 
 ## 5. Tabel `otp_delivery_events`
@@ -224,15 +224,15 @@ Semua tes race/concurrency harus memakai beberapa koneksi PostgreSQL nyata, buka
 
 ## 9. Gate sebelum implementasi
 
-Migration SQL 0002 baru boleh dibuat setelah review memastikan:
+Migration SQL 0002 telah dibuat dan diuji. Bagian ini mencatat gerbang lanjutan sebelum runtime OTP diaktifkan:
 
 - [ ] Kontrak purpose dan channel sesuai alur produk yang disetujui.
 - [ ] Representasi ciphertext/HMAC/key version cocok dengan abstraksi key provider yang akan dipakai backend.
 - [ ] Operasi advisory lock dan rotasi HMAC tidak membuka bypass untuk pengiriman maupun percobaan verifikasi.
-- [ ] Ambang dan jendela percobaan gagal lintas sesi ditetapkan sebelum runtime OTP diaktifkan.
-- [ ] Semua constraint, partial index, FK, dan state transition sudah ditinjau.
+- [x] Ambang percobaan gagal lintas sesi ditetapkan: 5 kegagalan per kontak dalam jendela bergulir 60 menit. Runtime tetap wajib menegakkan limit ini secara atomik sebelum OTP diaktifkan.
+- [x] Constraint, partial index, FK, dan state transition dasar telah ditinjau serta diuji di CI; enforcement transaksi/concurrency runtime tetap menjadi pekerjaan implementasi berikutnya.
 - [ ] Rencana transaksi resend, verifikasi, reset lock, dan cleanup jelas.
-- [ ] Tes PostgreSQL untuk concurrency dan batas waktu sudah dirancang.
+- [x] Tes PostgreSQL memvalidasi constraint dan state dasar; tes concurrency untuk enforcement runtime OTP tetap wajib sebelum fitur diaktifkan.
 - [ ] Tidak ada key, OTP, tujuan plaintext, atau data produksi dalam migration/test fixture.
 - [ ] Migration tetap terpisah dari runtime endpoint, provider, login session, recovery case, dan deployment.
 

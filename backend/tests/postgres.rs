@@ -27,6 +27,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_contact_reservations_and_release(&pool).await;
     assert_provider_identity_invariants(&pool).await;
     assert_client_creation_function(&pool).await;
+    assert_verification_schema_invariants(&pool).await;
 
     pool.close().await;
     assert_pool_closed(&pool);
@@ -771,4 +772,334 @@ async fn insert_active_email(pool: &PgPool, email: &str) -> String {
 
 fn assert_pool_closed(pool: &PgPool) {
     assert!(pool.is_closed());
+}
+
+async fn assert_verification_schema_invariants(pool: &PgPool) {
+    let pending_user_id = insert_pending_email(
+        pool,
+        "business_owner",
+        "verification-schema-owner@example.test",
+        Some("encoded-password-hash"),
+    )
+    .await
+    .expect("pending account should be available for registration verification");
+
+    let session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (              user_id, purpose, channel, destination_ciphertext, destination_nonce,              encryption_key_version, destination_hmac, hmac_key_version, expires_at          )          VALUES (              $1::uuid, 'registration', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1',              clock_timestamp() + INTERVAL '20 minutes'          )          RETURNING id::text",
+    )
+    .bind(&pending_user_id)
+    .bind(vec![1_u8])
+    .bind(vec![2_u8])
+    .bind(vec![3_u8])
+    .fetch_one(pool)
+    .await
+    .expect("valid registration verification session should be accepted");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_sessions (                  purpose, channel, destination_ciphertext, destination_nonce,                  encryption_key_version, destination_hmac, hmac_key_version, expires_at              )              VALUES (                  'registration', 'email', '\\x01', '\\x02', 'enc-v1', '\\x03', 'hmac-v1',                  clock_timestamp() + INTERVAL '10 minutes'              )"
+        )
+        .execute(pool)
+        .await
+        .is_err(),
+        "registration verification must require a user"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_sessions (                  user_id, purpose, channel, destination_ciphertext, destination_nonce,                  encryption_key_version, destination_hmac, hmac_key_version, expires_at              )              VALUES (                  $1::uuid, 'registration', 'whatsapp', $2, $3, 'enc-v1', $4, 'hmac-v1',                  clock_timestamp() + INTERVAL '20 minutes'              )"
+        )
+        .bind(&pending_user_id)
+        .bind(vec![1_u8])
+        .bind(vec![2_u8])
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "registration verification channel must match the selected initial contact"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_sessions (                  user_id, purpose, channel, destination_ciphertext, destination_nonce,                  encryption_key_version, destination_hmac, hmac_key_version, expires_at              )              VALUES (                  $1::uuid, 'registration', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1',                  clock_timestamp() + INTERVAL '40 minutes'              )"
+        )
+        .bind(&pending_user_id)
+        .bind(vec![1_u8])
+        .bind(vec![2_u8])
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "registration verification cannot outlive the pending account"
+    );
+
+    let lock_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (              user_id, purpose, channel, destination_ciphertext, destination_nonce,              encryption_key_version, destination_hmac, hmac_key_version, expires_at          ) VALUES ($1::uuid, 'registration', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1',              clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text"
+    )
+    .bind(&pending_user_id)
+    .bind(vec![1_u8])
+    .bind(vec![2_u8])
+    .bind(vec![3_u8])
+    .fetch_one(pool)
+    .await
+    .expect("second registration session should be accepted");
+
+    for count in 1_i16..=4 {
+        sqlx::query(
+            "UPDATE public.verification_sessions SET failed_attempt_count = $2 WHERE id = $1::uuid",
+        )
+        .bind(&lock_session_id)
+        .bind(count)
+        .execute(pool)
+        .await
+        .expect("failed attempt counter should increment one at a time");
+    }
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET failed_attempt_count = 5 WHERE id = $1::uuid",
+    )
+    .bind(&lock_session_id)
+    .execute(pool)
+    .await
+    .expect("fifth failed attempt should establish a one-hour lock");
+
+    let remaining_lock_seconds: f64 = sqlx::query_scalar(
+        "SELECT EXTRACT(EPOCH FROM (locked_until - clock_timestamp()))::double precision          FROM public.verification_sessions WHERE id = $1::uuid"
+    )
+    .bind(&lock_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("fifth failed attempt should persist a lock deadline");
+    assert!(
+        remaining_lock_seconds >= 3590.0,
+        "fifth failed attempt should lock the session for one hour"
+    );
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_sessions              SET failed_attempt_count = 0, locked_until = NULL WHERE id = $1::uuid"
+        )
+        .bind(&lock_session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "session failure counter cannot reset before its one-hour lock expires"
+    );
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid"
+        )
+        .bind(&lock_session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "a locked session cannot be verified through a direct state update"
+    );
+
+    let recovery_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (              purpose, channel, destination_ciphertext, destination_nonce,              encryption_key_version, destination_hmac, hmac_key_version, expires_at          )          VALUES (              'account_recovery', 'email', '\\x01', '\\x02', 'enc-v1', '\\x03', 'hmac-v1',              clock_timestamp() + INTERVAL '20 minutes'          )          RETURNING id::text",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("preselection account recovery session may omit its user");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_sessions (                  user_id, purpose, channel, destination_ciphertext, destination_nonce,                  encryption_key_version, destination_hmac, hmac_key_version, status, verified_at, expires_at              ) VALUES ($1::uuid, 'registration', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1',                  'verified', clock_timestamp(), clock_timestamp() + INTERVAL '10 minutes')"
+        )
+        .bind(&pending_user_id)
+        .bind(vec![1_u8])
+        .bind(vec![2_u8])
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "verification session must be inserted in pending state"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_challenges (                  verification_session_id, code_hash, hash_key_version, status, consumed_at, expires_at              ) VALUES ($1::uuid, $2, 'otp-hash-v1', 'consumed', clock_timestamp(),                  clock_timestamp() + INTERVAL '5 minutes')"
+        )
+        .bind(&session_id)
+        .bind(vec![7_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "verification challenge must be inserted in pending state"
+    );
+
+    let challenge_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_challenges (              verification_session_id, code_hash, hash_key_version, expires_at          )          VALUES ($1::uuid, $2, 'otp-hash-v1', clock_timestamp() + INTERVAL '5 minutes')          RETURNING id::text",
+    )
+    .bind(&session_id)
+    .bind(vec![4_u8])
+    .fetch_one(pool)
+    .await
+    .expect("valid challenge should be accepted");
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_challenges (                  verification_session_id, code_hash, hash_key_version, expires_at              )              VALUES ($1::uuid, $2, 'otp-hash-v1', clock_timestamp() + INTERVAL '5 minutes')"
+        )
+        .bind(&session_id)
+        .bind(vec![5_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "a session may have only one pending challenge"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_challenges (                  verification_session_id, code_hash, hash_key_version, expires_at              )              VALUES ($1::uuid, $2, 'otp-hash-v1', clock_timestamp() + INTERVAL '11 minutes')"
+        )
+        .bind(&session_id)
+        .bind(vec![6_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "challenge lifetime cannot exceed ten minutes"
+    );
+
+    let locked_challenge_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_challenges (verification_session_id, code_hash, hash_key_version, expires_at) VALUES ($1::uuid, $2, 'otp-hash-v1', clock_timestamp() + INTERVAL '5 minutes') RETURNING id::text"
+    )
+    .bind(&lock_session_id)
+    .bind(vec![8_u8])
+    .fetch_one(pool)
+    .await
+    .expect("challenge may be issued while a session is locked");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_challenges SET status = 'consumed', consumed_at = clock_timestamp() WHERE id = $1::uuid"
+        )
+        .bind(&locked_challenge_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "a challenge cannot be consumed while its parent session is locked"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.otp_verification_attempt_events (                  verification_session_id, verification_challenge_id, destination_hmac,                  hmac_key_version, channel, purpose, outcome              )              VALUES ($1::uuid, $2::uuid, $3, 'hmac-v1', 'email', 'registration', 'failed')"
+        )
+        .bind(&session_id)
+        .bind(&challenge_id)
+        .bind(vec![9_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "attempt event fingerprint must match its session"
+    );
+
+    sqlx::query(
+        "INSERT INTO public.otp_verification_attempt_events (              verification_session_id, verification_challenge_id, destination_hmac,              hmac_key_version, channel, purpose, outcome          )          VALUES ($1::uuid, $2::uuid, $3, 'hmac-v1', 'email', 'registration', 'failed')",
+    )
+    .bind(&session_id)
+    .bind(&challenge_id)
+    .bind(vec![3_u8])
+    .execute(pool)
+    .await
+    .expect("valid failed attempt event should be recorded");
+
+    sqlx::query(
+        "UPDATE public.verification_challenges SET status = 'consumed', consumed_at = clock_timestamp() WHERE id = $1::uuid"
+    )
+    .bind(&challenge_id)
+    .execute(pool)
+    .await
+    .expect("challenge may be consumed while its parent session is eligible");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.otp_verification_attempt_events              SET outcome = 'succeeded' WHERE verification_session_id = $1::uuid"
+        )
+        .bind(&session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "verification attempt events cannot be rewritten"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.otp_verification_attempt_events (                  verification_session_id, verification_challenge_id, destination_hmac,                  hmac_key_version, channel, purpose, outcome              )              VALUES ($1::uuid, $2::uuid, $3, 'hmac-v1', 'email', 'account_recovery', 'failed')"
+        )
+        .bind(&recovery_session_id)
+        .bind(&challenge_id)
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "attempt event must reference a challenge belonging to the same session"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.otp_delivery_events (                  destination_hmac, hmac_key_version, channel, purpose, dispatch_status              ) VALUES ($1, 'hmac-v1', 'email', 'registration', 'accepted')"
+        )
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "delivery event must be inserted in pending state"
+    );
+
+    let delivery_id: String = sqlx::query_scalar(
+        "INSERT INTO public.otp_delivery_events (              destination_hmac, hmac_key_version, channel, purpose          ) VALUES ($1, 'hmac-v1', 'email', 'registration') RETURNING id::text",
+    )
+    .bind(vec![3_u8])
+    .fetch_one(pool)
+    .await
+    .expect("valid delivery event should be recorded");
+
+    sqlx::query(
+        "UPDATE public.otp_delivery_events SET dispatch_status = 'accepted' WHERE id = $1::uuid",
+    )
+    .bind(&delivery_id)
+    .execute(pool)
+    .await
+    .expect("pending delivery event may transition to accepted");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.otp_delivery_events SET dispatch_status = 'failed' WHERE id = $1::uuid"
+        )
+        .bind(&delivery_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "terminal delivery event status cannot be reopened"
+    );
+
+    sqlx::query(
+        "UPDATE public.verification_sessions          SET status = 'verified', verified_at = clock_timestamp()          WHERE id = $1::uuid",
+    )
+    .bind(&recovery_session_id)
+    .execute(pool)
+    .await
+    .expect("pending recovery session may become verified");
+
+    let selected_user_id = insert_active_email(pool, "recovery-target@example.test").await;
+    sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
+        .bind(&recovery_session_id)
+        .bind(&selected_user_id)
+        .execute(pool)
+        .await
+        .expect("verified recovery session may be assigned to one selected account");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_sessions              SET user_id = NULL WHERE id = $1::uuid"
+        )
+        .bind(&recovery_session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "selected recovery account binding cannot be cleared"
+    );
 }

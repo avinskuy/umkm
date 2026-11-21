@@ -1,21 +1,20 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration akun pertama terimplementasi; kontrak migration verifikasi 0002 sedang ditinjau
+> Status: migration akun 0001 dan migration verifikasi 0002 telah lulus CI; migration 0002 siap digabung
 > Tanggal: 21 November 2026
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
-Dokumen ini adalah catatan gerbang desain teknis awal Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun pertama telah tersedia dan diuji. Kontrak migration verifikasi 0002 sedang disusun sebagai gerbang terpisah; dokumen ini tidak mengaktifkan database pada HTTP startup.
+Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun 0001 dan migration verifikasi 0002 tersedia pada repository dan diuji melalui CI PostgreSQL. Keduanya belum dijalankan pada database produksi; dokumen ini tidak mengaktifkan database pada HTTP startup.
 
 ## 1. Hasil pemeriksaan repository
 
 - Backend menggunakan Rust, Axum, Tokio, dan SQLx 0.8 dengan PostgreSQL 16 sebagai baseline.
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
-- `backend/migrations/` kini memiliki migration akun Identity Core pertama untuk `users` dan `user_identities`.
+- `backend/migrations/` memiliki migration akun 0001 untuk `users` dan `user_identities`, serta migration 0002 untuk sesi verifikasi, challenge, dan event OTP pada branch implementasi.
 - HTTP server saat ini hanya menyediakan `GET /api/v1/health`. Database belum diinisialisasi oleh proses startup.
-- Tes integrasi PostgreSQL kini memeriksa constraint akun, role immutable, initial-contact provenance, deadline registrasi 30 menit, masa tunggu penghapusan 30 hari, reservasi kontak, konkurensi, Google provider identity, dan metode autentikasi.
-- Tidak ada pull request terbuka saat pemeriksaan. Tidak ada perubahan runtime atau deployment yang dilakukan dalam tahap ini.
-
-Pada saat review awal, belum ada skema domain yang digunakan bersama. Migration akun pertama kini dibuat dan diuji pada PostgreSQL sementara di CI. Migration tersebut belum dijalankan pada database produksi dan tidak mengaktifkan registrasi/login.
+- Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, initial-contact provenance, reservasi kontak, provider identity, metode autentikasi, sesi verifikasi, challenge OTP, fingerprint event, dan lifecycle lock.
+- Migration 0002 diuji pada PostgreSQL sementara melalui CI; hasil CI dan review final harus selalu diverifikasi terhadap head PR terbaru.
+- HTTP server belum menginisialisasi database pada startup. Tidak ada endpoint OTP, provider, operasi enkripsi/HMAC, atau aktivasi fitur yang disertakan dalam migration ini.
 
 ## 2. Prinsip desain yang harus dipertahankan
 
@@ -37,7 +36,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 | Urutan | Cakupan | Isi utama |
 | --- | --- | --- |
 | 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, identitas provider, dan perlindungan role immutable |
-| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; kontrak skema sedang ditinjau di [dokumen migration 0002](identity-core-migration-0002-verification-contract.md) |
+| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; skema tersedia dan diuji di CI, runtime OTP tetap belum diimplementasikan |
 | 0003 | Sesi autentikasi | `sessions`, token hash, idle/absolute expiry, dan pencabutan |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
 | 0005 | Audit Identity Core | audit event yang dibutuhkan untuk perubahan identitas, sesi, verifikasi, dan pemulihan |
@@ -115,7 +114,7 @@ Rekomendasi:
 - Reset lock sesi tidak boleh mereset penghitung pengiriman per kontak.
 - Jangan mengandalkan cache proses lokal untuk kontrol yang harus berlaku lintas instance atau setelah restart.
 
-Pilihan algoritma/jendela rate limit dan key rotation perlu ditetapkan sebelum migration verifikasi dibuat; jangan mengimplementasikan tabel generik yang belum punya kontrak operasi jelas.
+Kontrak event pengiriman dan indeks pencarian telah tersedia pada migration 0002. Batas lima pengiriman per kontak dalam 60 menit dan cooldown 60 detik tetap harus ditegakkan oleh runtime melalui transaksi PostgreSQL yang diserialisasi berdasarkan fingerprint kontak/kanal. Rotasi HMAC harus mempertahankan penghitungan lintas versi agar perubahan key tidak membuka bypass limit.
 
 ### 4.6 `sessions`
 
@@ -224,9 +223,9 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Pekerjaan berikutnya adalah meninjau kontrak [migration 0002 untuk verifikasi kontak](identity-core-migration-0002-verification-contract.md), khususnya konsistensi enkripsi/HMAC, rotasi fingerprint, serialisasi advisory lock, batas percobaan lintas sesi, dan transaksi resend/verifikasi. Migration SQL belum dibuat sampai kontrak ini lolos review. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
+Migration 0002 tersedia pada branch implementasi dan telah lulus quality checks serta tes integrasi PostgreSQL CI pada head yang diperiksa. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
-Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
+Migration 0001 maupun 0002 tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
 ## 9. Referensi internal
 
