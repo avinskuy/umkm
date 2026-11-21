@@ -3,7 +3,7 @@
 > Status: proposed technical design; review required before implementation  
 > Product reference: `docs/product/public-and-auth-uiux-spec.md`  
 > Wireframe reference: `docs/product/low-fidelity-public-auth-wireframes.md`  
-> Backend direction: Rust + Axum; PostgreSQL + SQLx is the proposed persistence baseline.
+> Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 runtime foundation is available, but domain schema migrations are not yet implemented.
 
 This document defines the first authentication architecture for USahapintar. It is a design contract, not an implemented or security-audited system. Provider choices, operational secrets, retention periods, and final policies must be approved before production use.
 
@@ -79,7 +79,7 @@ Do not implement authorization as scattered frontend conditions. Use shared back
 
 ## 3. Proposed data model
 
-PostgreSQL is the proposed relational store. SQLx migrations should be versioned and reversible where practical. Use UUID primary keys and UTC timestamps. Exact SQL types and indexes are finalized in migrations.
+PostgreSQL 16 is the selected relational baseline. SQLx connection configuration, pool, and explicit migrator foundation are available, but the HTTP server does not yet initialize the database at startup and no domain schema migrations exist. Migrations must be versioned and immutable after application to a shared database. Use UUID primary keys and UTC timestamps. Exact SQL types and indexes are finalized in migration reviews.
 
 ### `users`
 
@@ -277,7 +277,7 @@ Google OAuth is supported for sign-in and registration. It does not replace mand
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| GET | `/auth/oauth/google/start?role=owner` | Begin Owner-context OAuth |
+| GET | `/auth/oauth/google/start?role=business_owner` | Begin Owner-context OAuth |
 | GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
 | GET | `/auth/oauth/google/callback` | Validate provider response and continue the role-bound flow |
 
@@ -326,7 +326,7 @@ Avoid storing long-lived bearer tokens in localStorage. If a cross-site architec
 - Role mismatch never creates a session.
 - Sensitive admin actions may require recent re-authentication/MFA.
 
-Exact idle/absolute timeouts must be chosen before production and documented in operations settings.
+Enforce the approved session limits: 7 days of inactivity and 30 days absolute. Persistent-device preference must not bypass either limit or server-side revocation. Sensitive actions may require fresh authentication.
 
 ## 6. Password policy
 
@@ -524,9 +524,9 @@ Hal-hal berikut harus ditetapkan sebelum sistem siap digunakan di lingkungan pro
 - Pemilihan penyedia email dan WhatsApp Business/API, persyaratan pengirim/template, keandalan pengiriman di Indonesia, percobaan ulang, pemantauan, batas biaya, dan penanggung jawab operasional.
 - Konfigurasi klien Google OAuth, alamat callback produksi, dan pengelolaan rahasia.
 - Parameter hashing kata sandi yang tepat dan perilaku pemulihan kredensial untuk akun yang hanya menggunakan Google jika pengaturan kata sandi lokal kelak disediakan.
-- Masa retensi berdasarkan kategori data, penanganan penghapusan/cadangan, dan penggunaan kembali kontak setelah akun ditutup.
-- Metode MFA Admin, proses pemulihan, dan kewenangan petugas yang meninjau pemulihan akun secara manual.
+- Masa retensi numerik berdasarkan kategori data, jadwal backup, dan durasi penyelesaian penghapusan. Kebijakan produk telah menetapkan masa tunggu pembatalan 30 hari; kontak utama baru dapat digunakan kembali setelah penghapusan selesai dan kontak dilepas secara sah. Kontak pemulihan bersama tetap diperbolehkan.
+- Metode dan penyedia MFA Admin, serta pemetaan izin teknis untuk petugas khusus yang menangani pemeriksaan pemulihan manual. Kebijakan pemulihan berbasis risiko dan standar bukti telah disetujui.
 - Penyimpanan pembatasan permintaan terdistribusi dan ambang operasional; penegakannya harus berlaku di seluruh instance aplikasi.
-- Kriteria bukti pemulihan yang terperinci, kendali eskalasi, dan persyaratan persetujuan dua pihak untuk kasus berisiko tinggi.
+- Skema metadata bukti pemulihan, pembobotan sinyal, kontrol eskalasi, dan kebutuhan persetujuan dua pihak untuk kasus berisiko tinggi; dokumen identitas atau selfie bukan metode standar pemulihan.
 
 Batas awal produk yang telah disetujui (OTP, masa berlaku pendaftaran tertunda, durasi sesi, masa tunggu penonaktifan/penghapusan, dan perilaku pemulihan) sudah didokumentasikan di atas dan bukan lagi keputusan yang belum ditetapkan.
