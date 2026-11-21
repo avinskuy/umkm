@@ -1,41 +1,43 @@
-# Contributing to USahapintar
+# Panduan Kontribusi USahapintar
 
-## Working agreement
+## Kesepakatan kerja
 
-1. Start from an up-to-date `main` and use a focused branch.
-2. Keep each change scoped to one feature or engineering concern.
-3. Read the relevant architecture and engineering documentation before changing boundaries.
-4. Add or update tests with behavior changes.
-5. Run formatting, linting, type checks, and tests before opening a pull request.
-6. Explain trade-offs and known limitations in the pull request.
-7. Do not merge failing or unreviewed changes.
+1. Mulai dari branch `main` yang sudah diperbarui dan gunakan branch khusus untuk setiap pekerjaan.
+2. Batasi setiap perubahan pada satu fitur atau satu kebutuhan rekayasa perangkat lunak.
+3. Baca dokumentasi arsitektur dan standar engineering yang relevan sebelum mengubah batas tanggung jawab modul.
+4. Tambahkan atau perbarui pengujian setiap kali perilaku sistem berubah.
+5. Jalankan pemeriksaan format, lint, tipe, dan pengujian sebelum membuka pull request.
+6. Jelaskan pertimbangan teknis serta keterbatasan yang masih diketahui di pull request.
+7. Jangan gabungkan perubahan yang gagal dalam pemeriksaan atau belum ditinjau.
 
-## Branch naming
+## Penamaan branch
 
-- `feat/<scope>` — product features.
-- `fix/<scope>` — bug fixes.
-- `chore/<scope>` — tooling and maintenance.
-- `docs/<scope>` — documentation-only changes.
-- `test/<scope>` — test infrastructure or coverage.
+- `feat/<scope>` — fitur produk.
+- `fix/<scope>` — perbaikan bug.
+- `chore/<scope>` — tooling dan pemeliharaan.
+- `docs/<scope>` — perubahan dokumentasi saja.
+- `test/<scope>` — infrastruktur atau cakupan pengujian.
 
-## Commit messages
+## Pesan commit
 
-Use Conventional Commits, for example:
+Gunakan format Conventional Commits. Contoh:
 
 - `feat(auth): add owner login flow`
 - `fix(api): reject mismatched account roles`
 - `chore(ci): add Rust quality checks`
 - `docs(architecture): document module boundaries`
 
-## Definition of Done
+Format pesan commit dan identifier teknis tetap mengikuti konvensi aslinya.
 
-- Scope and acceptance criteria are met.
-- No unrelated formatting or generated-file noise.
-- Frontend: format, lint, typecheck, unit tests, and build pass where applicable.
-- Backend: rustfmt, Clippy, unit/integration tests, and build checks pass where applicable.
-- Authorization and input validation are tested for security-sensitive behavior.
-- Documentation and environment examples are updated.
-- No credentials, personal data, or production data are committed.
-- CI is green and the diff has been reviewed.
+## Kriteria Selesai (Definition of Done)
 
-Never commit secrets. Use local environment files and keep them out of version control.
+- Cakupan pekerjaan dan kriteria penerimaan sudah terpenuhi.
+- Tidak ada perubahan format yang tidak terkait atau file hasil generate yang tidak diperlukan.
+- Frontend: pemeriksaan format, lint, typecheck, unit test, dan build berhasil jika relevan.
+- Backend: rustfmt, Clippy, unit/integration test, dan build berhasil jika relevan.
+- Otorisasi dan validasi input untuk perilaku sensitif terhadap keamanan sudah diuji.
+- Dokumentasi dan contoh konfigurasi lingkungan sudah diperbarui.
+- Tidak ada kredensial, data pribadi, atau data produksi yang ikut di-commit.
+- CI berstatus hijau dan seluruh diff sudah ditinjau.
+
+Jangan pernah melakukan commit terhadap rahasia. Gunakan file konfigurasi lingkungan lokal dan pastikan file tersebut tidak masuk version control.
