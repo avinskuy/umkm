@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::{postgres::PgPoolOptions, raw_sql, PgPool};
 use usahapintar_api::database::{connect, migrations::run, DatabaseConfig};
 
 #[tokio::test]
@@ -31,6 +31,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_authentication_session_invariants(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
+    assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
     assert_pool_closed(&pool);
@@ -1719,4 +1720,238 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
             .is_err(),
         "identity audit events must reject truncation"
     );
+}
+
+async fn assert_database_principal_bootstrap(pool: &PgPool) {
+    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL").expect(
+        "CI must provide a disposable target-database DBA connection for privilege bootstrap tests",
+    );
+    let admin_pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&admin_url)
+        .await
+        .expect("disposable DBA connection should succeed");
+
+    raw_sql(include_str!(
+        "../database/bootstrap/002_identity_core_grants.sql"
+    ))
+    .execute(&admin_pool)
+    .await
+    .expect("guarded Identity Core grants should apply after migrations");
+
+    let app_url = std::env::var("APP_DATABASE_URL")
+        .expect("CI must provide a separate least-privilege application connection");
+    let app_pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&app_url)
+        .await
+        .expect("application principal connection should succeed");
+
+    let app_role: String = sqlx::query_scalar("SELECT current_user")
+        .fetch_one(&app_pool)
+        .await
+        .expect("application principal should be identifiable");
+    assert_eq!(app_role, "usahapintar_app_login");
+
+    let app_flags: (bool, bool, bool, bool, bool) = sqlx::query_as(
+        "SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolreplication \
+         FROM pg_catalog.pg_roles WHERE rolname = current_user",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("application role flags should be queryable");
+    assert_eq!(app_flags, (false, false, false, false, false));
+
+    let app_group_member: bool =
+        sqlx::query_scalar("SELECT pg_has_role(current_user, 'usahapintar_app', 'member')")
+            .fetch_one(&app_pool)
+            .await
+            .expect("application group membership should be queryable");
+    assert!(app_group_member);
+
+    let schema_create: bool =
+        sqlx::query_scalar("SELECT has_schema_privilege(current_user, 'public', 'CREATE')")
+            .fetch_one(&app_pool)
+            .await
+            .expect("application schema privilege should be queryable");
+    assert!(!schema_create, "application must not create schema objects");
+
+    let direct_user_access: (bool, bool, bool) = sqlx::query_as(
+        "SELECT has_table_privilege(current_user, 'public.users', 'SELECT'), \
+                has_table_privilege(current_user, 'public.users', 'INSERT'), \
+                has_table_privilege(current_user, 'public.users', 'UPDATE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("direct account table privileges should be queryable");
+    assert_eq!(direct_user_access, (false, false, false));
+
+    let direct_sensitive_table_access: bool = sqlx::query_scalar(
+        "SELECT EXISTS ( \
+             SELECT 1 \
+               FROM unnest(ARRAY[ \
+                   'user_identities', 'verification_sessions', 'verification_challenges', \
+                   'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
+                   'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens' \
+               ]::TEXT[]) AS t(table_name) \
+              WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'INSERT') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'UPDATE') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'DELETE') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'TRUNCATE') \
+         )",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("sensitive table privileges should be queryable");
+    assert!(
+        !direct_sensitive_table_access,
+        "application must not receive direct access to verification, session, or recovery tables"
+    );
+
+    let database_privileges: (bool, bool, bool) = sqlx::query_as(
+        "SELECT has_database_privilege(current_user, current_database(), 'CONNECT'), \
+                has_database_privilege(current_user, current_database(), 'CREATE'), \
+                has_database_privilege(current_user, current_database(), 'TEMP')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("application database privileges should be queryable");
+    assert_eq!(database_privileges, (true, false, false));
+
+    let audit_access: (bool, bool, bool, bool, bool) = sqlx::query_as(
+        "SELECT has_table_privilege(current_user, 'public.identity_audit_events', 'INSERT'), \
+                has_table_privilege(current_user, 'public.identity_audit_events', 'SELECT'), \
+                has_table_privilege(current_user, 'public.identity_audit_events', 'UPDATE'), \
+                has_table_privilege(current_user, 'public.identity_audit_events', 'DELETE'), \
+                has_table_privilege(current_user, 'public.identity_audit_events', 'TRUNCATE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("audit table privileges should be queryable");
+    assert_eq!(audit_access, (true, false, false, false, false));
+
+    let function_access: (bool, bool, bool) = sqlx::query_as(
+        "SELECT has_function_privilege(current_user, \
+                    'public.create_client_user(text,text,text,text,text,text)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.is_safe_identity_audit_metadata(jsonb)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.guard_identity_audit_event()', 'EXECUTE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("function privileges should be queryable");
+    assert_eq!(function_access, (true, true, false));
+
+    let created_user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
+            .bind("business_owner")
+            .bind("email")
+            .bind("principal-bootstrap@example.test")
+            .bind(Option::<String>::None)
+            .bind("test-only-encoded-password-hash")
+            .bind(Option::<String>::None)
+            .fetch_one(&app_pool)
+            .await
+            .expect("application may create a pending account through the guarded function");
+    assert!(!created_user_id.is_empty());
+
+    sqlx::query(
+        "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome) \
+         VALUES ('system', 'database.bootstrap.checked', 'success')",
+    )
+    .execute(&app_pool)
+    .await
+    .expect("application may append a minimal audit event");
+
+    let migrator_flags: (bool, bool, bool, bool) = sqlx::query_as(
+        "SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls \
+         FROM pg_catalog.pg_roles WHERE rolname = 'usahapintar_migrator'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("migration role flags should be queryable");
+    assert_eq!(migrator_flags, (false, false, false, false));
+
+    let migrator_can_create: bool = sqlx::query_scalar(
+        "SELECT has_schema_privilege('usahapintar_migrator', 'public', 'CREATE')",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("migration schema privilege should be queryable");
+    assert!(migrator_can_create);
+
+    let database_owner_is_migrator: bool = sqlx::query_scalar(
+        "SELECT pg_catalog.pg_get_userbyid(datdba) = 'usahapintar_migrator' \
+         FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("database owner should be queryable");
+    assert!(
+        !database_owner_is_migrator,
+        "migration role must not own the database"
+    );
+
+    let public_default_privileges: bool = sqlx::query_scalar(
+        "SELECT EXISTS ( \
+             SELECT 1 \
+               FROM pg_catalog.pg_default_acl AS d \
+               CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) AS acl \
+              WHERE d.defaclrole = 'usahapintar_migrator'::pg_catalog.regrole \
+                AND d.defaclnamespace IN (0, 'public'::pg_catalog.regnamespace) \
+                AND d.defaclobjtype IN ('r', 'S', 'f') \
+                AND acl.grantee = 0 \
+         )",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("migrator default privileges should be queryable");
+    assert!(
+        !public_default_privileges,
+        "new objects created by migrator must not be granted to PUBLIC"
+    );
+
+    let unexpected_app_memberships: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+         FROM pg_catalog.pg_auth_members \
+         WHERE member = 'usahapintar_app_login'::pg_catalog.regrole \
+           AND roleid <> 'usahapintar_app'::pg_catalog.regrole",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("application role memberships should be queryable");
+    assert_eq!(unexpected_app_memberships, 0);
+
+    let backup_access: (bool, bool, bool) = sqlx::query_as(
+        "SELECT pg_has_role('usahapintar_backup_login', 'pg_read_all_data', 'member'), \
+                has_table_privilege('usahapintar_backup_login', 'public.identity_audit_events', 'SELECT'), \
+                has_table_privilege('usahapintar_backup_login', 'public.identity_audit_events', 'INSERT')",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("backup principal privileges should be queryable");
+    assert_eq!(backup_access, (true, true, false));
+
+    let monitor_access: (bool, bool) = sqlx::query_as(
+        "SELECT pg_has_role('usahapintar_monitor_login', 'pg_monitor', 'member'), \
+                has_table_privilege('usahapintar_monitor_login', 'public.identity_audit_events', 'SELECT')",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("monitoring principal privileges should be queryable");
+    assert_eq!(monitor_access, (true, false));
+
+    let audit_reader_access: (bool, bool) = sqlx::query_as(
+        "SELECT has_table_privilege('usahapintar_audit_reader', 'public.identity_audit_events', 'SELECT'), \
+                has_table_privilege('usahapintar_audit_reader', 'public.identity_audit_events', 'INSERT')",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("audit reader privileges should be queryable");
+    assert_eq!(audit_reader_access, (true, false));
+
+    app_pool.close().await;
+    admin_pool.close().await;
 }
