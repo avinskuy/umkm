@@ -1423,6 +1423,26 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .await
     .expect("same optional recovery contact may belong to another account");
 
+    let duplicate_contact_session: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+         VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
+    )
+    .bind(&first_user_id)
+    .bind(vec![13_u8])
+    .bind(vec![14_u8])
+    .bind(vec![31_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("duplicate contact must be independently re-verified before deduplication");
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&duplicate_contact_session)
+    .execute(pool)
+    .await
+    .expect("duplicate contact verification session should be verified");
+
     assert!(
         sqlx::query(
             "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
@@ -1432,7 +1452,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         .bind(vec![9_u8])
         .bind(vec![10_u8])
         .bind(vec![31_u8; 32])
-        .bind(&first_contact_session)
+        .bind(&duplicate_contact_session)
         .execute(pool)
         .await
         .is_err(),
