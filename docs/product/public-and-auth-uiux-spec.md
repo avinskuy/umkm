@@ -283,7 +283,6 @@ Ask for only the fields relevant to the selected stage:
 ## 9. Google OAuth behavior
 
 - Google OAuth remains available for sign-in and registration.
-- The user must choose Owner or Investor before starting a new Google registration flow. Role context is protected by server-side OAuth state.
 - Before starting Google registration, the user must explicitly choose Owner or Investor; the choice is bound to server-side OAuth state. Google registration does not ask for a separate local password.
 - A new Google identity must still complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
 - Existing linked Google identities sign in only to their existing account. The account's primary role remains immutable and determines the correct portal.
