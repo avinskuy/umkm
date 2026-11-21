@@ -194,7 +194,6 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Akun pending yang kontak awalnya sudah ditandai verified atau memiliki `initial_contact_verified_at` ditolak.
 - Akun aktif tanpa `initial_contact_verified_at` atau tanpa setidaknya satu kontak utama terverifikasi ditolak.
 - Mengganti kontak utama tanpa verifikasi nilai baru ditolak; provenance `initial_contact_channel` tidak dapat diubah.
-- Akun aktif tanpa verifikasi kontak awal ditolak.
 - Timestamp verified tanpa nilai kontak ditolak.
 - Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.
 - Email dan nomor telepon duplikat ditolak pada seluruh status yang masih memegang reservasi.
