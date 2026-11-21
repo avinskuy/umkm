@@ -230,6 +230,7 @@ Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifk
 
 ## 9. Referensi internal
 
+- [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md)
 - [Rancangan Skema Database](database-schema-design.md)
 - [Keputusan Registrasi Identity Core](identity-core-registration-decisions.md)
 - [Tinjauan Skema Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md)
