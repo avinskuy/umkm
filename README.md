@@ -11,7 +11,7 @@ USahapintar menghubungkan pemilik usaha dengan investor melalui penemuan bisnis,
 - Frontend React + TypeScript masih berupa shell awal proyek.
 - Backend Rust + Axum menyediakan endpoint health check `/api/v1/health`.
 - Fondasi koneksi PostgreSQL melalui SQLx, connection pool, dan migrator sudah tersedia.
-- Server HTTP belum menginisialisasi koneksi database saat startup dan belum ada migrasi skema domain.
+- Server HTTP belum menginisialisasi koneksi database saat startup. Migration Identity Core pertama untuk akun dan identitas Google sudah ditambahkan serta diuji di CI; domain verifikasi, sesi, recovery, audit, dan fitur produk lain belum dimigrasikan.
 - Dokumen kebijakan adalah baseline keputusan, bukan bukti bahwa seluruh fitur/kontrol sudah diimplementasikan atau tersertifikasi.
 
 ## Struktur proyek

@@ -1,5 +1,13 @@
 # Migrasi Database
 
-Direktori ini sengaja belum berisi migrasi skema selama model domain masih diselesaikan. SQLx migrator sudah terhubung dan diuji melalui pengujian integrasi PostgreSQL. Migrasi SQL berversi pertama baru boleh ditambahkan bersamaan dengan skema domain pertama yang telah disetujui.
+Direktori ini berisi migration SQLx berversi. Migration pertama untuk Identity Core adalah:
 
-Jangan pernah mengubah migrasi setelah diterapkan pada database bersama. Gunakan migrasi baru dengan nomor versi berikutnya untuk setiap perubahan skema selanjutnya.
+- `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
+
+Migration pertama tidak membuat sesi login, OTP, recovery, audit Identity Core, profil, atau domain produk lain. Tidak ada grant runtime atau provisioning Admin yang dibuka secara otomatis oleh migration ini; hak akses tiap principal harus disiapkan terpisah sesuai kebijakan least privilege.
+
+Migrasi dijalankan secara eksplisit melalui `database::migrations::run(&pool)`. HTTP server belum menjalankan migrasi atau menginisialisasi database pada startup. Migration ini belum dijalankan terhadap database produksi dan tidak boleh dianggap sebagai aktivasi fitur registrasi/login.
+
+Pengujian PostgreSQL untuk migration dan invariant identitas berada di `backend/tests/postgres.rs`. Gunakan database sementara yang dapat dibuang, bukan database produksi.
+
+Jangan pernah mengubah migration setelah diterapkan pada database bersama. Perubahan skema berikutnya harus menggunakan migration baru dengan versi SQLx berikutnya.

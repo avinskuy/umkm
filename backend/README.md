@@ -28,7 +28,7 @@ Fondasi database menggunakan SQLx dengan PostgreSQL serta runtime Tokio/Rustls.
 
 Lapisan database diinisialisasi secara eksplisit melalui `DatabaseConfig::from_env()` dan `database::connect()`. HTTP server belum terhubung ke database sampai proses startup aplikasi memang diatur untuk melakukannya. Dengan demikian, perilaku aplikasi saat ini yang hanya menyediakan health endpoint tetap tidak berubah.
 
-Migrasi SQLx disertakan dari `backend/migrations` dan dijalankan secara eksplisit melalui `database::migrations::run(&pool)`. Direktori tersebut sengaja belum memiliki migrasi skema: tabel domain hanya boleh ditambahkan setelah model datanya disetujui. Jangan pernah mengubah migrasi yang sudah diterapkan; buat migrasi baru dengan versi berikutnya.
+Migrasi SQLx disertakan dari `backend/migrations` dan dijalankan secara eksplisit melalui `database::migrations::run(&pool)`. Migration pertama Identity Core membuat tabel akun dan identitas Google, disertai constraint dan trigger integritas. Migration tersebut belum dijalankan pada database produksi dan tidak mengaktifkan endpoint registrasi/login. Domain verifikasi, sesi, recovery, audit, dan fitur produk lain tetap menunggu migration terpisah setelah review. Jangan pernah mengubah migrasi yang sudah diterapkan; buat migrasi baru dengan versi berikutnya.
 
 Jangan menyimpan kredensial database di source control, pengujian, log, atau dokumentasi. CI menggunakan layanan PostgreSQL sementara dengan kredensial khusus pengujian.
 

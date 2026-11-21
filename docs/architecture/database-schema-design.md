@@ -1,12 +1,12 @@
 # PostgreSQL Database Schema Design
 
-> Status: Proposed — architecture review required before the first production schema migration  
+> Status: Partially implemented — Identity Core account slice exists; remaining domain schemas are proposals  
 > Scope: relational model, integrity constraints, privacy boundaries, and migration sequencing  
 > Runtime baseline: PostgreSQL 16 + SQLx 0.8
 
-This document translates the approved USahapintar product and authentication policies into a proposed relational model. It is a design artifact, not a claim that these tables or features are implemented. No production migration should be created until the domain decisions and schema review are complete.
+This document translates the approved USahapintar product and authentication policies into a relational model. The first Identity Core account slice has been implemented as a SQLx migration and verified in CI; the remaining domain schemas are still design proposals. The migration has not been applied to production and does not activate runtime registration or authentication.
 
-The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions before creating the first identity migration. The proposed account-slice contract is documented in [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md); it remains a review artifact, not an applied migration.
+The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions. The account-slice contract is documented in [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md) and implemented by `backend/migrations/20261121170000_create_identity_accounts.sql`.
 
 ## 1. Design principles
 
@@ -49,8 +49,8 @@ The product's shorter labels “Owner” and “Investor” are display language
 
 | Table | Responsibility | Important constraints |
 | --- | --- | --- |
-| `users` | Account identity, immutable primary role, account status, normalized contact values, optional password hash | Unique non-null normalized email and phone; role check; status check; role immutable after insert |
-| `user_identities` | External provider identities such as Google | Unique (`provider`, `provider_subject`); FK to user; never auto-link by matching email |
+| `users` | Account identity, immutable primary role, lifecycle, normalized contact values, optional password hash | Unique reserved email/phone; role/lifecycle checks; verified-contact invariants; immutable role and initial-contact provenance; guarded lifecycle transitions |
+| `user_identities` | External provider identities, initially Google | Unique (`provider`, `provider_subject`); FK to user; stable subject only; never auto-link by matching email |
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
 | `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
@@ -61,10 +61,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 
 **Important identity rules**
 
-- `users.primary_role` is assigned at account creation and cannot be updated. Enforce immutability in the database as defense in depth (for example, a narrowly scoped trigger) as well as in application policy.
+- `users.primary_role` is assigned at account creation and cannot be updated. The first migration enforces this with a database trigger; the client-creation function only accepts `business_owner` or `investor` and is not executable by PUBLIC.
 - A user who wants the other client role must create a separate account using identities not linked elsewhere.
 - Unique indexes should be partial for nullable email/phone columns, and normalization must happen before insert.
 - Provider identity is keyed by the provider's stable subject, not email text.
+- `account_status` lifecycle values are `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, and `closed`. Suspend/feature limits are moderation/enforcement records, not lifecycle status.
 - Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
 - Verification challenges must support rate limiting, attempt caps, short expiry, resend cooldown, and invalidation of superseded challenges. OTP hashing must use a keyed construction suitable for short numeric codes.
 - Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.

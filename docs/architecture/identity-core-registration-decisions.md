@@ -37,11 +37,11 @@
 
 Pendaftaran tertunda kedaluwarsa setelah **30 menit** jika verifikasi kontak yang diwajibkan belum selesai. Proses kedaluwarsa dan pembersihan harus atomik serta idempotent, melepaskan reservasi kontak tertunda yang memenuhi syarat dengan aman, dan tidak pernah menghapus akun yang sudah aktif. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
 
-## Data-model implications (proposal only)
+## Data-model implications (verification and session slice proposal)
 
 The eventual schema should distinguish normalized email and E.164 phone values, the initial registration contact method, independent verification timestamps, challenge delivery channel (email or WhatsApp), challenge purpose and destination binding, keyed code hash, attempts, expiry, consumption, and pending-registration expiry.
 
-Do not infer that the user supplied both contact methods. Do not create a migration until the complete Identity Core decisions and schema review gate are approved.
+Do not infer that the user supplied both contact methods. The first account/Google-identity migration has been implemented after schema review (`backend/migrations/20261121170000_create_identity_accounts.sql`). Verification sessions, OTP challenges, recovery, and runtime endpoints remain separate implementation slices and must pass their own schema review and tests.
 
 ## Kebijakan Identity Core yang telah disetujui
 
@@ -104,7 +104,7 @@ Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia
 
 ## Gerbang implementasi
 
-Migrasi Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan yang disetujui diterjemahkan menjadi batasan skema yang telah ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
+Migration akun Identity Core pertama sudah selesai. Migration verifikasi/OTP, sesi, recovery, serta endpoint runtime berikutnya hanya boleh dimulai setelah batasan skema slice terkait ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
 
 
 ## Tambahan keputusan: kontak pemulihan bersama dan UX pemilihan akun
@@ -139,7 +139,7 @@ Konsekuensinya:
 - Status `verified`, `expired`, dan `cancelled` tidak dapat dibuka kembali. Penguncian yang berakhir tidak menghidupkan kembali sesi atau challenge yang sudah terminal.
 - Status challenge OTP individual tetap dikelola terpisah dari status sesi verifikasi. Challenge yang kedaluwarsa, dibatalkan/digantikan, atau telah digunakan tidak diaktifkan kembali.
 
-Daftar status ini adalah baseline konseptual. Nama kolom, constraint, transisi lengkap, serta pemetaan status challenge masih harus difinalisasi dalam rancangan state machine dan tinjauan skema sebelum migrasi.
+Status lifecycle akun sudah diterapkan pada migration akun pertama. Daftar status sesi verifikasi dan challenge di atas tetap merupakan baseline konseptual; nama kolom, constraint, transisi lengkap, dan pemetaan status challenge harus difinalisasi pada rancangan migration verifikasi tersendiri.
 
 
 

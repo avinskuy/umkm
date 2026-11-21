@@ -1,11 +1,11 @@
 # Kontrak Skema Migration 0001 — Identitas Akun
 
-> Status: rancangan teknis untuk review sebelum SQL migration
+> Status: diimplementasikan sebagai migration SQLx; dokumen ini menjadi kontrak dan referensi tes
 > Tanggal: 21 November 2026
 > Basis: keputusan teknis Identity Core yang telah disetujui sebagai baseline
 > Cakupan: akun, role permanen, kontak utama, dan identitas Google
 
-Dokumen ini menerjemahkan keputusan Identity Core menjadi kontrak skema yang dapat ditinjau. Ini belum merupakan migration SQL dan tidak menambahkan tabel atau mengubah runtime.
+Dokumen ini menetapkan kontrak skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
 
 Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`; nama file aktual akan ditentukan saat migration dibuat.
 
@@ -85,7 +85,22 @@ Status suspend atau pembatasan fitur oleh Admin **bukan** nilai `account_status`
 
 Status `deletion_pending` dan `deletion_processing` disediakan sebagai vocabulary lifecycle. Transisi penghapusan belum boleh diaktifkan sebelum tabel permintaan penghapusan, retensi, dan proses terkait tersedia pada migration domain tersendiri.
 
-### 2.4 CHECK constraint
+### 2.4 Transisi lifecycle
+
+Database menolak lompatan status yang tidak sah dan menegakkan batas waktu utama:
+
+| Status awal | Transisi yang diizinkan | Syarat |
+| --- | --- | --- |
+| `pending_verification` | `active` atau `pending_expired` | Aktivasi harus sebelum `pending_expires_at` dan mencatat verifikasi kontak awal; expiry hanya setelah deadline 30 menit. |
+| `active` | `deactivated` atau `deletion_pending` | Perubahan status dilakukan melalui operasi backend yang terotorisasi. |
+| `deactivated` | `active` atau `deletion_pending` | Reaktivasi memerlukan autentikasi/verifikasi sesuai kebijakan. |
+| `deletion_pending` | `active`, `deactivated`, atau `deletion_processing` | Pembatalan memerlukan verifikasi; processing hanya setelah 30 hari sejak status masuk `deletion_pending`. |
+| `deletion_processing` | `closed` | Hanya setelah pekerjaan penghapusan dan retensi selesai. |
+| `pending_expired` / `closed` | Tidak ada | Status terminal dan tidak dapat dibuka kembali. |
+
+`pending_expires_at` tidak dapat diubah selama akun tetap pending. Database menggunakan waktu server untuk memeriksa deadline; `status_changed_at` dicatat otomatis saat lifecycle berubah dan menjadi dasar 30 hari masa tunggu penghapusan. Pemeriksaan ini melengkapi, bukan menggantikan, validasi backend, audit, dan tabel permintaan penghapusan yang akan dibuat pada slice berikutnya.
+
+### 2.5 CHECK constraint
 
 Kontrak constraint minimum:
 
@@ -104,7 +119,7 @@ Kontrak constraint minimum:
 
 Constraint lintas tabel yang tidak dapat diekspresikan dengan aman sebagai CHECK harus dijaga oleh operasi backend/transaksi dan tes integrasi. Khusus akun klien: `password_hash` boleh NULL hanya jika identitas Google yang sah dibuat/ditautkan dalam transaksi pembuatan akun yang sama; registrasi email/telepon wajib memiliki password hash. Jangan membuat CHECK yang membaca tabel lain. Aturan kredensial Admin mengikuti jalur provisioning internal dan harus dipastikan sebelum akun Admin diaktifkan.
 
-### 2.5 Keunikan dan reservasi kontak
+### 2.6 Keunikan dan reservasi kontak
 
 Gunakan unique partial index terpisah:
 
@@ -119,7 +134,7 @@ Aturan:
 - Transisi ke `closed` hanya boleh melepas reservasi setelah proses penghapusan benar-benar selesai; berlalunya 30 hari saja tidak cukup.
 - Jangan mengandalkan soft-delete flag atau validasi frontend sebagai pengganti partial unique index.
 
-### 2.6 Password dan verifikasi
+### 2.7 Password dan verifikasi
 
 - `password_hash` menyimpan encoded hash hasil password-hashing library yang dipilih kemudian. Parameter dan library final bukan bagian dari migration.
 - Registrasi email/telepon wajib menyediakan password lokal.
@@ -197,6 +212,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Mengganti kontak utama tanpa verifikasi nilai baru ditolak; provenance `initial_contact_channel` tidak dapat diubah.
 - Timestamp verified tanpa nilai kontak ditolak.
 - Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.
+- Aktivasi sebelum/ sesudah deadline, expiry terlalu awal, lompatan lifecycle, pembatalan setelah deletion processing, dan pembukaan kembali status terminal ditolak.
 - Email dan nomor telepon duplikat ditolak pada seluruh status yang masih memegang reservasi.
 - Email/nomor yang sama dapat digunakan kembali setelah transisi terminal yang sah melepaskan reservasi.
 
@@ -231,15 +247,15 @@ Semua tes concurrency menggunakan beberapa koneksi PostgreSQL nyata. Unit test a
 
 Sebelum SQL migration dibuat, review harus memastikan:
 
-- [ ] Nama kolom dan tipe data final telah disetujui.
-- [ ] Constraint dan partial unique index telah dipetakan ke aturan lifecycle secara tepat.
+- [x] Nama kolom dan tipe data final ditetapkan pada migration pertama.
+- [x] Constraint dan partial unique index telah diterapkan dan diuji terhadap aturan lifecycle.
 - [ ] Jalur pembuatan akun klien dan provisioning Admin memiliki batas privilege yang dapat ditegakkan.
 - [x] Tabel `user_identities` masuk migration pertama karena Google OAuth merupakan metode registrasi/login yang sudah disetujui.
-- [ ] Foreign key dan perilaku terminal deletion tidak menghapus history yang wajib dipertahankan.
-- [ ] Tes PostgreSQL untuk constraint, role immutability, dan concurrency siap ditulis.
-- [ ] Tidak ada kebutuhan verifikasi, session, recovery, atau audit yang terselip ke migration pertama.
+- [x] Foreign key dan perilaku terminal deletion menggunakan ON DELETE RESTRICT serta cleanup identitas eksplisit.
+- [x] Tes PostgreSQL untuk constraint, role immutability, provider identity, reservasi kontak, dan konkurensi telah dijalankan di CI.
+- [x] Tidak ada kebutuhan verifikasi, session, recovery, atau audit yang terselip ke migration pertama.
 
-Setelah gate disetujui, barulah buat satu SQLx migration untuk slice identitas akun, jalankan pada PostgreSQL sementara, uji rollback/reapply pada database disposable, review SQL dan privilege, lalu buka PR terpisah. Tidak ada database produksi atau deployment pada tahap ini.
+Migration pertama telah dibuat dan diuji pada PostgreSQL sementara. Sebelum runtime diaktifkan, tahap berikutnya tetap harus menyelesaikan bootstrap privilege untuk runtime/provisioning Admin, mengintegrasikan operasi registrasi dengan fungsi database, dan menambahkan migration verifikasi secara terpisah. Tidak ada database produksi atau deployment pada tahap ini.
 
 ## 9. Referensi
 

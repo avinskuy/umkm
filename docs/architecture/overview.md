@@ -20,7 +20,7 @@ USahapintar dimulai dengan pendekatan **modular monolith**. Frontend dan backend
 - Modul berorientasi domain dengan pemisahan tanggung jawab API, application, domain, dan infrastructure secara eksplisit sesuai kebutuhan kompleksitas.
 - PostgreSQL 16 telah menjadi baseline database relasional.
 - Fondasi runtime SQLx 0.8 sudah tersedia: konfigurasi koneksi melalui environment, connection pool, dan migrator eksplisit.
-- API saat ini belum menginisialisasi koneksi database saat startup dan belum memiliki migrasi skema domain; integrasi runtime serta migrasi domain harus dilakukan bertahap setelah gerbang desainnya terpenuhi.
+- API saat ini belum menginisialisasi koneksi database saat startup. Migration Identity Core pertama untuk akun dan identitas Google sudah tersedia; integrasi runtime dan migration domain berikutnya tetap dilakukan bertahap setelah gerbang desainnya terpenuhi.
 - Otorisasi ditegakkan di sisi server.
 
 ## Batas domain awal
@@ -39,11 +39,11 @@ Daftar ini menunjukkan batas tanggung jawab secara logis, bukan kewajiban untuk 
 
 ## Keputusan Identity Core
 
-Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Migrasi Identity Core belum boleh dibuat sebelum seluruh persyaratan gerbang implementasinya terpenuhi.
+Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Migration akun pertama sudah dibuat; fitur registrasi, verifikasi, sesi, dan recovery belum diaktifkan sampai migration dan alur domain berikutnya siap.
 
 ## Skema database
 
-Model relasional yang diusulkan, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). SQLx migrator dan pengujian integrasi PostgreSQL sudah tersedia, tetapi belum ada migrasi skema domain. Dokumen skema tetap berstatus usulan sampai peninjauan domain dan gerbang migrasi pertama selesai.
+Model relasional, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Migration pertama membangun `users` dan `user_identities`; migration verifikasi, sesi, recovery, audit, dan domain produk lain tetap menunggu review tersendiri. HTTP server belum menjalankan migrasi atau koneksi database saat startup.
 
 ## Akses data dan privasi
 

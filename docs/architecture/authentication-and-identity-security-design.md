@@ -1,11 +1,11 @@
 # Authentication & Identity — Architecture and Security Design
 
-> Status: proposed technical design; review required before implementation  
+> Status: partially implemented; account schema exists, runtime authentication flows remain unimplemented  
 > Product reference: `docs/product/public-and-auth-uiux-spec.md`  
 > Wireframe reference: `docs/product/low-fidelity-public-auth-wireframes.md`  
-> Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 runtime foundation is available, but domain schema migrations are not yet implemented.
+> Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 foundation is available. The first account/Google-identity migration is implemented; verification, sessions, recovery, and runtime flows remain unimplemented.
 
-This document defines the first authentication architecture for USahapintar. It is a design contract, not an implemented or security-audited system. Provider choices, operational secrets, retention periods, and final policies must be approved before production use.
+This document defines the authentication architecture for USahapintar. The first database slice for account identity and Google provider identity is implemented, but authentication endpoints and runtime database integration are not. This is not a claim of a production-ready or security-audited system. Provider choices, operational secrets, retention periods, and final controls must be reviewed before production use.
 
 ## 1. Scope and invariants
 
@@ -69,7 +69,7 @@ A person who wants to operate as the other client role must create a separate ne
 Authorization is evaluated in this order:
 
 1. Is the session valid and not revoked/expired?
-2. Is the account active and not suspended/locked?
+2. Is the account lifecycle active, and are there no active moderation restrictions or security locks?
 3. Does the authenticated account have the required primary role?
 4. Does the account own or participate in the requested resource?
 5. Is the requested action permitted for that resource's current state?
@@ -79,51 +79,55 @@ Do not implement authorization as scattered frontend conditions. Use shared back
 
 ## 3. Proposed data model
 
-PostgreSQL 16 is the selected relational baseline. SQLx connection configuration, pool, and explicit migrator foundation are available, but the HTTP server does not yet initialize the database at startup and no domain schema migrations exist. Migrations must be versioned and immutable after application to a shared database. Use UUID primary keys and UTC timestamps. Exact SQL types and indexes are finalized in migration reviews.
+PostgreSQL 16 is the selected relational baseline. The first SQLx migration for account identity and Google provider identity is implemented and covered by PostgreSQL integration tests. The HTTP server still does not initialize the database at startup. Verification, session, recovery, audit, and product-domain migrations remain separate future slices. Migrations must be versioned and immutable after application to a shared database. Use UUID primary keys and `timestamptz`.
 
 ### `users`
 
+The first migration implements the following account fields. Profile data and deletion-request history remain in separate future domain tables.
+
 | Column | Purpose |
 | --- | --- |
 | `id` | UUID primary key |
-| `full_name` | Display name |
-| `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
-| `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
-| `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
-| `primary_role` | Role kanonis yang disimpan: `business_owner`, `investor`, atau `admin` |
-| `account_status` | Menunggu verifikasi, aktif, ditangguhkan, dinonaktifkan, menunggu penghapusan, proses penghapusan, atau ditutup; setiap perubahan status harus eksplisit dan diaudit |
-| `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
-| `email_verified_at` | Verification timestamp, independently nullable |
-| `phone_verified_at` | Verification timestamp, independently nullable |
-| `created_at`, `updated_at` | Audit timestamps |
-| `pending_expires_at` | Masa berlaku 30 menit untuk pendaftaran yang belum diaktifkan |
-| `deactivated_at` | Waktu penonaktifan sementara, jika berlaku |
-| `deletion_requested_at`, `deletion_due_at` | Waktu permintaan dan batas akhir masa tunggu penghapusan 30 hari |
-| `closed_at` | Account closure timestamp, if applicable |
+| `primary_role` | Immutable role: `business_owner`, `investor`, or `admin` |
+| `account_status` | Lifecycle: `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, or `closed` |
+| `email_normalized` | Normalized primary email; nullable when phone is the only current primary contact |
+| `phone_e164` | Normalized E.164 primary phone; nullable when email is the only current primary contact |
+| `initial_contact_channel` | Immutable initial registration channel: `email` or `phone` |
+| `email_verified_at`, `phone_verified_at` | Independent verification timestamps for the current contact values |
+| `initial_contact_verified_at` | Immutable registration verification provenance, set once during activation and cleared only after completed deletion |
+| `password_hash` | Nullable encoded local password hash; client accounts without it require a linked Google identity |
+| `pending_expires_at` | Immutable 30-minute deadline while registration is pending |
+| `created_at`, `updated_at`, `status_changed_at` | Database-managed timestamps |
 
-Constraints:
-- Unique indexes on non-null normalized email and phone.
-- Normalize before uniqueness checks.
-- Never store plaintext passwords.
-- Account status transitions must be explicit and audited.
-- Do not expose raw database IDs as authorization secrets.
+Constraints and lifecycle guards:
+- Partial unique indexes reserve non-null email and phone contacts while the account is pending, active, deactivated, deletion-pending, or deletion-processing.
+- A pending account has exactly one initial contact, not yet verified. An active account has at least one current verified primary contact.
+- The role and initial registration channel are immutable. Initial contact verification can be recorded only once during valid activation.
+- Pending registration cannot activate after 30 minutes or expire before its deadline. The pending expiry cannot be extended.
+- Deletion must wait 30 days in `deletion_pending` before entering `deletion_processing`; processing can only finish as `closed`. `pending_expired` and `closed` are terminal.
+- Suspend and feature limits are moderation/enforcement records, not `account_status` values.
+- Profile fields, deactivation/deletion request history, and retention records are not stored in this first slice.
+- Never store plaintext passwords. Do not expose raw database IDs as authorization secrets.
 
 ### `user_identities`
 
-Stores linked authentication providers.
+The first migration implements linked Google provider identities.
 
 | Column | Purpose |
 | --- | --- |
 | `id` | UUID primary key |
-| `user_id` | Owning user |
-| `provider` | e.g. `google` |
-| `provider_subject` | Stable provider subject identifier |
-| `provider_email` | Optional provider email metadata |
-| `created_at`, `last_used_at` | Lifecycle timestamps |
+| `user_id` | Owning user; FK with ON DELETE RESTRICT |
+| `provider` | Initially constrained to `google` |
+| `provider_subject` | Stable provider subject identifier; not email |
+| `created_at` | Creation timestamp |
 
 Constraints:
 - Unique composite key on (`provider`, `provider_subject`).
 - Provider subject, not email text, is the stable identity key.
+- Identity binding is immutable after insert; unlinking is a separate authenticated action.
+- Client accounts without a local password cannot unlink their last Google identity.
+- Terminal accounts cannot retain provider identities.
+- No provider email or OAuth access/refresh/ID tokens are stored in this table.
 - Linking requires proof of control of the existing account and the new provider identity.
 - Do not auto-link solely because provider emails appear to match.
 
@@ -505,7 +509,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 ## 13. Implementation sequence
 
 1. **Dependency reproducibility:** commit `frontend/package-lock.json` and change CI to `npm ci`; keep the current npm compatibility configuration only if the lockfile and CI prove it is still required.
-2. **Database baseline:** add PostgreSQL configuration, SQLx setup, migration runner, and test database strategy.
+2. **Database baseline:** PostgreSQL/SQLx configuration, migrator, and first account/Google-identity migration are implemented and covered by integration tests; next is the separate verification migration.
 3. **Domain types:** define User, PrimaryRole, AccountStatus, Session, VerificationChallenge, and typed error codes.
 4. **Registration:** implement Owner/Investor registration with validation and safe pending state.
 5. **Verification:** implement email and phone challenge lifecycle behind provider interfaces.

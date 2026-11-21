@@ -1,21 +1,21 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: rekomendasi rancangan untuk ditinjau sebelum migration pertama
+> Status: tinjauan awal selesai; migration akun pertama telah diimplementasikan dan diuji
 > Tanggal: 21 November 2026
 > Basis pemeriksaan: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`
 
-Dokumen ini adalah gerbang desain teknis pertama untuk implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx yang benar-benar tersedia. Dokumen ini **bukan** migration SQL dan tidak mengaktifkan database pada HTTP startup.
+Dokumen ini adalah catatan gerbang desain teknis awal Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun pertama kini tersedia; dokumen ini sendiri tetap merupakan catatan review dan tidak mengaktifkan database pada HTTP startup.
 
 ## 1. Hasil pemeriksaan repository
 
 - Backend menggunakan Rust, Axum, Tokio, dan SQLx 0.8 dengan PostgreSQL 16 sebagai baseline.
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
-- `backend/migrations/` belum memiliki migration domain; hanya README.
+- `backend/migrations/` kini memiliki migration akun Identity Core pertama untuk `users` dan `user_identities`.
 - HTTP server saat ini hanya menyediakan `GET /api/v1/health`. Database belum diinisialisasi oleh proses startup.
-- Tes integrasi PostgreSQL yang ada memeriksa koneksi, migration runner, query sederhana, dan penutupan pool. Tes tersebut belum menguji constraint domain Identity Core.
+- Tes integrasi PostgreSQL kini memeriksa constraint akun, role immutable, initial-contact provenance, deadline registrasi 30 menit, masa tunggu penghapusan 30 hari, reservasi kontak, konkurensi, Google provider identity, dan metode autentikasi.
 - Tidak ada pull request terbuka saat pemeriksaan. Tidak ada perubahan runtime atau deployment yang dilakukan dalam tahap ini.
 
-Karena belum ada skema domain yang digunakan bersama, kita dapat merancang migration pertama secara bersih tanpa harus mempertahankan kompatibilitas dengan tabel produksi yang belum ada. Namun, migration tetap harus diuji pada PostgreSQL nyata dan tidak boleh dijalankan terhadap database produksi pada tahap ini.
+Pada saat review awal, belum ada skema domain yang digunakan bersama. Migration akun pertama kini dibuat dan diuji pada PostgreSQL sementara di CI. Migration tersebut belum dijalankan pada database produksi dan tidak mengaktifkan registrasi/login.
 
 ## 2. Prinsip desain yang harus dipertahankan
 
@@ -54,7 +54,7 @@ Kolom konseptual yang diperlukan:
 
 - `id`: UUID primary key.
 - `primary_role`: constrained value `business_owner`, `investor`, `admin`.
-- `account_status`: constrained lifecycle value. Nilai final harus konsisten dengan alur pending verification, active, suspended, deactivated, deletion pending/processing, dan closed.
+- `account_status`: constrained lifecycle value `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`. Suspend/limit fitur dicatat terpisah melalui moderation/enforcement records.
 - `email_normalized` dan `phone_e164`: nullable secara individual, tetapi akun klien harus memiliki tepat satu kontak awal yang dipilih saat pendaftaran. Akun Google tetap wajib memverifikasi satu kontak email atau WhatsApp terpisah.
 - `initial_contact_channel`: membedakan email dan phone/WhatsApp yang dipilih saat pendaftaran; nilainya harus cocok dengan kontak yang diverifikasi.
 - `email_verified_at` dan `phone_verified_at`: waktu verifikasi yang sesuai; jangan menyimpulkan kontak kedua telah diverifikasi.
@@ -216,15 +216,15 @@ Semua pengujian database harus memakai database PostgreSQL sementara yang dapat 
 
 ## 8. Gate untuk pekerjaan berikutnya
 
-Tahap finalisasi keputusan teknis dinyatakan siap ketika:
+Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut telah terpenuhi:
 
-- [x] lima penghalang teknis memiliki baseline keputusan dan batas implementasi;
-- [ ] nama kolom final, tipe PostgreSQL, constraint, partial index, dan foreign key untuk migration pertama ditinjau;
-- [ ] migration sequence dibatasi pada slice yang benar-benar akan diimplementasikan;
-- [ ] test plan concurrency dan integritas diterjemahkan menjadi tes PostgreSQL yang dapat dijalankan di CI;
-- [x] perubahan dokumentasi selaras dengan kebijakan Identity Core yang telah disetujui.
+- [x] Lima penghalang teknis memiliki baseline keputusan dan batas implementasi.
+- [x] Kontrak kolom, tipe PostgreSQL, constraint, partial unique index, dan foreign key untuk slice akun telah diterapkan.
+- [x] Tabel `user_identities` disertakan untuk stable Google provider subject.
+- [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
+- [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Tahap berikutnya adalah **review kontrak skema migration 0001 untuk identitas akun**. Fokusnya hanya tabel akun, role immutable, status lifecycle, kontak utama, identitas provider bila benar-benar diperlukan pada slice pertama, dan reservasi kontak. Jangan memasukkan verifikasi, sesi, recovery, atau audit ke migration 0001 sebelum kontrak dan dependensinya ditinjau.
+Pekerjaan berikutnya adalah **migration 0002 untuk verifikasi kontak**. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
 Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
