@@ -92,7 +92,30 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
-        IF OLD.status <> 'pending' AND NEW IS DISTINCT FROM OLD THEN
+        IF OLD.status <> 'pending'
+           AND NOT (
+               OLD.status = 'verified'
+               AND OLD.purpose = 'account_recovery'
+               AND OLD.user_id IS NULL
+               AND NEW.user_id IS NOT NULL
+               AND NEW.id IS NOT DISTINCT FROM OLD.id
+               AND NEW.purpose IS NOT DISTINCT FROM OLD.purpose
+               AND NEW.channel IS NOT DISTINCT FROM OLD.channel
+               AND NEW.destination_ciphertext IS NOT DISTINCT FROM OLD.destination_ciphertext
+               AND NEW.destination_nonce IS NOT DISTINCT FROM OLD.destination_nonce
+               AND NEW.encryption_key_version IS NOT DISTINCT FROM OLD.encryption_key_version
+               AND NEW.destination_hmac IS NOT DISTINCT FROM OLD.destination_hmac
+               AND NEW.hmac_key_version IS NOT DISTINCT FROM OLD.hmac_key_version
+               AND NEW.status IS NOT DISTINCT FROM OLD.status
+               AND NEW.failed_attempt_count IS NOT DISTINCT FROM OLD.failed_attempt_count
+               AND NEW.locked_until IS NOT DISTINCT FROM OLD.locked_until
+               AND NEW.resend_available_at IS NOT DISTINCT FROM OLD.resend_available_at
+               AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
+               AND NEW.expires_at IS NOT DISTINCT FROM OLD.expires_at
+               AND NEW.verified_at IS NOT DISTINCT FROM OLD.verified_at
+               AND NEW.expired_at IS NOT DISTINCT FROM OLD.expired_at
+               AND NEW.cancelled_at IS NOT DISTINCT FROM OLD.cancelled_at
+           ) THEN
             RAISE EXCEPTION 'terminal verification session cannot be changed'
                 USING ERRCODE = '23514';
         END IF;
@@ -278,9 +301,10 @@ DECLARE
     v_hmac_key_version TEXT;
     v_channel TEXT;
     v_purpose TEXT;
+    v_challenge_status TEXT;
 BEGIN
     IF TG_OP <> 'INSERT' THEN
-        RAISE EXCEPTION 'OTP verification attempt events are append-only'
+        RAISE EXCEPTION 'OTP verification attempt events cannot be updated'
             USING ERRCODE = '23514';
     END IF;
 
@@ -298,12 +322,22 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    SELECT status INTO v_challenge_status
+    FROM public.verification_challenges
+    WHERE id = NEW.verification_challenge_id
+      AND verification_session_id = NEW.verification_session_id;
+
+    IF v_challenge_status IS DISTINCT FROM 'pending' THEN
+        RAISE EXCEPTION 'OTP attempt event requires a pending challenge'
+            USING ERRCODE = '23514';
+    END IF;
+
     RETURN NEW;
 END;
-$$;
+$;
 
 CREATE TRIGGER otp_verification_attempt_events_10_guard
-    BEFORE INSERT OR UPDATE OR DELETE ON public.otp_verification_attempt_events
+    BEFORE INSERT OR UPDATE ON public.otp_verification_attempt_events
     FOR EACH ROW EXECUTE FUNCTION public.guard_otp_verification_attempt_event();
 
 CREATE TABLE public.otp_delivery_events (
@@ -337,11 +371,6 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog
 AS $$
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        RAISE EXCEPTION 'OTP delivery events cannot be deleted by the application'
-            USING ERRCODE = '23514';
-    END IF;
-
     IF NEW.id IS DISTINCT FROM OLD.id
        OR NEW.destination_hmac IS DISTINCT FROM OLD.destination_hmac
        OR NEW.hmac_key_version IS DISTINCT FROM OLD.hmac_key_version
@@ -364,7 +393,7 @@ END;
 $$;
 
 CREATE TRIGGER otp_delivery_events_10_guard
-    BEFORE UPDATE OR DELETE ON public.otp_delivery_events
+    BEFORE UPDATE ON public.otp_delivery_events
     FOR EACH ROW EXECUTE FUNCTION public.guard_otp_delivery_event();
 
 REVOKE ALL ON TABLE
