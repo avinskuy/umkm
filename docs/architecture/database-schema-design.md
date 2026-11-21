@@ -148,7 +148,10 @@ Moderation status is not publication status. An opportunity can be published and
 erDiagram
     USERS ||--o{ USER_IDENTITIES : links
     USERS ||--o{ SESSIONS : owns
-    USERS ||--o{ VERIFICATION_CHALLENGES : verifies
+    USERS ||--o{ VERIFICATION_SESSIONS : starts
+    VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
+    USERS ||--o{ RECOVERY_CONTACTS : owns
+    USERS ||--o{ ACCOUNT_RECOVERY_CASES : requests
     USERS ||--o{ PASSWORD_RESET_TOKENS : resets
     USERS ||--o| OWNER_PROFILES : has
     USERS ||--o| INVESTOR_PROFILES : has
@@ -184,7 +187,10 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `users(email_normalized)` and `users(phone_e164)`: unique partial indexes where values are not null.
 - `user_identities(provider, provider_subject)`: unique.
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
-- `verification_challenges(user_id, purpose, created_at)`; destination hash and active/expiry lookup as required by the chosen challenge lifecycle.
+- `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
+- `recovery_contacts(user_id, status, created_at)` dan indeks unik parsial pada nilai kontak yang sudah dinormalisasi sesuai kebijakan keunikan yang disetujui.
+- `account_recovery_cases(user_id, status, created_at)` serta indeks untuk antrean pemeriksaan petugas berdasarkan status dan waktu penugasan.
+- `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
 - `business_data_shares(business_id, investor_user_id, revoked_at)`.
 - `opportunities(publication_status, moderation_status, published_at)` for eligible discovery; validate with actual feed queries.
@@ -217,7 +223,7 @@ Do not add broad GIN/full-text indexes, geospatial extensions, or analytics-spec
 
 Do not implement all domains in one large initial migration. Introduce reviewed, incremental migrations aligned with working feature slices:
 
-1. **Identity core:** users, provider identities, sessions, verification challenges, password reset tokens. Add role and identity constraints first.
+1. **Identity Core:** users, identitas penyedia, sessions, verification sessions, verification challenges, recovery contacts, account recovery cases, password reset tokens, dan audit log yang diperlukan. Mulai dari batasan role dan identitas, lalu tambahkan alur verifikasi serta pemulihan akun secara bertahap.
 2. **Profiles and businesses:** role-specific profiles, businesses, explicit data-sharing grants, verification history.
 3. **Opportunities:** common parent, role-specific detail tables, media metadata, reports, publication/moderation state.
 4. **Connections and messaging:** request lifecycle, canonical accepted pair, conversation participants, messages.
