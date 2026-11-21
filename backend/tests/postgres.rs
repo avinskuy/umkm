@@ -28,6 +28,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_provider_identity_invariants(&pool).await;
     assert_client_creation_function(&pool).await;
     assert_verification_schema_invariants(&pool).await;
+    assert_authentication_session_invariants(&pool).await;
 
     pool.close().await;
     assert_pool_closed(&pool);
@@ -1101,5 +1102,187 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
         .await
         .is_err(),
         "selected recovery account binding cannot be cleared"
+    );
+}
+
+
+async fn assert_authentication_session_invariants(pool: &PgPool) {
+    let user_id = insert_active_email(pool, "session-schema-owner@example.test").await;
+    let pending_user_id = insert_pending_email(
+        pool,
+        "investor",
+        "session-schema-pending@example.test",
+        Some("encoded-password-hash"),
+    )
+    .await
+    .expect("pending account should exist for session rejection test");
+
+    let session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.sessions (user_id, token_hash, remember_device, user_agent_summary, ip_prefix_hash) \
+         VALUES ($1::uuid, $2, TRUE, 'Chrome on Android', $3) RETURNING id::text",
+    )
+    .bind(&user_id)
+    .bind(vec![1_u8; 32])
+    .bind(vec![9_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("active account should be able to create a session");
+
+    let session_timestamps: (i64, bool, Option<String>) = sqlx::query_as(
+        "SELECT EXTRACT(EPOCH FROM (expires_at - created_at))::bigint, remember_device, user_agent_summary \
+         FROM public.sessions WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("session timestamps should be queryable");
+    assert_eq!(session_timestamps.0, 30 * 24 * 60 * 60);
+    assert!(session_timestamps.1);
+    assert_eq!(session_timestamps.2.as_deref(), Some("Chrome on Android"));
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
+        )
+        .bind(&pending_user_id)
+        .bind(vec![2_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "pending accounts cannot create authentication sessions"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
+        )
+        .bind(&user_id)
+        .bind(vec![1_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "session token hashes must be globally unique"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
+        )
+        .bind(&user_id)
+        .bind(vec![3_u8; 31])
+        .execute(pool)
+        .await
+        .is_err(),
+        "session token hash must be a 32-byte SHA-256 digest"
+    );
+
+    let rotated_at_before: f64 = sqlx::query_scalar(
+        "SELECT EXTRACT(EPOCH FROM token_rotated_at)::double precision FROM public.sessions WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("token rotation timestamp should exist");
+
+    sqlx::query("UPDATE public.sessions SET token_hash = $2 WHERE id = $1::uuid")
+        .bind(&session_id)
+        .bind(vec![4_u8; 32])
+        .execute(pool)
+        .await
+        .expect("active session token may be rotated");
+
+    let rotated_at_after: f64 = sqlx::query_scalar(
+        "SELECT EXTRACT(EPOCH FROM token_rotated_at)::double precision FROM public.sessions WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("rotated timestamp should be queryable");
+    assert!(rotated_at_after >= rotated_at_before);
+
+    assert!(
+        sqlx::query("UPDATE public.sessions SET remember_device = FALSE WHERE id = $1::uuid")
+            .bind(&session_id)
+            .execute(pool)
+            .await
+            .is_err(),
+        "remember-device choice is immutable for a session"
+    );
+
+    sqlx::query(
+        "UPDATE public.sessions SET revoked_at = clock_timestamp(), revocation_reason = 'user_revoked' \
+         WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .execute(pool)
+    .await
+    .expect("user may revoke an individual session");
+
+    let revoked_reason: Option<String> = sqlx::query_scalar(
+        "SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("revocation reason should be recorded");
+    assert_eq!(revoked_reason.as_deref(), Some("user_revoked"));
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.sessions SET revoked_at = NULL, revocation_reason = NULL WHERE id = $1::uuid",
+        )
+        .bind(&session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "revoked sessions cannot be reactivated"
+    );
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.sessions SET token_hash = $2 WHERE id = $1::uuid",
+        )
+        .bind(&session_id)
+        .bind(vec![5_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "revoked sessions cannot rotate tokens"
+    );
+
+    let second_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.sessions (user_id, token_hash, remember_device) \
+         VALUES ($1::uuid, $2, FALSE) RETURNING id::text",
+    )
+    .bind(&user_id)
+    .bind(vec![6_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("a user may have multiple concurrent sessions");
+
+    sqlx::query("UPDATE public.users SET account_status = 'deactivated' WHERE id = $1::uuid")
+        .bind(&user_id)
+        .execute(pool)
+        .await
+        .expect("account deactivation should succeed");
+
+    let second_session_revocation: (Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT revoked_at::text, revocation_reason FROM public.sessions WHERE id = $1::uuid",
+    )
+    .bind(&second_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("session should remain available as a revoked record");
+    assert!(second_session_revocation.0.is_some());
+    assert_eq!(second_session_revocation.1.as_deref(), Some("account_status_changed"));
+
+    assert!(
+        sqlx::query("INSERT INTO public.sessions (user_id, token_hash) VALUES ($1::uuid, $2)")
+            .bind(&user_id)
+            .bind(vec![7_u8; 32])
+            .execute(pool)
+            .await
+            .is_err(),
+        "deactivated accounts cannot create new sessions"
     );
 }
