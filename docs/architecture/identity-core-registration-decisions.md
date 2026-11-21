@@ -182,3 +182,18 @@ Acuan pola UX dan kemampuan platform:
 - Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
 
 Keputusan operasional yang masih perlu dibahas terpisah: apakah penerbitan/resend challenge diperbolehkan selama sesi sedang terkunci satu jam. Apa pun pilihannya, challenge baru tidak boleh membuat sesi dapat diverifikasi sebelum penguncian berakhir.
+
+
+### Keputusan: penerbitan OTP selama penguncian sesi
+
+Pengguna **boleh meminta dan menerima OTP baru selama sesi verifikasi terkunci**, selama jeda resend, batas pengiriman per kontak, dan rate limit lain terpenuhi.
+
+Ketentuan:
+- Pengiriman OTP baru tidak menghapus, memperpendek, atau mengatur ulang penguncian satu jam.
+- Semua percobaan verifikasi tetap ditolak sampai `locked_until` berakhir, termasuk untuk challenge baru yang diterbitkan selama penguncian.
+- Challenge baru menggantikan challenge sebelumnya sesuai aturan `superseded`; challenge lama tidak dapat digunakan kembali.
+- Jika challenge baru kedaluwarsa sebelum sesi terbuka, pengguna dapat meminta OTP berikutnya setelah batas resend/pengiriman mengizinkan.
+- Setelah penguncian berakhir, sesi `pending` yang sama dapat digunakan kembali sesuai aturan reset penghitung kegagalan yang sudah disetujui.
+- Penerbitan OTP tetap tunduk pada batas lima pengiriman per kontak per jam dan rate limit lintas sesi/instance.
+
+Tujuan UX: pengguna tetap dapat memperoleh kode terbaru saat menunggu, tanpa membuat kode tersebut menjadi jalan pintas untuk melewati penguncian keamanan.
