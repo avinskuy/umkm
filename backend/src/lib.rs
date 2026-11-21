@@ -1,8 +1,9 @@
 pub mod config;
 pub mod database;
 
-use axum::{routing::get, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
+use sqlx::PgPool;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -17,8 +18,37 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
-pub fn app() -> Router {
-    Router::new().route("/api/v1/health", get(health))
+async fn readiness(State(pool): State<PgPool>) -> (StatusCode, Json<HealthResponse>) {
+    let database_ready = sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&pool)
+        .await
+        .is_ok();
+
+    if database_ready {
+        (
+            StatusCode::OK,
+            Json(HealthResponse {
+                status: "ready",
+                service: "usahapintar-api",
+            }),
+        )
+    } else {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(HealthResponse {
+                status: "unavailable",
+                service: "usahapintar-api",
+            }),
+        )
+    }
+}
+
+/// Build the HTTP application using the runtime application's PostgreSQL pool.
+pub fn app(pool: PgPool) -> Router {
+    Router::new()
+        .route("/api/v1/health", get(health))
+        .route("/api/v1/readyz", get(readiness))
+        .with_state(pool)
 }
 
 #[cfg(test)]
@@ -26,11 +56,16 @@ mod tests {
     use super::app;
     use axum::body::Body;
     use http_body_util::BodyExt;
+    use sqlx::postgres::PgPoolOptions;
     use tower::ServiceExt;
 
     #[tokio::test]
-    async fn health_endpoint_returns_ok() {
-        let response = app()
+    async fn health_endpoint_is_a_database_independent_liveness_check() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy pool configuration should be valid");
+
+        let response = app(pool)
             .oneshot(
                 axum::http::Request::builder()
                     .uri("/api/v1/health")

@@ -79,4 +79,5 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo test --locked -p usahapintar-api --test postgres -- --ignored
+      - run: cargo test --locked -p usahapintar-api --test runtime -- --ignored
       - run: cargo build --workspace --locked

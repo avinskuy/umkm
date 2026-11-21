@@ -12,6 +12,16 @@ pub struct DatabaseConfig {
 }
 
 impl DatabaseConfig {
+    /// Configuration for the least-privilege application runtime principal.
+    pub fn from_app_env() -> Result<Self, DatabaseConfigError> {
+        let database_url =
+            env::var("APP_DATABASE_URL").map_err(|_| DatabaseConfigError::MissingAppDatabaseUrl)?;
+        let max_connections = env::var("DATABASE_MAX_CONNECTIONS").ok();
+
+        Self::from_values(&database_url, max_connections.as_deref())
+    }
+
+    /// Configuration for explicit migration/test tooling using DATABASE_URL.
     pub fn from_env() -> Result<Self, DatabaseConfigError> {
         let database_url =
             env::var("DATABASE_URL").map_err(|_| DatabaseConfigError::MissingDatabaseUrl)?;
@@ -55,6 +65,7 @@ impl DatabaseConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DatabaseConfigError {
+    MissingAppDatabaseUrl,
     MissingDatabaseUrl,
     InvalidDatabaseUrl,
     InvalidMaxConnections,
@@ -63,10 +74,16 @@ pub enum DatabaseConfigError {
 impl fmt::Display for DatabaseConfigError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::MissingAppDatabaseUrl => {
+                write!(
+                    formatter,
+                    "APP_DATABASE_URL environment variable is required"
+                )
+            }
             Self::MissingDatabaseUrl => {
                 write!(formatter, "DATABASE_URL environment variable is required")
             }
-            Self::InvalidDatabaseUrl => write!(formatter, "DATABASE_URL is invalid"),
+            Self::InvalidDatabaseUrl => write!(formatter, "database URL is invalid"),
             Self::InvalidMaxConnections => write!(
                 formatter,
                 "DATABASE_MAX_CONNECTIONS must be an integer between 1 and 100"
