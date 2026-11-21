@@ -97,32 +97,35 @@ mod tests {
 
     #[test]
     fn rejects_invalid_database_url_without_echoing_it() {
-        let error = DatabaseConfig::from_values("not-a-database-url", None).unwrap_err();
+        let error = match DatabaseConfig::from_values("not-a-database-url", None) {
+            Err(error) => error,
+            Ok(_) => panic!("invalid URL must be rejected"),
+        };
         assert_eq!(error, DatabaseConfigError::InvalidDatabaseUrl);
         assert!(!error.to_string().contains("not-a-database-url"));
     }
 
     #[test]
     fn rejects_non_numeric_connection_limit() {
-        assert_eq!(
-            DatabaseConfig::from_values(VALID_URL, Some("many")).unwrap_err(),
-            DatabaseConfigError::InvalidMaxConnections
-        );
+        assert!(matches!(
+            DatabaseConfig::from_values(VALID_URL, Some("many")),
+            Err(DatabaseConfigError::InvalidMaxConnections)
+        ));
     }
 
     #[test]
     fn rejects_zero_connection_limit() {
-        assert_eq!(
-            DatabaseConfig::from_values(VALID_URL, Some("0")).unwrap_err(),
-            DatabaseConfigError::InvalidMaxConnections
-        );
+        assert!(matches!(
+            DatabaseConfig::from_values(VALID_URL, Some("0")),
+            Err(DatabaseConfigError::InvalidMaxConnections)
+        ));
     }
 
     #[test]
     fn rejects_connection_limit_above_safety_cap() {
-        assert_eq!(
-            DatabaseConfig::from_values(VALID_URL, Some("101")).unwrap_err(),
-            DatabaseConfigError::InvalidMaxConnections
-        );
+        assert!(matches!(
+            DatabaseConfig::from_values(VALID_URL, Some("101")),
+            Err(DatabaseConfigError::InvalidMaxConnections)
+        ));
     }
 }
