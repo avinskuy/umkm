@@ -78,6 +78,16 @@ DECLARE
     v_pending_expires_at TIMESTAMPTZ;
 BEGIN
     IF TG_OP = 'INSERT' THEN
+        IF NEW.status <> 'pending'
+           OR NEW.failed_attempt_count <> 0
+           OR NEW.locked_until IS NOT NULL
+           OR NEW.verified_at IS NOT NULL
+           OR NEW.expired_at IS NOT NULL
+           OR NEW.cancelled_at IS NOT NULL THEN
+            RAISE EXCEPTION 'verification session must start in pending state'
+                USING ERRCODE = '23514';
+        END IF;
+
         NEW.created_at := clock_timestamp();
         IF NEW.expires_at <= NEW.created_at THEN
             RAISE EXCEPTION 'verification session deadline must be in the future'
@@ -257,6 +267,15 @@ DECLARE
     v_session_expires_at TIMESTAMPTZ;
 BEGIN
     IF TG_OP = 'INSERT' THEN
+        IF NEW.status <> 'pending'
+           OR NEW.consumed_at IS NOT NULL
+           OR NEW.expired_at IS NOT NULL
+           OR NEW.superseded_at IS NOT NULL
+           OR NEW.cancelled_at IS NOT NULL THEN
+            RAISE EXCEPTION 'verification challenge must start in pending state'
+                USING ERRCODE = '23514';
+        END IF;
+
         NEW.created_at := clock_timestamp();
         IF NEW.expires_at <= NEW.created_at THEN
             RAISE EXCEPTION 'verification challenge deadline must be in the future'
@@ -447,6 +466,11 @@ SET search_path = pg_catalog
 AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
+        IF NEW.dispatch_status <> 'pending' THEN
+            RAISE EXCEPTION 'OTP delivery event must start in pending state'
+                USING ERRCODE = '23514';
+        END IF;
+
         NEW.created_at := clock_timestamp();
         NEW.updated_at := NEW.created_at;
         RETURN NEW;
