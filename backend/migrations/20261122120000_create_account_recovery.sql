@@ -428,8 +428,7 @@ BEGIN
 
         SELECT account_status INTO v_account_status
         FROM public.users
-        WHERE id = OLD.user_id
-        FOR SHARE;
+        WHERE id = OLD.user_id;
 
         IF NOT FOUND OR v_account_status <> 'active' THEN
             RAISE EXCEPTION 'password reset token cannot be consumed for an inactive account'
