@@ -19,7 +19,7 @@ It is **not** a goods marketplace or an investment transaction platform. The MVP
 - **Investor** — discovers business opportunities, creates and manages partnership-seeking posts using the Investor post format, uses Investment Intelligence, and builds connections.
 - **Admin** — internal operational role for verification, moderation, membership, reports, and platform governance. Admin accounts are provisioned internally and are not offered in public registration.
 
-Each client account has exactly one immutable primary client role: `owner` or `investor`. The role is selected during registration and cannot be changed later through profile settings, support requests, account migration, OAuth, or any other self-service or administrative workflow. Anyone who wants to use the other client role must register a separate new account with eligible, unlinked login identities. Owner and Investor experiences use separate login entry points and role-aware authorization. The backend is authoritative for role and resource access. Admin is a separately provisioned internal role and is not a client registration choice.
+Each client account has exactly one immutable primary client role: `business_owner` or `investor`. The role is selected during registration and cannot be changed later through profile settings, support requests, account migration, OAuth, or any other self-service or administrative workflow. Anyone who wants to use the other client role must register a separate new account with eligible, unlinked login identities. Owner and Investor experiences use separate login entry points and role-aware authorization. The backend is authoritative for role and resource access. Admin is a separately provisioned internal role and is not a client registration choice.
 
 ### Membership model
 
@@ -71,7 +71,7 @@ After login, users enter the application shell for their primary role. The shell
 
 | Route | Page | Access |
 | --- | --- | --- |
-| `/app/notifikasi` | Notifications | Owner, Investor |
+| `/app/notifikasi` | Notifications | Owner, Investor; security notifications cannot be disabled through marketing preferences |
 | `/app/koneksi` | Connections | Owner, Investor |
 | `/app/pesan` | Messages | Owner, Investor; approved connections only |
 | `/app/pesan/:conversationId` | Conversation | Conversation participants only |
@@ -79,6 +79,8 @@ After login, users enter the application shell for their primary role. The shell
 | `/app/profil/:userId` | Public-facing member profile | Authenticated users, field-level visibility |
 | `/app/pengaturan` | Account settings | Owner, Investor |
 | `/app/keanggotaan` | Membership and usage | Owner, Investor |
+| `/app/riwayat-aktivitas` | Account activity history | Own account only; moderation actions and appeal status/outcomes |
+| `/app/riwayat-aktivitas/:actionId/banding` | Submit moderation appeal | Affected account only; at most one appeal per moderation action |
 
 A connection request must be approved before a conversation can be started. Direct messaging is not a Premium-only feature. Free and Premium users can connect and chat after approval, subject to fair-use and safety limits.
 
@@ -150,6 +152,7 @@ Suggested route prefix: `/admin`. Access is internal and enforced server-side.
 | `/admin/businesses` | Business verification | Review business profiles and submitted evidence |
 | `/admin/posts` | Post moderation | Review, approve, reject, hide, or request edits |
 | `/admin/reports` | Reports and complaints | Triage reports, investigate, and record outcomes |
+| `/admin/banding` | Moderation appeals | Review submitted appeals and record accepted, modified, or rejected outcomes |
 | `/admin/memberships` | Membership management | Plans, entitlements, quotas, and subscription status |
 | `/admin/connections` | Connection oversight | Investigate abuse reports and relevant safety events; no routine private-chat browsing |
 | `/admin/ai-governance` | AI and data governance | Review data-source status, consent, output incidents, and audit metadata |

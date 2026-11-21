@@ -182,7 +182,7 @@
 └─────────────────────────────┘
 ```
 
-Interaction: selecting a role navigates to its dedicated registration path. The role is not editable later through a casual profile setting; role changes require an explicit account migration/support policy.
+Interaction: selecting a role navigates to its dedicated registration path. The role is immutable for the account and cannot be changed through profile settings, support, Admin action, account migration, or OAuth. Anyone who wants the other client role must register a separate account using eligible identities that are not linked to another account.
 
 ## 4. Owner and Investor login
 
@@ -309,7 +309,7 @@ Registration is a staged flow. The account is created before the user is asked f
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The visual OTP control may use grouped boxes, but the underlying input must support paste, keyboard navigation, and assistive technology. Do not expose the OTP in logs or analytics.
+The visual OTP control may use grouped boxes, but the underlying input must support paste, keyboard navigation, and assistive technology. The approved baseline is a 10-minute code lifetime, 60-second resend cooldown, at most five sends per destination per hour, and a one-hour verification-session lock after five failed attempts. Resending may issue a new code but must not clear or shorten an active lock. Do not expose the OTP in logs or analytics.
 
 ### Step 3 — Business stage
 
@@ -434,7 +434,7 @@ Keep financial range and risk preference optional in the initial onboarding unle
 └──────────────────────────────────────────────────────────────┘
 ```
 
-No public Admin registration or role selector is present. The exact MFA method and recovery policy must be decided in the security design before implementation.
+No public Admin registration or role selector is present. Admin MFA is required before production use; the exact MFA method/provider remains an implementation decision. Account recovery policy is defined in the approved Identity Core decisions; provider, evidence storage, and operational details remain subject to implementation review.
 
 ## 9. Shared error, loading, and empty states
 

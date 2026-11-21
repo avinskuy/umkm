@@ -137,10 +137,33 @@ Payment-provider events, invoices, payment methods, and refunds are out of the i
 | Table | Responsibility | Important constraints |
 | --- | --- | --- |
 | `moderation_cases` | Review case for a user, business, opportunity, or report | Target type/ID, state, assigned reviewer, timestamps |
-| `moderation_actions` | Append-only decision history | Actor, action, reason, outcome, timestamp |
+| `moderation_actions` | Append-only decision history | Actor, target, action, applicable rule, reason, scope, duration/end condition, outcome, timestamp |
+| `moderation_appeals` | One appeal per moderation action | Unique `moderation_action_id`; submitter, context/evidence reference, reviewer, outcome (`accepted`, `modified`, `rejected`), reason, timestamps |
 | `admin_audit_logs` | Security-sensitive Admin action trail | Append-only, separately permissioned read access |
 
-Moderation status is not publication status. An opportunity can be published and later restricted. Admin actions must be permission-checked and audited. Routine Admin access to private conversations is not part of this model.
+Moderation status is not publication status. An opportunity can be published and later restricted. Admin actions must be permission-checked and audited. Routine Admin access to private conversations is not part of this model. Each moderation action may have at most one appeal; preserve the original action and append the review outcome rather than overwriting its history.
+
+### G. Privacy, consent, and account lifecycle
+
+| Table | Responsibility | Important constraints |
+| --- | --- | --- |
+| `consent_records` | Record optional consent and purpose-specific user choices | User, purpose, policy/version, granted/revoked timestamps, source; no bundled marketing consent |
+| `account_deletion_requests` | Track user-requested permanent account deletion | User, request time, 30-day cancellation deadline, lifecycle status, cancellation/completion timestamps; Admin cannot create unilateral permanent deletion |
+| `data_retention_records` | Track data retained for a documented legal/security/accountability purpose | Data category/reference, purpose/basis, access restriction, retention deadline/review; never repurpose retained data for marketing |
+| `data_export_requests` | Track user-requested copy of their own data | User, request/status timestamps, security verification, secure artifact reference and expiry; exclude other users' data and internal security material |
+
+Temporary deactivation remains a distinct account status/action and must not be represented as a deletion request. The 30-day waiting period is a cancellation window; deletion processing begins afterward and may take additional time. Exact retention periods and backup schedules remain open until legal and infrastructure review. Backup restore must reapply deletion records before the service returns to normal operation.
+
+### H. Security notifications and account activity
+
+| Table | Responsibility | Important constraints |
+| --- | --- | --- |
+| `security_notifications` | In-app record of mandatory security events for the affected account | Event type, account, safe minimal metadata, created/read timestamps; no password, OTP, token, private chat, or investigation details |
+| `notification_deliveries` | Delivery attempts for an eligible notification over email, push, or SMS | Channel, provider reference, attempt/status timestamps, minimal error classification; idempotency to prevent accidental duplicate sends |
+
+Mandatory security notification events include new-device login, password/primary-contact/recovery-contact changes, account-recovery request/outcome, and Admin restrictions/suspensions. Security notifications are separate from marketing preferences. Shared recovery contacts must not receive unrelated account-specific information.
+
+The user-facing `account_activity_history` should be a scoped read model/view over moderation actions and appeal outcomes, not a second editable source of truth. It exposes only the affected user's own actions and safe explanations; internal Admin identity, reporter identity, investigation notes, detection signals, and other users' data remain hidden.
 
 ## 4. Relationship overview
 
@@ -176,6 +199,13 @@ erDiagram
     USERS ||--o{ USAGE_COUNTERS : consumes
     USERS ||--o{ MODERATION_CASES : may_be_target
     MODERATION_CASES ||--o{ MODERATION_ACTIONS : records
+    MODERATION_ACTIONS ||--o| MODERATION_APPEALS : appealed_by
+    USERS ||--o{ CONSENT_RECORDS : grants
+    USERS ||--o{ ACCOUNT_DELETION_REQUESTS : requests
+    USERS ||--o{ DATA_RETENTION_RECORDS : subject
+    USERS ||--o{ DATA_EXPORT_REQUESTS : requests
+    USERS ||--o{ SECURITY_NOTIFICATIONS : receives
+    SECURITY_NOTIFICATIONS ||--o{ NOTIFICATION_DELIVERIES : attempts
     USERS ||--o{ ADMIN_AUDIT_LOGS : acts
 ```
 
@@ -214,7 +244,12 @@ Do not add broad GIN/full-text indexes, geospatial extensions, or analytics-spec
 - Never trust a user ID, role, membership plan, quota, ownership claim, or consent flag supplied by the client.
 - Check consent and field visibility on every protected business-data read.
 - Check account status, block/report restrictions, connection status, and participant membership before messaging.
-- Keep Admin audit records append-only and minimize sensitive payloads.
+- Keep Admin audit records and moderation decisions append-only; an appeal must not overwrite the original action.
+- Enforce at most one appeal per moderation action and scope appeal reads/writes to the affected account and authorized reviewers.
+- Keep account deletion requests, retention exceptions, and data export requests separately auditable; do not equate the 30-day cancellation window with immediate deletion completion.
+- Scope security notifications and delivery attempts to the affected account; keep mandatory security events separate from marketing preferences.
+- Build account activity history from authorized moderation/appeal records and redact internal identities, reporter details, and investigation material.
+- Record consent purpose/version/grant/revocation and enforce withdrawal for optional processing.
 - Use parameterized SQLx queries; avoid string-concatenated SQL.
 - Use transactions for multi-row state transitions and quota consumption.
 - Do not use database cascade behavior that can erase audit or moderation history.
@@ -229,7 +264,8 @@ Do not implement all domains in one large initial migration. Introduce reviewed,
 3. **Opportunities:** common parent, role-specific detail tables, media metadata, reports, publication/moderation state.
 4. **Connections and messaging:** request lifecycle, canonical accepted pair, conversation participants, messages.
 5. **Membership and quotas:** plans, entitlements, subscriptions, atomic usage counters after commercial and quota decisions.
-6. **Moderation and Admin operations:** cases, actions, audit permissions, append-only protections.
+6. **Moderation and Admin operations:** cases, actions, one-to-one appeal records, audit permissions, append-only protections.
+7. **Privacy and operational records:** consent history, account deletion requests, retention exceptions, data export requests, security notifications, and delivery attempts. Implement each slice only when its corresponding user flow and retention rules are ready.
 
 Each migration must be immutable after application to a shared database. Include forward migration tests against a disposable PostgreSQL instance. Add rollback guidance where safe; do not promise down migrations for destructive or data-transforming changes without a recovery plan.
 
@@ -255,16 +291,16 @@ Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui beri
 
 Tetapkan hal-hal berikut saat peninjauan migrasi; jangan mengarang keputusan langsung di SQL:
 
-- Rancangan tabel dan status yang tepat untuk penonaktifan sementara, permintaan/pembatalan penghapusan, proses penghapusan, serta penahanan data untuk kebutuhan retensi/hukum.
+- Status dan transisi teknis yang tepat untuk `account_deletion_requests`, `data_retention_records`, dan penonaktifan sementara; kebijakan produk telah memutuskan pemisahan entitas dan masa tunggu 30 hari, sedangkan nilai retensi numerik tetap menunggu tinjauan hukum/infrastruktur.
 - Kebijakan penggunaan kembali kontak dan perilaku reservasi keunikan selama pendaftaran tertunda, penonaktifan, masa tunggu penghapusan, serta retensi setelah penghapusan.
-- Skema untuk bukti pemulihan, penugasan pemeriksaan manual, cakupan kewenangan pemeriksa, peristiwa audit, dan persetujuan dua pihak jika diperlukan.
+- Struktur metadata bukti pemulihan, penugasan pemeriksaan manual, cakupan kewenangan petugas khusus, dan kebutuhan persetujuan tambahan untuk tindakan berisiko tinggi.
 - Konfigurasi penyedia layanan dan model antrean/outbox serta percobaan pengiriman email dan WhatsApp, termasuk idempotensi dan penanganan kegagalan.
 - Penyimpanan pembatasan permintaan terdistribusi serta cara mempertahankan penghitung setelah aplikasi dimulai ulang dan saat berjalan di beberapa instance.
 - Parameter hashing kata sandi, jadwal retensi, MFA/pemulihan Admin, dan pengaturan kata sandi lokal untuk akun yang hanya menggunakan Google jika kelak disediakan.
 
 ### Keputusan di luar cakupan Identity Core yang ditunda
 
-Kolom profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; cakupan persetujuan serta penanganan ekspor data; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta rancangan izin moderasi/Admin yang lebih luas. Hal-hal ini tidak menghalangi migrasi Identity Core kecuali ditemukan ketergantungan yang nyata.
+Detail field profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; status dan metadata consent/export/deletion yang tepat; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta pemetaan izin Admin ke tabel dan policy enforcement. Kebijakan produk untuk privasi, consent, export, lifecycle, Admin enforcement, moderasi, banding, notifikasi, dan riwayat aktivitas telah ditetapkan; detail skema dan implementasinya tetap memerlukan review domain sebelum migration.
 
 ## 9. Review and implementation gate
 

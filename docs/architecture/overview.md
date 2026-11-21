@@ -18,8 +18,9 @@ USahapintar dimulai dengan pendekatan **modular monolith**. Frontend dan backend
 
 - Rust dan Axum.
 - Modul berorientasi domain dengan pemisahan tanggung jawab API, application, domain, dan infrastructure secara eksplisit sesuai kebutuhan kompleksitas.
-- PostgreSQL direncanakan sebagai database relasional utama.
-- SQLx direncanakan sebagai lapisan akses database.
+- PostgreSQL 16 telah menjadi baseline database relasional.
+- Fondasi runtime SQLx 0.8 sudah tersedia: konfigurasi koneksi melalui environment, connection pool, dan migrator eksplisit.
+- API saat ini belum menginisialisasi koneksi database saat startup dan belum memiliki migrasi skema domain; integrasi runtime serta migrasi domain harus dilakukan bertahap setelah gerbang desainnya terpenuhi.
 - Otorisasi ditegakkan di sisi server.
 
 ## Batas domain awal
@@ -42,7 +43,7 @@ Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah diset
 
 ## Skema database
 
-Model relasional yang diusulkan, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Dokumen tersebut masih berupa usulan sampai tahap peninjauan migrasi pertama selesai.
+Model relasional yang diusulkan, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). SQLx migrator dan pengujian integrasi PostgreSQL sudah tersedia, tetapi belum ada migrasi skema domain. Dokumen skema tetap berstatus usulan sampai peninjauan domain dan gerbang migrasi pertama selesai.
 
 ## Akses data dan privasi
 
