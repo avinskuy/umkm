@@ -190,7 +190,7 @@ Acuan:
 - Google for Developers, [Automatic SMS Verification with the SMS Retriever API](https://developers.google.com/identity/sms-retriever/overview).
 - Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
 
-**Catatan terbuka:** kebijakan apakah penerbitan atau resend challenge diperbolehkan selama sesi terkunci satu jam belum diputuskan. Jika penerbitan diizinkan, challenge tersebut tetap tidak dapat diverifikasi sampai sesi dibuka kembali. Penerbitan challenge tidak boleh mempercepat atau mengatur ulang penguncian.
+**Status keputusan:** kebijakan penerbitan challenge selama sesi terkunci telah diputuskan dan dijelaskan pada Bagian 12. Catatan ini bukan keputusan terbuka. Kebijakan OTP pada tingkat produk dianggap selesai; detail library, penyedia, konfigurasi, dan integrasi mengikuti pola teruji serta dokumentasi resmi saat implementasi.
 
 
 ## 12. Penerbitan challenge selama sesi terkunci
