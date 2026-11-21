@@ -21,7 +21,10 @@ impl fmt::Display for ServerConfigError {
                 write!(formatter, "HOST must be a valid IP address, got '{host}'")
             }
             Self::InvalidPort(port) => {
-                write!(formatter, "PORT must be an integer between 1 and 65535, got '{port}'")
+                write!(
+                    formatter,
+                    "PORT must be an integer between 1 and 65535, got '{port}'"
+                )
             }
             Self::ZeroPort => write!(formatter, "PORT must be greater than zero"),
         }
