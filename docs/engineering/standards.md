@@ -83,5 +83,6 @@ Persetujuan kebijakan merupakan baseline desain dan implementasi; hal tersebut t
 - [Performance, Scalability & Reliability](performance-scalability-reliability.md) mengatur pengukuran, kapasitas, ketahanan terhadap kegagalan, dan optimasi berbasis bukti.
 - [Secure Software Development Lifecycle](secure-software-development-lifecycle.md) mengatur integrasi keamanan dari perencanaan sampai pemeliharaan.
 - [Kebijakan Keamanan Dependency & Komponen Pihak Ketiga](../security/dependency-third-party-security.md) mengatur supply chain software, package, SDK, dan komponen vendor.
+- [Kesiapan Operasional](../operations/README.md) mengatur respons insiden, kesinambungan layanan, observability, release/change control, dan runbook operasional.
 
-Dokumen tersebut merupakan baseline kebijakan. Status implementasi setiap kontrol harus dibuktikan melalui kode, konfigurasi, hasil pengujian, atau catatan operasional yang relevan.
+Status implementasi setiap kontrol harus dibuktikan melalui kode, konfigurasi, hasil pengujian, atau catatan operasional yang relevan. Dokumen kebijakan dan prosedur tidak dengan sendirinya membuktikan kontrol sudah berjalan.

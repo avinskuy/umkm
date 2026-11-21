@@ -58,6 +58,7 @@ Development, test, staging, dan production harus dipisahkan secara logis dan men
 - Periksa hasil build, dependency, dan konfigurasi sebelum distribusi.
 - Catat versi, commit sumber, hasil CI, perubahan penting, dan prosedur rollback.
 - Jangan menyertakan secret, data pengguna, backup production, atau konfigurasi privat dalam artifact publik.
+- Ikuti [Release Management & Change Control](../operations/release-management-change-control.md) untuk penilaian, persetujuan, deployment, dan rollback.
 
 ## 8. Production deployment
 
@@ -69,7 +70,7 @@ Development, test, staging, dan production harus dipisahkan secara logis dan men
 
 ## 9. Monitoring, patching, dan operasi
 
-Pantau kesehatan layanan, kapasitas, error, aktivitas administratif, dan kejadian keamanan. Tetapkan pemilik respons serta prosedur pemeliharaan. Terapkan patch berdasarkan tingkat risiko, paparan, dan ketersediaan pembaruan yang aman.
+Pantau kesehatan layanan, kapasitas, error, aktivitas administratif, dan kejadian keamanan. Tetapkan pemilik respons serta prosedur pemeliharaan. Terapkan patch berdasarkan tingkat risiko, paparan, dan ketersediaan pembaruan yang aman. Gunakan [Observability & Monitoring](../operations/observability-monitoring.md) dan [Operational Runbooks](../operations/operational-runbooks.md) sebagai prosedur pendukung.
 
 ## 10. Pengujian dan pemeriksaan
 

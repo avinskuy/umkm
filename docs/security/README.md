@@ -33,6 +33,7 @@ Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelol
 
 ## Hubungan dengan dokumen lain
 
+- [Kesiapan Operasional](../operations/README.md): Incident Response, BCDR, Observability, Release Management, dan Runbooks.
 - [Standar Engineering](../engineering/standards.md)
 - [Gambaran Arsitektur](../architecture/overview.md)
 - [Rancangan Skema Database PostgreSQL](../architecture/database-schema-design.md)
