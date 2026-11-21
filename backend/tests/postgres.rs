@@ -1632,8 +1632,8 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
         insert_active_email(pool, "identity-audit-subject@example.test").await;
 
     let event_id: String = sqlx::query_scalar(
-        "INSERT INTO public.identity_audit_events (actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata) \
-         VALUES ('user', $1::uuid, $1::uuid, 'account.recovery.requested', 'success', 'contact_verified', gen_random_uuid(), jsonb_build_object('channel', 'email', 'purpose', 'account_recovery', 'risk_level', 'elevated')) \
+        "INSERT INTO public.identity_audit_events (occurred_at, actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata) \
+         VALUES ('2000-01-01 00:00:00+00'::timestamptz, 'user', $1::uuid, $1::uuid, 'account.recovery.requested', 'success', 'contact_verified', gen_random_uuid(), jsonb_build_object('channel', 'email', 'purpose', 'account_recovery', 'risk_level', 'elevated')) \
          RETURNING id::text",
     )
     .bind(&subject_user_id)
@@ -1642,7 +1642,7 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
     .expect("valid identity audit event should be accepted");
 
     let timestamp_is_database_managed: bool = sqlx::query_scalar(
-        "SELECT occurred_at <= clock_timestamp() FROM public.identity_audit_events WHERE id = $1::uuid",
+        "SELECT occurred_at > clock_timestamp() - INTERVAL '1 minute' FROM public.identity_audit_events WHERE id = $1::uuid",
     )
     .bind(&event_id)
     .fetch_one(pool)
