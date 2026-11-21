@@ -6,6 +6,7 @@ DECLARE
     v_function_owner TEXT;
     v_users_owner TEXT;
     v_audit_owner TEXT;
+    v_database_owner TEXT;
     v_owner_is_privileged BOOLEAN;
     v_is_security_definer BOOLEAN;
     v_has_safe_search_path BOOLEAN;
@@ -50,6 +51,16 @@ BEGIN
     IF v_owner_is_privileged IS DISTINCT FROM FALSE THEN
         RAISE EXCEPTION
             'Refusing SECURITY DEFINER grant: migration owner has elevated cluster privileges';
+    END IF;
+
+    SELECT pg_catalog.pg_get_userbyid(d.datdba)
+      INTO v_database_owner
+      FROM pg_catalog.pg_database AS d
+     WHERE d.datname = pg_catalog.current_database();
+
+    IF v_database_owner IS NOT DISTINCT FROM 'usahapintar_migrator' THEN
+        RAISE EXCEPTION
+            'Refusing SECURITY DEFINER grant: migrator must not own the database';
     END IF;
 
     IF EXISTS (
