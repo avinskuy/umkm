@@ -1786,6 +1786,39 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("direct account table privileges should be queryable");
     assert_eq!(direct_user_access, (false, false, false));
 
+    let direct_sensitive_table_access: bool = sqlx::query_scalar(
+        "SELECT EXISTS ( \
+             SELECT 1 \
+               FROM unnest(ARRAY[ \
+                   'user_identities', 'verification_sessions', 'verification_challenges', \
+                   'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
+                   'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens' \
+               ]::TEXT[]) AS t(table_name) \
+              WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'INSERT') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'UPDATE') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'DELETE') \
+                 OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'TRUNCATE') \
+         )",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("sensitive table privileges should be queryable");
+    assert!(
+        !direct_sensitive_table_access,
+        "application must not receive direct access to verification, session, or recovery tables"
+    );
+
+    let database_privileges: (bool, bool, bool) = sqlx::query_as(
+        "SELECT has_database_privilege(current_user, current_database(), 'CONNECT'), \
+                has_database_privilege(current_user, current_database(), 'CREATE'), \
+                has_database_privilege(current_user, current_database(), 'TEMP')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("application database privileges should be queryable");
+    assert_eq!(database_privileges, (true, false, false));
+
     let audit_access: (bool, bool, bool, bool, bool) = sqlx::query_as(
         "SELECT has_table_privilege(current_user, 'public.identity_audit_events', 'INSERT'), \
                 has_table_privilege(current_user, 'public.identity_audit_events', 'SELECT'), \
