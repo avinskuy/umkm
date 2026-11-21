@@ -165,7 +165,7 @@ Content:
 
 ### Form fields and behavior
 
-- Email or phone number field. Label clearly states accepted formats.
+- The registrant chooses exactly one initial contact method: email, or phone number verified through WhatsApp. These are alternatives; both are not required during initial registration.
 - Password field with show/hide toggle.
 - Forgot password link.
 - Remember-device/session option only if the backend session policy supports it safely; do not imply permanent sessions.
@@ -223,8 +223,9 @@ Keep the visual layout consistent so the two pages feel like one product. Distin
 - Optional product updates consent, unchecked by default.
 
 **Step 2 — Contact verification**
-- Email verification link/code.
-- Phone OTP.
+- If Email was selected: enter the one-time code delivered to that email address.
+- If Phone was selected: enter the one-time code delivered through WhatsApp.
+- Only the selected contact is required for initial activation. The other contact may be added and verified later.
 - Show destination in masked form.
 - Resend action with visible cooldown and attempt limits.
 - OTP expiry and retry states must be explicit.
@@ -263,7 +264,7 @@ Ask for only the fields relevant to the selected stage:
 - Optional product updates consent, unchecked by default.
 
 **Step 2 — Contact verification**
-- Same verification pattern as Owner registration.
+- Same mutually exclusive Email or Phone/WhatsApp choice and verification pattern as Owner registration.
 
 **Step 3 — Investor profile**
 - Investor type/profile description, using approved non-sensitive categories.
@@ -366,12 +367,12 @@ Do not send passwords, OTP values, raw phone/email, tokens, or sensitive form co
 - [ ] Shared form behavior is consistent.
 - [ ] Role mismatch is handled by the backend and gives a safe next step.
 - [ ] Password visibility, forgot password, loading, error, and rate-limit states are designed.
-- [ ] Google OAuth remains role-aware.
+- [ ] Google OAuth behavior is approved before any implementation.
 
 ### Registration and verification
 - [ ] Only Owner and Investor can register publicly.
 - [ ] Account creation is separate from longer onboarding.
-- [ ] Verification states, resend cooldown, expiry, and attempt limits are defined.
+- [ ] Email OR phone/WhatsApp registration choice is explicit; selected-channel verification, resend cooldown, expiry, and attempt limits are defined.
 - [ ] Optional consent is unchecked by default.
 - [ ] Progress and recovery behavior are defined.
 
