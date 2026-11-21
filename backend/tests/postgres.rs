@@ -1117,8 +1117,8 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
     .expect("pending account should exist for session rejection test");
 
     let session_id: String = sqlx::query_scalar(
-        "INSERT INTO public.sessions (user_id, token_hash, remember_device, user_agent_summary, ip_prefix_hash, expires_at) \
-         VALUES ($1::uuid, $2, TRUE, 'Chrome on Android', $3, clock_timestamp() + INTERVAL '365 days') RETURNING id::text",
+        "INSERT INTO public.sessions (user_id, token_hash, remember_device, user_agent_summary, ip_prefix_hash, ip_prefix_hmac_key_version, expires_at) \
+         VALUES ($1::uuid, $2, TRUE, 'Chrome on Android', $3, 'ip-hmac-v1', clock_timestamp() + INTERVAL '365 days') RETURNING id::text",
     )
     .bind(&user_id)
     .bind(vec![1_u8; 32])
