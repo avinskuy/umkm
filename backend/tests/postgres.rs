@@ -840,6 +840,32 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     .await
     .expect("preselection account recovery session may omit its user");
 
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_sessions (                  user_id, purpose, channel, destination_ciphertext, destination_nonce,                  encryption_key_version, destination_hmac, hmac_key_version, status, verified_at, expires_at              ) VALUES ($1::uuid, 'registration', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1',                  'verified', clock_timestamp(), clock_timestamp() + INTERVAL '10 minutes')"
+        )
+        .bind(&pending_user_id)
+        .bind(vec![1_u8])
+        .bind(vec![2_u8])
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "verification session must be inserted in pending state"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.verification_challenges (                  verification_session_id, code_hash, hash_key_version, status, consumed_at, expires_at              ) VALUES ($1::uuid, $2, 'otp-hash-v1', 'consumed', clock_timestamp(),                  clock_timestamp() + INTERVAL '5 minutes')"
+        )
+        .bind(&session_id)
+        .bind(vec![7_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "verification challenge must be inserted in pending state"
+    );
+
     let challenge_id: String = sqlx::query_scalar(
         "INSERT INTO public.verification_challenges (              verification_session_id, code_hash, hash_key_version, expires_at          )          VALUES ($1::uuid, $2, 'otp-hash-v1', clock_timestamp() + INTERVAL '5 minutes')          RETURNING id::text",
     )
@@ -918,6 +944,17 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
         .await
         .is_err(),
         "attempt event must reference a challenge belonging to the same session"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.otp_delivery_events (                  destination_hmac, hmac_key_version, channel, purpose, dispatch_status              ) VALUES ($1, 'hmac-v1', 'email', 'registration', 'accepted')"
+        )
+        .bind(vec![3_u8])
+        .execute(pool)
+        .await
+        .is_err(),
+        "delivery event must be inserted in pending state"
     );
 
     let delivery_id: String = sqlx::query_scalar(
