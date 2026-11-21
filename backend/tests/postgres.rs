@@ -774,7 +774,6 @@ fn assert_pool_closed(pool: &PgPool) {
     assert!(pool.is_closed());
 }
 
-
 async fn assert_verification_schema_invariants(pool: &PgPool) {
     let pending_user_id = insert_pending_email(
         pool,
@@ -957,10 +956,8 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     .expect("pending recovery session may become verified");
 
     let selected_user_id = insert_active_email(pool, "recovery-target@example.test").await;
-    sqlx::query(
-        "UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid",
-    )
-    .bind(&recovery_session_id)
+    sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
+        .bind(&recovery_session_id)
     .bind(&selected_user_id)
     .execute(pool)
     .await
