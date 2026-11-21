@@ -418,10 +418,9 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Reset token cannot be reused.
 - Logout and logout-all revoke sessions.
 - Suspended accounts cannot use existing sessions.
-- OAuth state mismatch/expired state/invalid audience/invalid issuer are rejected.
-- Duplicate provider subject cannot be linked to a second user.
-- Account linking requires fresh proof of both identities and cannot change the account's primary role.
-- OAuth login with a role context that differs from the linked account is rejected; it must not silently create a second account using the same provider subject.
+- If Google OAuth is approved later, OAuth state mismatch/expired state/invalid audience/invalid issuer are rejected.
+- If Google OAuth is approved later, duplicate provider subject cannot be linked to a second user and linking requires fresh proof of both identities.
+- OAuth must never create a second account using a provider subject already linked to an account with another role.
 - Unauthorized user cannot read/update another user's business or profile.
 - Non-participant cannot read a conversation.
 - Chat access is granted only after a connection is accepted.
@@ -456,7 +455,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 4. **Registration:** implement Owner/Investor registration with validation and safe pending state.
 5. **Verification:** implement email and phone challenge lifecycle behind provider interfaces.
 6. **Password auth:** implement hashing, role-specific login, session cookie, logout, and recovery.
-7. **Google OAuth:** add provider integration with state/nonce validation and explicit account linking rules.
+7. **Google OAuth (conditional):** implement only after the Google account-creation/linking decision is approved.
 8. **Authorization:** add backend role/resource policies and negative tests.
 9. **Admin foundation:** provisioning, MFA, permissions, and audit trail.
 10. **Hardening:** rate-limit review, security tests, logging review, accessibility, and deployment configuration.
@@ -468,12 +467,12 @@ Implement each step as a small pull request. Do not merge until CI, focused inte
 - PostgreSQL hosting and backup/restore approach.
 - Email delivery provider and sender/domain verification.
 - SMS/OTP provider, cost limits, and Indonesia phone delivery reliability.
-- Google OAuth client setup and production callback origins.
+- Google OAuth client setup and production callback origins, only if Google OAuth is approved.
 - Exact password and session timeout policy.
 - Whether phone OTP is a login method at MVP launch or only a verification method.
 - Admin MFA method and recovery procedure.
 - Consent versioning and retention periods.
 - Account closure, data export, and deletion workflow.
-- Whether registration requires both email and phone verification before activating the account.
+- Google OAuth creation/linking policy and whether phone OTP is a login method or only a registration verification channel.
 
 Do not invent provider credentials or put secrets in chat, repository files, screenshots, or frontend environment variables. Use server-side environment/secret management and test with non-production credentials.
