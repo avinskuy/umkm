@@ -63,7 +63,7 @@ Ketentuan:
 - Public registration hanya dapat membuat `business_owner` atau `investor`.
 - `admin` hanya dibuat melalui jalur provisioning internal dengan principal/workflow terpisah.
 - Tidak ada endpoint, dukungan operasional biasa, OAuth linking, atau proses recovery yang dapat memindahkan role.
-- Tambahkan trigger database yang menolak perubahan `primary_role` dan `initial_contact_channel` pada UPDATE sebagai defense in depth.
+- Tambahkan trigger database yang menolak perubahan `primary_role` dan `initial_contact_channel` pada UPDATE sebagai defense in depth. `initial_contact_verified_at` hanya boleh diisi sekali oleh operasi aktivasi tepercaya setelah verifikasi berhasil dan tidak boleh diubah setelah terisi.
 - Hak akses database harus mencegah runtime principal membuat role Admin dengan mengirim nilai role arbitrer. Gunakan jalur pembuatan akun klien yang hanya menerima dua role klien dan jalur provisioning Admin yang terpisah. Jangan memberi runtime principal hak INSERT generik pada tabel yang memungkinkan pemilihan role bebas.
 - Fungsi database `SECURITY DEFINER` (jika dipakai) harus dimiliki role non-login, memakai `search_path` tetap, tidak memakai SQL dinamis, dan hak EXECUTE publik dicabut. Nama role database serta GRANT aktual ditangani pada bootstrap lingkungan, bukan ditebak dalam migration.
 
@@ -92,7 +92,7 @@ Kontrak constraint minimum:
 1. `primary_role` hanya menerima tiga nilai role kanonis.
 2. `account_status` hanya menerima nilai lifecycle pada Bagian 2.3.
 3. `initial_contact_channel` hanya menerima `email` atau `phone`.
-4. `initial_contact_channel` immutable setelah INSERT karena mencatat metode registrasi awal, bukan kanal kontak yang harus dipertahankan selamanya.
+4. `initial_contact_channel` immutable setelah INSERT karena mencatat metode registrasi awal, bukan kanal kontak yang harus dipertahankan selamanya. `initial_contact_verified_at` hanya boleh berubah dari NULL menjadi timestamp ketika aktivasi yang sah terjadi, lalu immutable.
 5. Selama `pending_verification`, kontak sesuai `initial_contact_channel` wajib tersedia; `pending_expires_at` wajib terisi; `initial_contact_verified_at` dan timestamp verifikasi kontak awal harus NULL.
 6. Untuk status pasca-verifikasi (`active`, `deactivated`, `deletion_pending`, `deletion_processing`), `initial_contact_verified_at` wajib terisi dan setidaknya satu kontak utama saat ini harus tersedia serta terverifikasi.
 7. Setiap kontak utama saat ini yang disimpan pada status pasca-verifikasi harus memiliki timestamp verifikasi yang sesuai. Kontak baru tidak boleh ditulis ke kolom identitas aktif sebelum diverifikasi.
@@ -200,7 +200,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Email/nomor yang sama dapat digunakan kembali setelah transisi terminal yang sah melepaskan reservasi.
 
 ### Role dan provisioning
-- Primary role dan `initial_contact_channel` tidak dapat diubah setelah INSERT, termasuk melalui update yang mencoba mempertahankan nilai lain.
+- Primary role dan `initial_contact_channel` tidak dapat diubah setelah INSERT; `initial_contact_verified_at` hanya dapat diisi sekali pada aktivasi sah. Percobaan perubahan berikutnya ditolak.
 - Jalur registrasi klien hanya dapat membuat Business Owner atau Investor.
 - Runtime application principal tidak dapat membuat Admin melalui insert langsung atau parameter role yang dimanipulasi.
 - Provisioning Admin hanya dapat dilakukan melalui principal/workflow internal yang terpisah dan tercatat.
