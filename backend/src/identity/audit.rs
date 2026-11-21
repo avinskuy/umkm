@@ -52,14 +52,19 @@ pub struct AuditEvent<'a> {
 }
 
 /// Menambahkan event audit tanpa menyediakan operasi baca/perubahan/penghapusan.
+///
+/// Fungsi ini tidak menggunakan RETURNING agar principal aplikasi tidak memerlukan
+/// privilege SELECT pada tabel audit.
 pub async fn append_audit_event(
     connection: &mut PgConnection,
     event: &AuditEvent<'_>,
 ) -> Result<(), sqlx::Error> {
     let metadata = event.metadata.to_string();
 
-    sqlx::query_scalar::<_, String>(
-        "INSERT INTO public.identity_audit_events          (actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata)          VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6, $7::uuid, $8::jsonb)          RETURNING id::text",
+    sqlx::query(
+        "INSERT INTO public.identity_audit_events \
+         (actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata) \
+         VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6, $7::uuid, $8::jsonb)",
     )
     .bind(event.actor_type.as_db_value())
     .bind(event.actor_id)
