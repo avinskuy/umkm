@@ -1867,7 +1867,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                FROM pg_catalog.pg_default_acl AS d \
                CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) AS acl \
               WHERE d.defaclrole = 'usahapintar_migrator'::pg_catalog.regrole \
-                AND d.defaclnamespace = 'public'::pg_catalog.regnamespace \
+                AND d.defaclnamespace IN (0, 'public'::pg_catalog.regnamespace) \
                 AND d.defaclobjtype IN ('r', 'S', 'f') \
                 AND acl.grantee = 0 \
          )",
