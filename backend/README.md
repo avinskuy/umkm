@@ -1,62 +1,62 @@
 # Backend
 
-The API is a Rust/Axum service in the workspace package `usahapintar-api`.
+API merupakan layanan Rust/Axum dalam paket workspace `usahapintar-api`.
 
-## Runtime configuration
+## Konfigurasi runtime
 
-The server reads its bind address from environment variables:
+Server membaca alamat bind dari variabel lingkungan:
 
-| Variable | Default | Description |
+| Variabel | Nilai bawaan | Keterangan |
 | --- | --- | --- |
-| `HOST` | `127.0.0.1` | IP address to bind to. IPv4 and IPv6 literals are supported. |
-| `PORT` | `5000` | TCP port. Must be an integer from 1 to 65535. |
+| `HOST` | `127.0.0.1` | Alamat IP untuk bind. Mendukung literal IPv4 dan IPv6. |
+| `PORT` | `5000` | Port TCP. Harus berupa bilangan bulat dari 1 sampai 65535. |
 
-If either variable is omitted, its default is used. Invalid values stop startup with a configuration error instead of silently falling back.
+Jika salah satu variabel tidak diisi, server menggunakan nilai bawaannya. Nilai yang tidak valid akan menghentikan proses startup dengan kesalahan konfigurasi, bukan diam-diam diganti dengan nilai bawaan.
 
-The default loopback address keeps the API local to the host. Set `HOST=0.0.0.0` only when the deployment environment requires an externally reachable interface, and protect the service with the intended network controls or reverse proxy. Do not expose the API directly to the public internet without an explicit deployment security review.
+Alamat loopback bawaan menjaga API tetap dapat diakses dari host itu sendiri. Atur `HOST=0.0.0.0` hanya jika lingkungan deployment memang memerlukan antarmuka yang dapat dijangkau dari luar. Lindungi layanan menggunakan kontrol jaringan atau reverse proxy yang sesuai. Jangan membuka API secara langsung ke internet publik tanpa tinjauan keamanan deployment yang jelas.
 
-The application does not load `.env` files itself. Configure environment variables through the shell, service manager, container runtime, or deployment platform.
+Aplikasi tidak memuat file `.env` dengan sendirinya. Atur variabel lingkungan melalui shell, service manager, container runtime, atau platform deployment.
 
 ## PostgreSQL
 
-The database foundation uses SQLx with PostgreSQL and a Tokio/Rustls runtime.
+Fondasi database menggunakan SQLx dengan PostgreSQL serta runtime Tokio/Rustls.
 
-| Variable | Required | Default | Description |
+| Variabel | Wajib | Nilai bawaan | Keterangan |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | Yes, when database access is initialized | — | PostgreSQL connection URL. Supply it through a secret manager or runtime environment. |
-| `DATABASE_MAX_CONNECTIONS` | No | `10` | Pool limit; accepted range is 1–100. |
+| `DATABASE_URL` | Ya, ketika akses database diinisialisasi | — | URL koneksi PostgreSQL. Berikan melalui secret manager atau lingkungan runtime. |
+| `DATABASE_MAX_CONNECTIONS` | Tidak | `10` | Batas connection pool; rentang yang diterima adalah 1–100. |
 
-The database layer is initialized explicitly with `DatabaseConfig::from_env()` and `database::connect()`; the HTTP server does not connect to a database until application startup is deliberately wired to do so. This keeps the current health-only application behavior unchanged.
+Lapisan database diinisialisasi secara eksplisit melalui `DatabaseConfig::from_env()` dan `database::connect()`. HTTP server belum terhubung ke database sampai proses startup aplikasi memang diatur untuk melakukannya. Dengan demikian, perilaku aplikasi saat ini yang hanya menyediakan health endpoint tetap tidak berubah.
 
-SQLx migrations are embedded from `backend/migrations` and run explicitly through `database::migrations::run(&pool)`. The directory intentionally has no schema migration yet: domain tables must be introduced only after their data model is approved. Never edit an applied migration; add a new versioned migration instead.
+Migrasi SQLx disertakan dari `backend/migrations` dan dijalankan secara eksplisit melalui `database::migrations::run(&pool)`. Direktori tersebut sengaja belum memiliki migrasi skema: tabel domain hanya boleh ditambahkan setelah model datanya disetujui. Jangan pernah mengubah migrasi yang sudah diterapkan; buat migrasi baru dengan versi berikutnya.
 
-Do not put database credentials in source control, tests, logs, or documentation. CI uses a disposable PostgreSQL service with test-only credentials.
+Jangan menyimpan kredensial database di source control, pengujian, log, atau dokumentasi. CI menggunakan layanan PostgreSQL sementara dengan kredensial khusus pengujian.
 
-## Run locally
+## Menjalankan secara lokal
 
-From the repository root:
+Jalankan dari direktori utama repositori:
 
 ```sh
 HOST=127.0.0.1 PORT=5000 cargo run --locked -p usahapintar-api
 ```
 
-To exercise PostgreSQL integration locally, create a disposable development database and set `DATABASE_URL` before running the ignored integration test:
+Untuk menjalankan pengujian integrasi PostgreSQL secara lokal, buat database pengembangan sementara dan atur `DATABASE_URL` sebelum menjalankan pengujian yang secara default diabaikan:
 
 ```sh
 DATABASE_URL='postgres://app_user:local_password@127.0.0.1:5432/usahapintar_test' cargo test --locked -p usahapintar-api --test postgres -- --ignored
 ```
 
-Use local-only credentials and never reuse production credentials in development or CI.
+Gunakan kredensial khusus lingkungan lokal. Jangan pernah menggunakan ulang kredensial produksi untuk pengembangan atau CI.
 
-Health endpoint:
+Endpoint kesehatan:
 
 ```
 http://127.0.0.1:5000/api/v1/health
 ```
 
-## Quality checks
+## Pemeriksaan kualitas
 
-From the repository root:
+Jalankan dari direktori utama repositori:
 
 ```sh
 cargo fmt --all -- --check
