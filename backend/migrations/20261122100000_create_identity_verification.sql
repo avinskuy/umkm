@@ -297,7 +297,7 @@ END;
 $$;
 
 CREATE TRIGGER verification_challenges_10_guard
-    BEFORE UPDATE ON public.verification_challenges
+    BEFORE INSERT OR UPDATE ON public.verification_challenges
     FOR EACH ROW EXECUTE FUNCTION public.guard_verification_challenge();
 
 CREATE TABLE public.otp_verification_attempt_events (
