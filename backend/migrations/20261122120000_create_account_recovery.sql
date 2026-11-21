@@ -243,8 +243,18 @@ BEGIN
         END IF;
     END IF;
 
+    IF NEW.status = 'account_selection_required' AND NEW.target_user_id IS NOT NULL THEN
+        RAISE EXCEPTION 'account selection state cannot retain a selected account'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NEW.target_user_id IS NOT NULL AND NEW.status = 'pending_verification' THEN
+        RAISE EXCEPTION 'pending verification case cannot have a selected account'
+            USING ERRCODE = '23514';
+    END IF;
+
     IF NEW.status IS DISTINCT FROM OLD.status THEN
-        IF OLD.status = 'pending_verification' AND NEW.status <> 'pending_verification' THEN
+        IF OLD.status = 'pending_verification' AND NEW.status IN ('account_selection_required', 'under_review') THEN
             SELECT purpose, status INTO v_session_purpose, v_session_status
             FROM public.verification_sessions
             WHERE id = OLD.verification_session_id;
@@ -252,11 +262,6 @@ BEGIN
                 RAISE EXCEPTION 'recovery case cannot advance before contact verification'
                     USING ERRCODE = '23514';
             END IF;
-        END IF;
-
-        IF NEW.status = 'account_selection_required' AND NEW.target_user_id IS NOT NULL THEN
-            RAISE EXCEPTION 'account selection state cannot retain a selected account'
-                USING ERRCODE = '23514';
         END IF;
 
         IF NEW.status = 'approved' AND NEW.target_user_id IS NULL THEN
@@ -316,12 +321,12 @@ CREATE TABLE public.password_reset_tokens (
     CONSTRAINT password_reset_tokens_terminal_check
         CHECK (
             NOT (consumed_at IS NOT NULL AND revoked_at IS NOT NULL)
-            AND (revoked_at IS NULL OR revocation_reason IN (
+            AND (revoked_at IS NULL OR (revocation_reason IS NOT NULL AND revocation_reason IN (
                 'superseded',
                 'security_event',
                 'account_status_changed',
                 'admin_action'
-            ))
+            )))
             AND (revocation_reason IS NULL OR revoked_at IS NOT NULL)
         )
 );
