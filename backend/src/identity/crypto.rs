@@ -126,7 +126,7 @@ pub fn encrypt(
     key.seal_in_place_append_tag(
         aead::Nonce::assume_unique_for_key(nonce),
         aead::Aad::from(associated_data),
-        &mut ciphertext[..],
+        &mut *ciphertext,
     )
     .map_err(|_| CryptoError::EncryptionFailed)?;
 
@@ -177,7 +177,7 @@ pub fn contact_fingerprint(
     append_field(&mut input, canonical_contact.as_bytes())?;
 
     let versioned_key = provider.active_key(KeyPurpose::ContactFingerprint)?;
-    let key = hmac::Key::new(&hmac::HMAC_SHA256, versioned_key.key.expose());
+    let key = hmac::Key::new(hmac::HMAC_SHA256, versioned_key.key.expose());
     let tag = hmac::sign(&key, &input);
     let mut digest = [0_u8; DIGEST_LEN];
     digest.copy_from_slice(tag.as_ref());
@@ -221,7 +221,7 @@ pub fn otp_digest(
     append_field(&mut input, channel.as_bytes())?;
     append_field(&mut input, code)?;
 
-    let key = hmac::Key::new(&hmac::HMAC_SHA256, versioned_key.key.expose());
+    let key = hmac::Key::new(hmac::HMAC_SHA256, versioned_key.key.expose());
     let tag = hmac::sign(&key, &input);
     let mut digest = [0_u8; DIGEST_LEN];
     digest.copy_from_slice(tag.as_ref());
@@ -260,7 +260,7 @@ pub fn verify_otp_digest(
     append_field(&mut input, channel.as_bytes())?;
     append_field(&mut input, code)?;
 
-    let key = hmac::Key::new(&hmac::HMAC_SHA256, key_material.expose());
+    let key = hmac::Key::new(hmac::HMAC_SHA256, key_material.expose());
     Ok(hmac::verify(&key, &input, expected_digest).is_ok())
 }
 
@@ -385,9 +385,9 @@ mod tests {
     #[test]
     fn empty_contact_fields_are_rejected() {
         let provider = TestKeyProvider;
-        assert_eq!(
-            contact_fingerprint(&provider, "email", "").unwrap_err(),
-            CryptoError::InvalidInput
-        );
+        assert!(matches!(
+            contact_fingerprint(&provider, "email", ""),
+            Err(CryptoError::InvalidInput)
+        ));
     }
 }
