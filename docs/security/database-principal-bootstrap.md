@@ -9,7 +9,7 @@
 
 Provisioning role PostgreSQL adalah operasi tingkat cluster/database, bukan SQLx schema migration. Skrip di `backend/database/bootstrap/` dijalankan secara eksplisit oleh DBA pada database khusus aplikasi. Jangan menjalankannya pada database bersama atau produksi tanpa rencana perubahan, backup, dan persetujuan deployment terpisah.
 
-Password tidak ditulis di repository. Skrip membuat login role tanpa password; kredensial harus ditetapkan melalui secret manager atau prosedur interaktif `psql \\password`. Jangan menaruh password production di command history, file SQL, CI log, atau commit.
+Password tidak ditulis di repository. Skrip membuat login role tanpa password; kredensial harus ditetapkan melalui secret manager atau prosedur interaktif `psql \password`. Jangan menaruh password production di command history, file SQL, CI log, atau commit.
 
 ## 2. Principal
 
@@ -17,7 +17,7 @@ Password tidak ditulis di repository. Skrip membuat login role tanpa password; k
 | --- | --- | --- | --- |
 | `usahapintar_app` | NOLOGIN group | Hak minimum aplikasi | Tidak memiliki tabel; hanya hak eksplisit |
 | `usahapintar_app_login` | LOGIN | Koneksi runtime aplikasi | Mewarisi hak group aplikasi; bukan owner |
-| `usahapintar_migrator` | LOGIN | Menjalankan SQLx migrations | CREATE pada schema `public`; bukan superuser dan bukan pemilik cluster |
+| `usahapintar_migrator` | LOGIN | Menjalankan SQLx migrations | CREATE pada schema `public`; bukan superuser dan bukan pemilik database |
 | `usahapintar_backup` | NOLOGIN group | Membaca data untuk backup | Mewarisi `pg_read_all_data`; tidak BYPASSRLS dan tidak punya hak tulis |
 | `usahapintar_backup_login` | LOGIN | Koneksi proses backup | Hanya anggota group backup |
 | `usahapintar_monitor` | NOLOGIN group | Monitoring PostgreSQL | Mewarisi `pg_monitor`; tidak mendapat akses tabel aplikasi |
@@ -31,7 +31,7 @@ Jangan memakai satu credential untuk aplikasi, migrasi, backup, monitoring, dan 
 
 1. Buat database khusus aplikasi dan siapkan principal DBA.
 2. Jalankan `001_create_principals.sql` sebagai DBA pada database target. Skrip ini idempotent untuk role/privilege yang dikelolanya.
-3. Tetapkan password setiap LOGIN role dari secret manager atau melalui sesi `psql` interaktif `\\password role_name`. Untuk autentikasi production, utamakan SCRAM-SHA-256 atau sertifikat sesuai kebijakan jaringan.
+3. Tetapkan password setiap LOGIN role dari secret manager atau melalui sesi `psql` interaktif `\password role_name`. Untuk autentikasi production, utamakan SCRAM-SHA-256 atau sertifikat sesuai kebijakan jaringan.
 4. Jalankan seluruh SQLx migrations sebagai `usahapintar_migrator`, bukan superuser/DBA. Dengan demikian tabel dan fungsi dimiliki migrator yang tidak memiliki hak superuser.
 5. Setelah Identity Core 0001–0005 terpasang, jalankan `002_identity_core_grants.sql` sebagai DBA. Skrip menolak melanjutkan bila `create_client_user`, `users`, atau `identity_audit_events` bukan milik migrator non-superuser.
 6. Verifikasi koneksi dan privilege memakai tes PostgreSQL pada CI atau database disposable sebelum perubahan lingkungan bersama.
