@@ -19,7 +19,7 @@
 
 ## Role and identity invariants
 
-- Each client account has exactly one immutable primary role: owner or investor.
+- Each client account has exactly one immutable persisted primary role: `business_owner` or `investor`.
 - A person who wants the other role must register a separate account using a different, eligible, unlinked contact identity.
 - Admin accounts are provisioned internally and cannot use public registration.
 - Identity linking must prove control of both the existing account and the new identity. Matching email text alone is never sufficient.
