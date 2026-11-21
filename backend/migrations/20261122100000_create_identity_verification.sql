@@ -144,9 +144,16 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
-        IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'verified' AND OLD.expires_at <= clock_timestamp() THEN
-            RAISE EXCEPTION 'expired verification session cannot be verified'
-                USING ERRCODE = '23514';
+        IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'verified' THEN
+            IF OLD.expires_at <= clock_timestamp() THEN
+                RAISE EXCEPTION 'expired verification session cannot be verified'
+                    USING ERRCODE = '23514';
+            END IF;
+
+            IF OLD.failed_attempt_count = 5 THEN
+                RAISE EXCEPTION 'verification session must be unlocked before it can be verified'
+                    USING ERRCODE = '23514';
+            END IF;
         END IF;
 
         IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'expired' AND OLD.expires_at > clock_timestamp() THEN
@@ -275,6 +282,8 @@ AS $$
 DECLARE
     v_session_status TEXT;
     v_session_expires_at TIMESTAMPTZ;
+    v_session_locked_until TIMESTAMPTZ;
+    v_session_failed_attempt_count SMALLINT;
 BEGIN
     IF TG_OP = 'INSERT' THEN
         IF NEW.status <> 'pending'
@@ -324,9 +333,25 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
-        IF NEW.status = 'consumed' AND OLD.expires_at <= clock_timestamp() THEN
-            RAISE EXCEPTION 'expired verification challenge cannot be consumed'
-                USING ERRCODE = '23514';
+        IF NEW.status = 'consumed' THEN
+            IF OLD.expires_at <= clock_timestamp() THEN
+                RAISE EXCEPTION 'expired verification challenge cannot be consumed'
+                    USING ERRCODE = '23514';
+            END IF;
+
+            SELECT status, expires_at, locked_until, failed_attempt_count
+            INTO v_session_status, v_session_expires_at, v_session_locked_until, v_session_failed_attempt_count
+            FROM public.verification_sessions
+            WHERE id = OLD.verification_session_id;
+
+            IF NOT FOUND
+               OR v_session_status <> 'pending'
+               OR v_session_expires_at <= clock_timestamp()
+               OR v_session_failed_attempt_count = 5
+               OR (v_session_locked_until IS NOT NULL AND v_session_locked_until > clock_timestamp()) THEN
+                RAISE EXCEPTION 'challenge can only be consumed by an eligible verification session'
+                    USING ERRCODE = '23514';
+            END IF;
         END IF;
 
         IF NEW.status = 'expired' AND OLD.expires_at > clock_timestamp() THEN
