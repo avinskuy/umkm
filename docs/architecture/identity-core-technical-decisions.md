@@ -1,0 +1,202 @@
+# Keputusan Teknis Identity Core
+
+> Status: baseline teknis yang direkomendasikan untuk implementasi bertahap
+> Tanggal: 21 November 2026
+> Cakupan: lima penghalang teknis sebelum migration domain pertama
+
+Dokumen ini menetapkan cara teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk, tidak menambahkan migration, dan tidak mengaktifkan koneksi database pada HTTP startup. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
+
+## 1. Perlindungan tujuan pengiriman OTP
+
+### Keputusan
+
+Gunakan dua representasi yang berbeda untuk dua kebutuhan berbeda:
+
+1. **Ciphertext tujuan** untuk mengirim ulang kode melalui provider.
+2. **HMAC tujuan yang dinormalisasi** untuk pencarian, deduplikasi, dan pembatasan lintas sesi.
+
+Hash biasa tidak dapat dipakai untuk pengiriman karena tidak dapat dipulihkan menjadi alamat email atau nomor telepon. Jangan menyimpan tujuan OTP dalam plaintext pada tabel verifikasi.
+
+Kolom konseptual untuk sesi verifikasi dan relasi kontak pemulihan:
+
+- `destination_ciphertext` atau `contact_ciphertext`: bytea berisi ciphertext.
+- `destination_nonce` atau `contact_nonce`: nonce AEAD yang unik sesuai algoritma yang dipilih.
+- `encryption_key_version`: identifier versi key/envelope yang dipakai.
+- `destination_hmac` atau `contact_hmac`: HMAC atas nilai tujuan yang telah dinormalisasi.
+- `hmac_key_version`: versi key HMAC untuk pencarian.
+
+### Batas keamanan
+
+- Gunakan enkripsi terautentikasi (AEAD) dari library kriptografi yang terawat. Jangan membuat algoritma atau format kriptografi sendiri.
+- Kunci enkripsi dan HMAC harus berbeda, disimpan di luar database, dan tidak masuk source control, log, atau frontend.
+- Desain produksi mengutamakan envelope encryption dengan KMS/secret-management yang sesuai. Backend mengakses operasi enkripsi/dekripsi melalui abstraksi key provider; kode domain tidak membaca key mentah secara bebas.
+- Akses dekripsi hanya diberikan pada komponen yang benar-benar perlu mengirim OTP atau memproses kontak. Admin operasional tidak memperoleh akses plaintext hanya karena memiliki role Admin.
+- HMAC hanya untuk pencocokan; HMAC tidak boleh dipakai sebagai bukti kepemilikan akun.
+- Normalisasi email dan nomor telepon dilakukan sebelum enkripsi dan HMAC. Untuk nomor telepon gunakan format E.164; normalisasi email harus konsisten dan tidak boleh menerapkan transformasi provider-specific yang mengubah identitas.
+- Rotasi key harus mendukung pembacaan versi lama selama masa transisi, penulisan dengan versi aktif, backfill terkontrol, verifikasi hasil, dan pencabutan versi lama setelah seluruh data relevan selesai. Rotasi HMAC memerlukan strategi dual-read/backfill agar pencarian dan deduplikasi tidak terputus.
+
+Nilai kontak utama yang dibutuhkan untuk login tetap mengikuti model identitas akun dan perlindungan database/storage sesuai klasifikasi data. Keputusan ini terutama mengatur salinan tujuan sementara yang diperlukan untuk verifikasi/pengiriman dan kontak pemulihan yang perlu dicari lintas akun.
+
+### Batas migration
+
+Migration hanya menyediakan kolom ciphertext, nonce, key version, HMAC, dan HMAC key version yang telah disepakati. Migration tidak menyimpan key, tidak melakukan enkripsi sendiri, dan tidak mengunci algoritma library sebelum dependency serta key provider dipilih pada tahap implementasi.
+
+## 2. Rate limit pengiriman OTP lintas sesi dan instance
+
+### Keputusan
+
+Gunakan PostgreSQL sebagai sumber kebenaran untuk baseline batas per kontak. Catat setiap percobaan penerbitan/pengiriman dalam tabel event terbatas, dengan fingerprint HMAC tujuan, kanal, purpose, dan timestamp. Jangan mengandalkan penghitung di memory proses atau satu baris verification session.
+
+Untuk setiap permintaan pengiriman:
+
+1. Normalisasi tujuan dan hitung fingerprint HMAC menggunakan key versi aktif.
+2. Mulai transaksi PostgreSQL.
+3. Ambil transaction-scoped advisory lock yang stabil berdasarkan fingerprint tujuan dan kanal. Benturan hash hanya boleh menyebabkan serialisasi tambahan, bukan melemahkan limit.
+4. Periksa event untuk fingerprint dan kanal yang sama pada 60 menit berjalan, tanpa memisahkan berdasarkan verification session. Batas berlaku lintas purpose agar pembuatan sesi baru tidak menghindarinya.
+5. Periksa waktu pengiriman terakhir untuk cooldown 60 detik.
+6. Jika batas terpenuhi, tolak permintaan tanpa mengirim. Jika diizinkan, catat event dalam transaksi sebelum pekerjaan pengiriman diteruskan.
+7. Commit transaksi; pengiriman provider dilakukan melalui alur yang menangani kegagalan secara eksplisit. Percobaan yang sudah mengonsumsi kuota tidak boleh mengembalikan kuota secara otomatis hanya karena hasil provider tidak pasti.
+
+Aturan produk yang harus ditegakkan tetap:
+- Maksimal lima pengiriman per kontak dalam jendela bergulir 60 menit.
+- Cooldown minimal 60 detik antar-pengiriman.
+- Batas tersebut berlaku lintas sesi, proses, dan instance aplikasi.
+- Reset lock percobaan verifikasi setelah satu jam tidak menghapus event pengiriman dan tidak mengubah kuota kontak.
+- Penerbitan OTP baru saat sesi terkunci boleh dilakukan bila cooldown dan limit pengiriman mengizinkan, tetapi tidak membuka verifikasi sebelum lock berakhir.
+
+### Data dan operasi
+
+- Tabel event menyimpan fingerprint HMAC, kanal, purpose, timestamp, dan status dispatch minimum; tidak menyimpan alamat tujuan plaintext atau kode OTP.
+- Gunakan indeks yang mendukung filter fingerprint + kanal + timestamp.
+- Bersihkan event hanya setelah tidak lagi diperlukan untuk evaluasi jendela limit dan kebutuhan operasional yang disetujui. Jangan menghapus event yang masih berada dalam jendela 60 menit.
+- Limit per IP/network, per akun, serta guard biaya/throughput provider tetap menjadi lapisan tambahan. Implementasinya harus mengikuti kebijakan privasi dan tidak menjadikan IP sebagai satu-satunya identitas abuse control.
+
+PostgreSQL advisory lock dipilih karena bersifat lintas koneksi dan lintas instance yang memakai database yang sama. Pengujian wajib memakai beberapa koneksi bersamaan untuk membuktikan bahwa permintaan paralel tidak melewati batas.
+
+## 3. Status akun dan reservasi kontak utama
+
+### Keputusan
+
+Gunakan satu kolom lifecycle `account_status` dengan nilai terbatas berikut:
+
+| Status | Arti dan aturan |
+| --- | --- |
+| `pending_verification` | Registrasi belum selesai; berlaku paling lama 30 menit dan kontak utama tetap direservasi. |
+| `active` | Akun aktif dan dapat memakai fitur sesuai role/entitlement. |
+| `suspended` | Akses dibatasi oleh tindakan Admin; kontak utama tetap direservasi. |
+| `deactivated` | Penonaktifan sementara oleh pengguna; profil disembunyikan, data dipertahankan, kontak tetap direservasi. |
+| `deletion_pending` | Permintaan penghapusan dalam masa tunggu pembatalan 30 hari; akun dibatasi dan kontak tetap direservasi. |
+| `deletion_processing` | Masa tunggu selesai dan proses penghapusan sedang berlangsung; kontak tetap direservasi sampai penghapusan benar-benar selesai. |
+| `pending_expired` | Registrasi tidak selesai dalam 30 menit; tidak dapat login dan kontak utama telah dilepas secara atomik. |
+| `closed` | Penghapusan telah selesai sesuai proses retensi; kontak utama telah dilepas dan data personal telah dihapus atau dianonimkan sesuai kebijakan. |
+
+Status lock verifikasi, lock keamanan sementara, dan status OTP tidak boleh dimasukkan ke `account_status`. Status moderasi konten juga bukan status akun.
+
+### Aturan reservasi
+
+Unique partial index kontak utama hanya mencakup akun yang masih memegang reservasi: `pending_verification`, `active`, `suspended`, `deactivated`, `deletion_pending`, dan `deletion_processing`.
+
+Kontak dilepas hanya dalam dua kondisi:
+- Registrasi pending telah kedaluwarsa dan transisi ke `pending_expired` selesai secara atomik.
+- Penghapusan permanen benar-benar selesai dan transisi ke `closed` dilakukan setelah kewajiban retensi yang berlaku ditangani.
+
+Saat pending expired, hapus nilai kontak dari kolom identitas aktif dalam transaksi yang sama atau pindahkan hanya ke data audit yang tidak dapat digunakan untuk autentikasi. Jangan mempertahankan nilai yang masih memblokir unique index tanpa alasan. Saat deletion processing, jangan melepas kontak hanya karena 30 hari telah berlalu.
+
+Transisi status harus dilakukan oleh operasi backend yang tervalidasi dan tercatat. CHECK constraint menjaga nilai status yang sah; partial unique index menjaga reservasi; tes transaksi membuktikan tidak ada race antara aktivasi, cleanup, pembatalan penghapusan, dan registrasi baru.
+
+## 4. Provisioning Admin
+
+### Keputusan
+
+Tidak ada endpoint registrasi publik untuk role `admin`. Akun Admin dibuat melalui jalur provisioning internal yang terpisah dari alur registrasi Business Owner dan Investor.
+
+Baseline provisioning:
+
+- Operator yang berwenang membuat akun melalui prosedur internal/CLI atau workflow provisioning yang terautentikasi; bukan melalui payload registrasi publik.
+- Gunakan kredensial database/principal provisioning yang terpisah dan hanya tersedia pada lingkungan operator yang dikendalikan. Kredensial tersebut tidak boleh tersedia bagi frontend atau proses API publik.
+- Runtime principal aplikasi tidak boleh memiliki jalur umum untuk menaikkan role akun menjadi Admin. Role tidak dapat diubah setelah INSERT.
+- Provisioning mencatat aktor, alasan, waktu, identitas target, dan hasil ke audit trail.
+- Akun Admin tidak memperoleh akses istimewa sebelum menyelesaikan bootstrap keamanan yang diwajibkan, termasuk MFA. Mekanisme MFA dan penyedia final dipilih pada tahap implementasi Admin.
+- Undangan/bootstrap harus sekali pakai, kedaluwarsa, dan tidak memuat password atau OTP plaintext dalam log.
+- Pembuatan akun Admin tidak boleh mengubah atau mengambil alih akun klien yang sudah ada. Tidak ada role migration.
+
+### Batas implementasi
+
+Migration boleh mendukung nilai role `admin`, tetapi nilai tersebut bukan izin bagi endpoint publik untuk membuat Admin. Pengujian harus membuktikan bahwa jalur registrasi publik hanya menerima `business_owner` atau `investor`, sementara provisioning Admin membutuhkan principal/workflow internal terpisah dan tercatat.
+
+## 5. Batas audit Identity Core
+
+### Keputusan
+
+Gunakan tabel audit Identity Core khusus untuk peristiwa keamanan dan perubahan identitas yang penting. Audit trail berbeda dari log aplikasi/observability dan bukan tempat menyimpan salinan payload request.
+
+Event minimum:
+- Registrasi dibuat, diverifikasi, kedaluwarsa, atau dibatalkan.
+- Upaya perubahan role, termasuk penolakan.
+- Perubahan status akun, termasuk suspend, restore, deactivate, deletion request, cancellation, processing, dan closed.
+- Perubahan kontak utama atau recovery contact.
+- Penerbitan, verifikasi, supersede, expiry, dan kegagalan challenge yang relevan.
+- Login/session creation, revocation, logout-all, dan penolakan karena sesi tidak valid.
+- Recovery request, account selection, hasil pemeriksaan, assignment/review, dan outcome.
+- Provisioning Admin, perubahan izin Admin, dan tindakan istimewa terkait Identity Core.
+
+Kolom konseptual:
+- ID event UUID.
+- Waktu kejadian `timestamptz`.
+- Jenis aktor (`user`, `admin`, `system`, atau `operator`) dan actor ID bila tersedia.
+- Subject user ID bila relevan.
+- Kode aksi, outcome, reason code yang aman, dan request/correlation ID.
+- Metadata JSONB yang dibatasi allowlist dan tidak berisi rahasia.
+
+### Perlindungan
+
+- Principal aplikasi memperoleh hak INSERT saja untuk audit event dan SELECT hanya pada kebutuhan internal yang jelas; tidak memperoleh UPDATE/DELETE.
+- Pemilik tabel adalah migration/database owner yang terpisah dari runtime application principal.
+- Perubahan hak akses dan operasi administratif database diaudit melalui jalur operasional terpisah.
+- Audit tidak menyimpan password, OTP, session/reset token, secret, data pembayaran sensitif, isi percakapan privat, dokumen rahasia, bukti recovery mentah, atau catatan investigasi internal.
+- PII diminimalkan; gunakan ID internal, reason code, dan fingerprint bila cukup.
+- Akses baca audit dibatasi berdasarkan kebutuhan tugas dan dicatat. Role Admin umum tidak otomatis memperoleh akses ke seluruh metadata sensitif.
+- Untuk kebutuhan deteksi dan ketahanan terhadap manipulasi yang lebih tinggi, event terpilih dapat diteruskan ke penyimpanan log terpisah yang akses dan retensinya dikelola independen. Ini tidak menggantikan kontrol database.
+
+Append-only di sini berarti tidak dapat diubah oleh principal aplikasi normal; bukan klaim bahwa data mustahil diubah oleh pemilik database atau operator dengan hak tertinggi.
+
+## 6. Kontrak skema lintas migration
+
+Keputusan berikut mengikat rancangan migration yang relevan:
+
+1. `users.primary_role` hanya `business_owner`, `investor`, atau `admin`; tidak ada operasi update role.
+2. `account_status` memakai lifecycle pada Bagian 3. Temporary lock berada di tabel/sesi yang sesuai.
+3. Kontak utama unik secara global selama reservasi. Recovery contact dapat dipakai bersama lintas akun, tetapi unique constraint per akun/channel/fingerprint mencegah duplikasi relasi.
+4. `verification_sessions.user_id` nullable hanya untuk recovery pra-pemilihan akun. Registration dan verifikasi account-specific wajib memiliki user ID.
+5. Satu verification session memiliki maksimal satu recovery case; setiap recovery case wajib memiliki satu verification session. Target user nullable sebelum account selection.
+6. OTP challenge mempunyai state `pending`, `consumed`, `expired`, `superseded`, atau `cancelled`; hanya satu challenge pending per sesi.
+7. Limit pengiriman per kontak menggunakan event lintas sesi yang diserialisasi melalui PostgreSQL; penghitung gagal verifikasi dan lock tetap melekat pada verification session.
+8. Token OTP, session, dan password reset hanya disimpan sebagai hash yang sesuai; tujuan pengiriman yang perlu dipulihkan disimpan terenkripsi.
+9. Semua perubahan lifecycle, kontak, sesi, recovery, dan provisioning Admin yang penting menghasilkan audit event.
+10. Migration yang sudah diterapkan tidak diedit; perubahan berikutnya menggunakan migration baru.
+
+## 7. Gerbang sebelum migration pertama
+
+Sebelum membuat migration `0001`:
+
+- Tinjau nama kolom final, tipe PostgreSQL, CHECK constraint, partial unique index, foreign key, dan transisi status.
+- Pisahkan migration owner, runtime application principal, dan provisioning principal sejak desain privilege.
+- Siapkan database PostgreSQL sementara yang dapat dibuang.
+- Uji role immutable, penolakan role Admin pada jalur publik, unique reservasi kontak, cleanup pending, dan race registrasi paralel.
+- Pastikan migration tidak memuat key, ciphertext contoh, data pribadi, atau kredensial.
+- Jangan menjalankan migration pada database produksi dan jangan mengaktifkan database pada HTTP startup dalam tahap desain.
+
+Migration pertama dibatasi pada identitas akun dan role. Verifikasi, sesi, recovery, audit, dan notifikasi tetap menjadi slice berikutnya; jangan menarik semua domain ke migration pertama hanya demi kelengkapan.
+
+## 8. Keputusan yang tetap ditunda
+
+Hal berikut bukan penghalang untuk menyepakati model konseptual, tetapi harus diputuskan sebelum fitur terkait diaktifkan:
+
+- Provider email/WhatsApp, sender/template, retry, monitoring, biaya, dan fallback.
+- Library AEAD, KMS/key provider, parameter key wrapping, dan prosedur operasional rotasi.
+- Detail implementasi advisory-lock helper, cleanup event, dan limit tambahan IP/account/provider.
+- Penyedia dan metode MFA Admin.
+- Retensi numerik audit, verification delivery event, dan data lifecycle sesuai kajian hukum/operasional.
+- Parameter password hashing dan konfigurasi sesi/cookie produksi.
+
+Keputusan ini tidak membuka ulang kebijakan OTP atau recovery yang telah disetujui; ini adalah detail implementasi dan operasi yang perlu diverifikasi sebelum rilis fitur terkait.
