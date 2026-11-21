@@ -85,17 +85,17 @@ PostgreSQL 16 merupakan baseline database relasional. Migration SQLx Identity Co
 
 Migration 0001 mengimplementasikan field akun berikut. Data profil dan riwayat permintaan penghapusan tetap berada dalam tabel domain terpisah pada tahap berikutnya.
 
-| Column | Purpose |
+| Kolom | Tujuan |
 | --- | --- |
 | `id` | UUID primary key |
-| `primary_role` | Immutable role: `business_owner`, `investor`, or `admin` |
+| `primary_role` | Role tetap: `business_owner`, `investor`, atau `admin` |
 | `account_status` | Lifecycle: `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, or `closed` |
-| `email_normalized` | Normalized primary email; nullable when phone is the only current primary contact |
-| `phone_e164` | Normalized E.164 primary phone; nullable when email is the only current primary contact |
-| `initial_contact_channel` | Immutable initial registration channel: `email` or `phone` |
-| `email_verified_at`, `phone_verified_at` | Independent verification timestamps for the current contact values |
-| `initial_contact_verified_at` | Immutable registration verification provenance, set once during activation and cleared only after completed deletion |
-| `password_hash` | Nullable encoded local password hash; client accounts without it require a linked Google identity |
+| `email_normalized` | Email utama yang sudah dinormalisasi; boleh NULL jika nomor telepon menjadi satu-satunya kontak utama saat ini |
+| `phone_e164` | Nomor telepon utama yang sudah dinormalisasi ke E.164; boleh NULL jika email menjadi satu-satunya kontak utama saat ini |
+| `initial_contact_channel` | Kanal pendaftaran awal yang tetap: `email` atau `phone` |
+| `email_verified_at`, `phone_verified_at` | Timestamp verifikasi terpisah untuk nilai kontak saat ini |
+| `initial_contact_verified_at` | Bukti waktu verifikasi pendaftaran yang tetap, ditetapkan satu kali saat aktivasi dan hanya dihapus setelah proses penghapusan selesai |
+| `password_hash` | Hash kata sandi lokal dalam format encoded yang boleh NULL; akun klien tanpa nilai ini wajib memiliki identitas Google yang terhubung |
 | `pending_expires_at` | Immutable 30-minute deadline while registration is pending |
 | `created_at`, `updated_at`, `status_changed_at` | Database-managed timestamps |
 
@@ -113,12 +113,12 @@ Constraint dan pengaman siklus hidup:
 
 Migration 0001 mengimplementasikan identitas penyedia Google yang terhubung.
 
-| Column | Purpose |
+| Kolom | Tujuan |
 | --- | --- |
 | `id` | UUID primary key |
-| `user_id` | Owning user; FK with ON DELETE RESTRICT |
+| `user_id` | Pengguna pemilik; FK dengan ON DELETE RESTRICT |
 | `provider` | Initially constrained to `google` |
-| `provider_subject` | Stable provider subject identifier; not email |
+| `provider_subject` | Identifier subject penyedia yang stabil; bukan email |
 | `created_at` | Creation timestamp |
 
 Constraints:
@@ -135,11 +135,11 @@ Constraints:
 
 Opaque, server-managed sessions.
 
-| Column | Purpose |
+| Kolom | Tujuan |
 | --- | --- |
 | `id` | UUID primary key |
-| `user_id` | Session owner |
-| `token_hash` | SHA-256 hash 32-byte dari token sesi opaque berentropi tinggi; unique global |
+| `user_id` | Pemilik sesi |
+| `token_hash` | Hash SHA-256 32 byte dari token sesi opaque berentropi tinggi; unik secara global |
 | `created_at` | Waktu pembuatan sesi yang ditetapkan database |
 | `last_seen_at` | Aktivitas terakhir yang diperbarui server untuk menegakkan batas idle 7 hari |
 | `expires_at` | Batas absolut yang ditetapkan database, 30 hari sejak sesi dibuat |
@@ -162,14 +162,14 @@ Constraints:
 
 Mendukung verifikasi email dan nomor telepon melalui WhatsApp untuk aktivasi akun/verifikasi kontak tanpa menyimpan kode yang masih dapat digunakan. Kode tersebut bukan kredensial login.
 
-| Column | Purpose |
+| Kolom | Tujuan |
 | --- | --- |
 | `id` | UUID primary key |
-| `user_id` | Related user, nullable only for pre-account registration flow if necessary |
-| `channel` | email or whatsapp; phone is the normalized destination, WhatsApp is the delivery channel |
+| `user_id` | Pengguna terkait; hanya boleh NULL pada alur pendaftaran sebelum akun dibuat jika memang diperlukan |
+| `channel` | `email` atau `whatsapp`; nomor telepon merupakan tujuan yang dinormalisasi, sedangkan WhatsApp adalah kanal pengiriman |
 | `destination_hash` | Hash or protected reference to destination |
 | `code_hash` | Hash of a high-entropy one-time code |
-| `purpose` | Registration verification or contact change |
+| `purpose` | Verifikasi pendaftaran atau perubahan kontak |
 | `verification_session_id` | Alur verifikasi induk; jumlah kegagalan dan penguncian tetap berlaku setelah OTP dikirim ulang |
 | `attempt_count` | Jumlah percobaan gagal untuk challenge ini |
 | `expires_at` | Masa berlaku 10 menit |
@@ -252,14 +252,14 @@ Semua rute menggunakan versi `/api/v1`. Bentuk request/response JSON harus ditet
 
 ### Pendaftaran dan verifikasi
 
-| Method | Route | Purpose |
+| Metode | Rute | Tujuan |
 | --- | --- | --- |
-| POST | `/auth/register/owner` | Create Owner account in pending-verification state |
-| POST | `/auth/register/investor` | Create Investor account in pending-verification state |
-| POST | `/auth/verification/email/request` | Request/resend email verification |
-| POST | `/auth/verification/email/confirm` | Confirm email challenge |
-| POST | `/auth/verification/whatsapp/request` | Request/resend a phone verification code delivered through WhatsApp |
-| POST | `/auth/verification/whatsapp/confirm` | Confirm the WhatsApp-delivered phone verification code |
+| POST | `/auth/register/owner` | Membuat akun Owner dengan status menunggu verifikasi |
+| POST | `/auth/register/investor` | Membuat akun Investor dengan status menunggu verifikasi |
+| POST | `/auth/verification/email/request` | Meminta/mengirim ulang verifikasi email |
+| POST | `/auth/verification/email/confirm` | Mengonfirmasi challenge email |
+| POST | `/auth/verification/whatsapp/request` | Meminta/mengirim ulang kode verifikasi nomor telepon melalui WhatsApp |
+| POST | `/auth/verification/whatsapp/confirm` | Mengonfirmasi kode verifikasi nomor telepon yang dikirim melalui WhatsApp |
 
 There is intentionally no `/auth/register/admin` endpoint.
 
@@ -267,15 +267,15 @@ There is intentionally no `/auth/register/admin` endpoint.
 
 Pendaftaran melalui email atau telepon wajib membuat kata sandi lokal. Pendaftaran Google OAuth tidak perlu membuat atau memasukkan kata sandi lokal terpisah; autentikasi dilakukan melalui identitas Google yang terhubung. Kode verifikasi email/WhatsApp hanya mengaktifkan akun dan membuktikan kendali atas kontak terpilih; kode tersebut tidak pernah diterima sebagai kredensial login.
 
-| Method | Route | Purpose |
+| Metode | Rute | Tujuan |
 | --- | --- | --- |
-| POST | `/auth/login/owner` | Authenticate only an Owner account |
-| POST | `/auth/login/investor` | Authenticate only an Investor account |
-| POST | `/auth/logout` | Revoke current session |
-| POST | `/auth/logout-all` | Revoke all sessions for the authenticated account |
-| GET | `/auth/session` | Return current authenticated user and safe role/session metadata |
-| POST | `/auth/password/forgot` | Request a password reset |
-| POST | `/auth/password/reset` | Consume reset token and set a new password |
+| POST | `/auth/login/owner` | Mengautentikasi akun Owner saja |
+| POST | `/auth/login/investor` | Mengautentikasi akun Investor saja |
+| POST | `/auth/logout` | Mencabut sesi saat ini |
+| POST | `/auth/logout-all` | Mencabut seluruh sesi akun yang terautentikasi |
+| GET | `/auth/session` | Mengembalikan pengguna yang sedang terautentikasi serta metadata role/sesi yang aman |
+| POST | `/auth/password/forgot` | Meminta reset kata sandi |
+| POST | `/auth/password/reset` | Mengonsumsi token reset dan menetapkan kata sandi baru |
 
 Login menerima email atau nomor telepon terdaftar beserta kata sandi akun. Endpoint login tidak menerima kode verifikasi. Endpoint login wajib memeriksa role yang diharapkan di server. Ketidaksesuaian role menghasilkan respons panduan portal yang umum tanpa mengungkap detail akun tambahan.
 
@@ -283,11 +283,11 @@ Login menerima email atau nomor telepon terdaftar beserta kata sandi akun. Endpo
 
 Google OAuth didukung untuk login dan pendaftaran. Metode ini tidak menggantikan kewajiban pemilihan role atau verifikasi kontak; pengguna yang mendaftar dengan Google tidak perlu membuat atau memasukkan kata sandi lokal terpisah.
 
-| Method | Route | Purpose |
+| Metode | Rute | Tujuan |
 | --- | --- | --- |
-| GET | `/auth/oauth/google/start?role=business_owner` | Begin Owner-context OAuth |
-| GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
-| GET | `/auth/oauth/google/callback` | Validate provider response and continue the role-bound flow |
+| GET | `/auth/oauth/google/start?role=business_owner` | Memulai OAuth dengan konteks Owner |
+| GET | `/auth/oauth/google/start?role=investor` | Memulai OAuth dengan konteks Investor |
+| GET | `/auth/oauth/google/callback` | Memvalidasi respons penyedia dan melanjutkan alur yang terikat pada role |
 
 Untuk identitas Google baru, pengguna harus memilih Owner atau Investor terlebih dahulu, menyelesaikan Google OAuth, lalu memilih tepat satu metode kontak (kode email atau kode telepon melalui WhatsApp) untuk diverifikasi secara terpisah sebelum akun diaktifkan. Kata sandi lokal terpisah tidak diwajibkan. Email yang dinyatakan Google tidak menggantikan verifikasi ini. Konteks role diikat pada state di sisi server dan tidak dapat diubah melalui input callback. Identitas yang sudah terhubung hanya dapat login ke akun lamanya dengan role yang tetap. Jangan mengaitkan akun secara otomatis hanya karena email cocok; pengaitan memerlukan bukti terbaru atas kendali kedua identitas. Akun Admin tidak dapat dibuat melalui OAuth publik. Validasi state, nonce, issuer, audience, signature, expiry, dan redirect URI yang tepat.
 
@@ -392,22 +392,22 @@ Aturan pengaitan akun:
 
 ## 9. Matriks otorisasi
 
-| Capability | Public | Owner | Investor | Admin |
+| Kemampuan | Pengunjung publik | Owner | Investor | Admin |
 | --- | --- | --- | --- | --- |
-| View public landing/features | Yes | Yes | Yes | Yes |
-| Public registration | Owner/Investor only | — | — | No |
-| Owner login portal | No session | Owner only | Reject mismatch | Internal Admin portal only |
-| Investor login portal | No session | Reject mismatch | Investor only | Internal Admin portal only |
-| Manage own business profile | No | Own resources | No | Only with explicit review permission |
-| Publish Owner promotion post | No | Yes, subject to quota/moderation | No | Moderation only |
-| Publish partnership-seeking post | No | No | Yes, subject to Investor quota/moderation | Moderation only |
-| Discover eligible opportunities | Public preview only | Authenticated | Authenticated | Operational review |
-| Request connection | No | Yes | Yes | Not as an ordinary user |
-| Accept/reject own connection request | No | Own requests | Own requests | No routine impersonation |
-| Chat | No | Accepted connection only | Accepted connection only | No routine private-chat access |
-| View Owner private business data | No | Own data | Only fields explicitly shared | Purpose-limited, permissioned review |
-| Manage membership | No | Own plan/usage | Own plan/usage | Entitlement administration |
-| Provision Admin | No | No | No | Super-admin only |
+| Melihat halaman publik/fitur | Ya | Ya | Ya | Ya |
+| Pendaftaran publik | Owner/Investor saja | — | — | Tidak |
+| Portal login Owner | Tanpa sesi | Owner saja | Tolak role yang tidak sesuai | Hanya portal Admin internal |
+| Portal login Investor | Tanpa sesi | Tolak role yang tidak sesuai | Investor saja | Hanya portal Admin internal |
+| Mengelola profil usaha sendiri | Tidak | Sumber daya sendiri | Tidak | Hanya dengan izin tinjauan eksplisit |
+| Menerbitkan posting promosi Owner | Tidak | Ya, sesuai kuota/moderasi | Tidak | Hanya moderasi |
+| Menerbitkan posting pencarian kemitraan | Tidak | Tidak | Ya, sesuai kuota/moderasi Investor | Hanya moderasi |
+| Menemukan peluang yang dapat diakses | Hanya pratinjau publik | Terautentikasi | Terautentikasi | Tinjauan operasional |
+| Mengajukan koneksi | Tidak | Ya | Ya | Bukan sebagai pengguna biasa |
+| Menerima/menolak permintaan koneksi sendiri | Tidak | Permintaan sendiri | Permintaan sendiri | Tidak boleh rutin menyamar sebagai pengguna |
+| Mengirim pesan | Tidak | Hanya setelah koneksi disetujui | Hanya setelah koneksi disetujui | Tidak ada akses rutin ke chat privat |
+| Melihat data bisnis privat Owner | Tidak | Data sendiri | Hanya field yang dibagikan secara eksplisit | Tinjauan berizin dengan tujuan terbatas |
+| Mengelola keanggotaan | Tidak | Paket/penggunaan sendiri | Paket/penggunaan sendiri | Administrasi hak fitur |
+| Melakukan provisioning Admin | Tidak | Tidak | Tidak | Hanya super-admin |
 
 Izin Admin harus terperinci (misalnya tinjauan pengguna, verifikasi usaha, moderasi posting, operasi keanggotaan, dan pembacaan audit). Role Admin yang luas saja tidak cukup.
 
@@ -435,21 +435,21 @@ Requirements:
 
 ## 11. Model ancaman dan mitigasi wajib
 
-| Threat | Required controls |
+| Ancaman | Kontrol wajib |
 | --- | --- |
-| Credential stuffing | Rate limits, monitoring, safe lockout/progressive controls, compromised-password checks |
-| Account enumeration | Uniform registration/recovery/login responses where applicable |
+| Credential stuffing | Rate limit, pemantauan, penguncian aman/kontrol bertahap, pemeriksaan kata sandi yang telah bocor |
+| Enumerasi akun | Respons pendaftaran/pemulihan/login yang seragam jika sesuai |
 | OTP brute force | Short expiry, keyed hash, attempt cap, resend limits, destination/IP controls |
-| Session theft | HttpOnly/Secure cookies, token hashing at rest, rotation, revocation, TLS |
-| CSRF | SameSite policy plus CSRF/origin protections for cookie-authenticated mutations |
-| OAuth login CSRF | One-time state, nonce, exact redirect URI, strict callback validation |
-| OAuth account takeover/linking | Explicit linking proof; never merge on email match alone |
-| Privilege escalation | Backend role checks, deny-by-default policies, ownership checks, Admin permission scopes |
-| IDOR/resource access | Query resources through authorized ownership/participation scope; negative tests |
-| Admin compromise | MFA, least privilege, short sessions, audit logs, re-auth for sensitive actions |
-| Secret leakage | Secret manager/environment config, log redaction, no secrets in frontend bundle |
-| Abuse of verification provider | Per-destination/global rate limits, spend caps, monitoring |
-| Replay of reset/verification tokens | One-time consumption, expiry, hashed storage, atomic updates |
+| Pencurian sesi | Cookie HttpOnly/Secure, hashing token saat tersimpan, rotasi, pencabutan, TLS |
+| CSRF | Kebijakan SameSite serta perlindungan CSRF/origin untuk perubahan yang diautentikasi melalui cookie |
+| CSRF pada login OAuth | State sekali pakai, nonce, redirect URI yang tepat, validasi callback yang ketat |
+| Pengambilalihan/pengaitan akun OAuth | Bukti pengaitan eksplisit; jangan pernah menggabungkan akun hanya berdasarkan kecocokan email |
+| Eskalasi hak akses | Pemeriksaan role backend, kebijakan deny-by-default, pemeriksaan kepemilikan, cakupan izin Admin |
+| IDOR/akses sumber daya | Query sumber daya melalui cakupan kepemilikan/partisipasi yang berizin; pengujian negatif |
+| Kompromi Admin | MFA, least privilege, sesi singkat, audit log, autentikasi ulang untuk tindakan sensitif |
+| Kebocoran secret | Secret manager/konfigurasi environment, penyamaran log, tanpa secret dalam bundle frontend |
+| Penyalahgunaan penyedia verifikasi | Rate limit per tujuan/global, batas biaya, pemantauan |
+| Replay token reset/verifikasi | Konsumsi satu kali, masa berlaku, penyimpanan dalam bentuk hash, pembaruan atomik |
 
 Ini merupakan baseline model ancaman, bukan pengganti penetration test atau penilaian keamanan formal.
 
