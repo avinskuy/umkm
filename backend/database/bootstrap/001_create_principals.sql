@@ -46,13 +46,64 @@ GRANT usahapintar_app TO usahapintar_app_login;
 GRANT usahapintar_backup TO usahapintar_backup_login;
 GRANT usahapintar_monitor TO usahapintar_monitor_login;
 
--- Pastikan principal aplikasi tidak mewarisi role bawaan yang lebih luas.
-REVOKE pg_read_all_data, pg_write_all_data, pg_monitor,
-    pg_signal_backend, pg_read_server_files, pg_write_server_files,
-    pg_execute_server_program
-FROM usahapintar_app, usahapintar_app_login;
-REVOKE usahapintar_backup, usahapintar_monitor, usahapintar_migrator
-FROM usahapintar_app_login;
+-- Pastikan principal aplikasi tidak mewarisi role bawaan atau group lain.
+DO $membership_cleanup$
+DECLARE
+    v_member_name TEXT;
+    v_role_name TEXT;
+BEGIN
+    FOREACH v_member_name IN ARRAY ARRAY[
+        'usahapintar_app',
+        'usahapintar_app_login'
+    ] LOOP
+        FOREACH v_role_name IN ARRAY ARRAY[
+            'pg_read_all_data',
+            'pg_write_all_data',
+            'pg_monitor',
+            'pg_signal_backend',
+            'pg_read_server_files',
+            'pg_write_server_files',
+            'pg_execute_server_program',
+            'usahapintar_backup',
+            'usahapintar_monitor',
+            'usahapintar_migrator'
+        ] LOOP
+            IF EXISTS (
+                SELECT 1
+                  FROM pg_catalog.pg_auth_members AS m
+                  JOIN pg_catalog.pg_roles AS granted_role ON granted_role.oid = m.roleid
+                  JOIN pg_catalog.pg_roles AS member_role ON member_role.oid = m.member
+                 WHERE granted_role.rolname = v_role_name
+                   AND member_role.rolname = v_member_name
+            ) THEN
+                EXECUTE pg_catalog.format(
+                    'REVOKE %I FROM %I',
+                    v_role_name,
+                    v_member_name
+                );
+            END IF;
+        END LOOP;
+    END LOOP;
+END;
+$membership_cleanup$;
+
+DO $app_membership_guard$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+          FROM pg_catalog.pg_auth_members AS m
+         WHERE m.member = 'usahapintar_app_login'::pg_catalog.regrole
+           AND m.roleid <> 'usahapintar_app'::pg_catalog.regrole
+    ) OR EXISTS (
+        SELECT 1
+          FROM pg_catalog.pg_auth_members AS m
+         WHERE m.member = 'usahapintar_app'::pg_catalog.regrole
+    ) THEN
+        RAISE EXCEPTION
+            'Application principals must not inherit any role except the dedicated app group';
+    END IF;
+END;
+$app_membership_guard$;
 
 -- Role bawaan PostgreSQL dibatasi pada tugas backup dan monitoring.
 -- pg_read_all_data tidak memiliki BYPASSRLS dan tidak memberi hak tulis.
