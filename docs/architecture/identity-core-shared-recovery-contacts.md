@@ -103,3 +103,17 @@ Rancangan constraint dan indeks harus membedakan kontak utama pada users dari re
 - [ ] Tes integrasi mencakup kontak bersama, beberapa akun, pemilihan akun, enumerasi, concurrency, penguncian, kedaluwarsa, pembatalan penghapusan, dan pelepasan reservasi.
 
 Tidak ada SQL migration yang dibuat oleh dokumen ini. Keputusan tentang state machine final, kolom tambahan, strategi rate-limit, enkripsi, dan retensi tetap memerlukan review sebelum implementasi.
+
+
+## 8. Pembukaan kembali sesi setelah penguncian OTP
+
+Setelah lima percobaan verifikasi gagal, sesi dikunci selama satu jam. Aturan pembukaan kembali:
+
+- Selama satu jam penguncian, seluruh percobaan verifikasi pada sesi ditolak, termasuk ketika pengguna meminta atau menerima OTP baru.
+- Setelah satu jam benar-benar berlalu, sesi yang sama boleh digunakan kembali dan penghitung kegagalan sesi direset.
+- Reset penghitung hanya terjadi setelah masa penguncian berakhir. Penerbitan OTP baru, resend, refresh halaman, atau pembuatan challenge baru tidak dapat mempercepat pembukaan kunci.
+- Challenge individual tetap mengikuti status dan masa berlakunya sendiri. Challenge yang kedaluwarsa, dibatalkan/digantikan, atau sudah digunakan tidak pernah diaktifkan kembali.
+- Batas pengiriman per kontak serta rate limit lintas sesi dan instance tetap berlaku. Sesi baru tidak boleh menjadi cara untuk menghindari pembatasan.
+- Pemeriksaan waktu dan reset penghitung dilakukan di server secara atomik. Request bersamaan pada batas akhir penguncian tidak boleh menghasilkan lebih dari satu reset yang tidak konsisten.
+
+Reset penghitung sesi setelah masa penguncian adalah keputusan kebijakan yang disetujui. Strategi penyimpanan counter dan rate limit terdistribusi tetap menjadi keputusan implementasi yang memerlukan review.
