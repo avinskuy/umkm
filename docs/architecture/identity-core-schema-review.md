@@ -224,7 +224,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Pekerjaan berikutnya adalah meninjau kontrak [migration 0002 untuk verifikasi kontak](identity-core-migration-0002-verification-contract.md), khususnya konsistensi enkripsi/HMAC, rotasi fingerprint, serialisasi advisory lock, batas percobaan lintas sesi, dan transaksi resend/verifikasi. Migration SQL belum dibuat sampai kontrak ini lolos review. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
+Migration 0002 kini tersedia pada branch implementasi dan sedang menunggu CI/review. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
 Migration 0002 menunggu hasil CI dan review PR. Migration 0001 maupun 0002 tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
