@@ -1169,6 +1169,31 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
         "session token hash must be a 32-byte SHA-256 digest"
     );
 
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.sessions (user_id, token_hash, ip_prefix_hmac_key_version) VALUES ($1::uuid, $2, 'ip-hmac-v1')",
+        )
+        .bind(&user_id)
+        .bind(vec![8_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "network fingerprint key version cannot exist without its HMAC"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.sessions (user_id, token_hash, ip_prefix_hash) VALUES ($1::uuid, $2, $3)",
+        )
+        .bind(&user_id)
+        .bind(vec![10_u8; 32])
+        .bind(vec![11_u8; 32])
+        .execute(pool)
+        .await
+        .is_err(),
+        "network fingerprint HMAC cannot exist without its key version"
+    );
+
     let rotated_at_before: f64 = sqlx::query_scalar(
         "SELECT EXTRACT(EPOCH FROM token_rotated_at)::double precision FROM public.sessions WHERE id = $1::uuid",
     )
