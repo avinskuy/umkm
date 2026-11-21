@@ -1626,10 +1626,8 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("approved recovery case may be completed");
 }
 
-
 async fn assert_identity_audit_event_invariants(pool: &PgPool) {
-    let subject_user_id =
-        insert_active_email(pool, "identity-audit-subject@example.test").await;
+    let subject_user_id = insert_active_email(pool, "identity-audit-subject@example.test").await;
 
     let event_id: String = sqlx::query_scalar(
         "INSERT INTO public.identity_audit_events (occurred_at, actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, request_id, metadata) \
