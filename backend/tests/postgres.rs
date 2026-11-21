@@ -356,7 +356,7 @@ async fn assert_contact_reservations_and_release(pool: &PgPool) {
     );
 
     assert_eq!(
-        usize::from(first.is_ok()) + usize::from(second.is_ok()),
+        (first.is_ok() as usize) + (second.is_ok() as usize),
         1,
         "only one concurrent registration may reserve the same email"
     );
