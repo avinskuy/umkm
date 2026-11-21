@@ -202,17 +202,13 @@ Gerbang migration akun pertama telah dipenuhi dan hasilnya sudah di-merge ke `ma
 
 ### Migration 0002 — verifikasi kontak dan OTP
 
-Kontrak skema migration 0002 sedang ditinjau pada [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md). Sebelum SQL dibuat, review harus memastikan:
+Migration 0002 telah di-merge ke `main` dan lulus CI PostgreSQL. Skema menyediakan sesi verifikasi, challenge, serta event percobaan/pengiriman. Runtime OTP, provider, abstraksi key provider, dan enforcement rate limit masih merupakan pekerjaan lanjutan; batas lima kegagalan per kontak dalam 60 menit tetap wajib ditegakkan secara atomik lintas sesi dan instance.
 
-- Konsistensi purpose/channel dan aturan nullable `user_id` khusus recovery pra-pemilihan akun.
-- Representasi ciphertext, nonce, HMAC, dan key version tidak menyimpan key material atau tujuan plaintext.
-- Rotasi HMAC dan transaction-scoped advisory lock tidak membuka bypass rate limit.
-- Constraint lifecycle sesi/challenge, partial unique index, foreign key, dan timestamp terminal lengkap.
-- Transaksi resend, konsumsi OTP, kegagalan kelima, reset lock, dan cleanup idempotent.
-- Tes PostgreSQL dengan beberapa koneksi membuktikan batas lima pengiriman, cooldown 60 detik, lock satu jam, dan one-time use.
-- Migration tidak mengaktifkan endpoint, provider, login session, recovery case, atau database startup.
+### Migration 0003 — sesi autentikasi
 
-Jangan menjalankan migration pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
+Migration 0003 tersedia pada branch implementasi dan sedang melalui review/CI. Skema menyediakan hash token sesi, batas absolut 30 hari, idle timeout 7 hari, rotasi token, pencabutan satu arah, dan pencabutan otomatis ketika status lifecycle akun berubah menjadi nonaktif. Endpoint, cookie, middleware, validasi sesi per request, audit event, serta pencabutan karena reset password/restriksi Admin tetap merupakan pekerjaan runtime.
+
+Jangan menjalankan migration 0001–0003 pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
 
 ## 8. Keputusan yang tetap ditunda
 
