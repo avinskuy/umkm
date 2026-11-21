@@ -1849,6 +1849,48 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("migration schema privilege should be queryable");
     assert!(migrator_can_create);
 
+    let database_owner_is_migrator: bool = sqlx::query_scalar(
+        "SELECT pg_catalog.pg_get_userbyid(datdba) = 'usahapintar_migrator' \
+         FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("database owner should be queryable");
+    assert!(
+        !database_owner_is_migrator,
+        "migration role must not own the database"
+    );
+
+    let public_default_privileges: bool = sqlx::query_scalar(
+        "SELECT EXISTS ( \
+             SELECT 1 \
+               FROM pg_catalog.pg_default_acl AS d \
+               CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) AS acl \
+              WHERE d.defaclrole = 'usahapintar_migrator'::pg_catalog.regrole \
+                AND d.defaclnamespace = 'public'::pg_catalog.regnamespace \
+                AND d.defaclobjtype IN ('r', 'S', 'f') \
+                AND acl.grantee = 0 \
+         )",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("migrator default privileges should be queryable");
+    assert!(
+        !public_default_privileges,
+        "new objects created by migrator must not be granted to PUBLIC"
+    );
+
+    let unexpected_app_memberships: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+         FROM pg_catalog.pg_auth_members \
+         WHERE member = 'usahapintar_app_login'::pg_catalog.regrole \
+           AND roleid <> 'usahapintar_app'::pg_catalog.regrole",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("application role memberships should be queryable");
+    assert_eq!(unexpected_app_memberships, 0);
+
     let backup_access: (bool, bool, bool) = sqlx::query_as(
         "SELECT pg_has_role('usahapintar_backup_login', 'pg_read_all_data', 'member'), \
                 has_table_privilege('usahapintar_backup_login', 'public.identity_audit_events', 'SELECT'), \
