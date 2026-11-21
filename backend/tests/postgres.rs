@@ -275,8 +275,10 @@ async fn assert_role_and_registration_provenance_are_immutable(pool: &PgPool) {
     );
 
     assert!(
-        sqlx::query("UPDATE public.users SET initial_contact_channel = 'phone' WHERE id = $1::uuid")
-            .bind(&pending_id)
+        sqlx::query(
+            "UPDATE public.users SET initial_contact_channel = 'phone' WHERE id = $1::uuid"
+        )
+        .bind(&pending_id)
             .execute(pool)
             .await
             .is_err(),
@@ -362,52 +364,40 @@ async fn assert_contact_reservations_and_release(pool: &PgPool) {
     );
 
     let (first, second) = tokio::join!(
-        insert_pending_phone(
-            pool,
-            "business_owner",
-            "+6281234567891",
-            Some("hash-one"),
-        ),
-        insert_pending_phone(
-            pool,
-            "investor",
-            "+6281234567891",
-            Some("hash-two"),
-        )
+        insert_pending_phone(pool, "business_owner", "+6281234567891", Some("hash-one"),),
+        insert_pending_phone(pool, "investor", "+6281234567891", Some("hash-two"),)
     );
 
     assert_eq!(
-        usize::from(first.is_ok()) + usize::from(second.is_ok()),
+        (first.is_ok() as usize) + (second.is_ok() as usize),
         1,
         "only one concurrent registration may reserve the same phone number"
     );
 }
 
 async fn assert_provider_identity_invariants(pool: &PgPool) {
-    let google_user_id: String = sqlx::query_scalar(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
-    )
-    .bind("business_owner")
-    .bind("email")
-    .bind("google-owner@example.test")
-    .bind(Option::<String>::None)
-    .bind(Option::<String>::None)
-    .bind("google-subject-001")
-    .fetch_one(pool)
-    .await
+    let google_user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
+            .bind("business_owner")
+            .bind("email")
+            .bind("google-owner@example.test")
+            .bind(Option::<String>::None)
+            .bind(Option::<String>::None)
+            .bind("google-subject-001")
+            .fetch_one(pool)
+            .await
     .expect("Google-only registration should create user and provider identity atomically");
 
-    let local_user_id: String = sqlx::query_scalar(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
-    )
-    .bind("investor")
-    .bind("email")
-    .bind("local-investor@example.test")
-    .bind(Option::<String>::None)
-    .bind("encoded-password-hash")
-    .bind(Option::<String>::None)
-    .fetch_one(pool)
-    .await
+    let local_user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
+            .bind("investor")
+            .bind("email")
+            .bind("local-investor@example.test")
+            .bind(Option::<String>::None)
+            .bind("encoded-password-hash")
+            .bind(Option::<String>::None)
+            .fetch_one(pool)
+            .await
     .expect("local-password registration should create a pending client account");
 
     assert!(
