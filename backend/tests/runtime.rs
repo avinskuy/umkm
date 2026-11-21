@@ -55,10 +55,7 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
     };
 
     let pool = application_pool().await;
-    let email = format!(
-        "identity-runtime-{}@example.test",
-        std::process::id()
-    );
+    let email = format!("identity-runtime-{}@example.test", std::process::id());
 
     let registration = ClientRegistration {
         role: ClientRole::BusinessOwner,
@@ -69,7 +66,10 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
         google_subject: None,
     };
 
-    let mut transaction = pool.begin().await.expect("application may start a transaction");
+    let mut transaction = pool
+        .begin()
+        .await
+        .expect("application may start a transaction");
     let user_id = create_client_user(&mut transaction, &registration)
         .await
         .expect("application may create a pending account through the guarded database function");
