@@ -157,15 +157,14 @@ Content:
 1. Brand and a short return link to the public site.
 2. Heading: **Masuk sebagai Pemilik Usaha**
 3. Supporting text: **Kelola profil usaha, bagikan peluang, dan kembangkan koneksi.**
-4. Authentication form.
-5. Alternative sign-in separator.
-6. Google sign-in action.
-7. Registration link for new Owners.
-8. Privacy/terms links and support link.
+4. Authentication form using the approved login identifier/method.
+5. Google sign-in action for existing linked identities and role-bound new registrations.
+6. Registration link for new Owners.
+7. Privacy/terms links and support link.
 
 ### Form fields and behavior
 
-- Email or phone number field. Label clearly states accepted formats.
+- Login accepts the registered email or phone number plus the account password. Email/WhatsApp codes only activate the account and are never login credentials.
 - Password field with show/hide toggle.
 - Forgot password link.
 - Remember-device/session option only if the backend session policy supports it safely; do not imply permanent sessions.
@@ -216,15 +215,17 @@ Keep the visual layout consistent so the two pages feel like one product. Distin
 
 **Step 1 — Account**
 - Full name.
-- Email.
-- Phone number.
-- Password and confirmation.
+- Choose one contact method: email address OR phone number.
+- If email is chosen, send the verification code to that email address.
+- If phone is chosen, send the verification code through WhatsApp.
+- Required password and confirmation for email/phone registration. Google registration does not ask for a separate local password.
 - Required acceptance of Terms and Privacy Policy.
 - Optional product updates consent, unchecked by default.
 
 **Step 2 — Contact verification**
-- Email verification link/code.
-- Phone OTP.
+- If Email was selected: enter the one-time code delivered to that email address.
+- If Phone was selected: enter the one-time code delivered through WhatsApp.
+- Only the selected contact is required for initial activation. The other contact may be added and verified later.
 - Show destination in masked form.
 - Resend action with visible cooldown and attempt limits.
 - OTP expiry and retry states must be explicit.
@@ -256,14 +257,15 @@ Ask for only the fields relevant to the selected stage:
 
 **Step 1 — Account**
 - Full name.
-- Email.
-- Phone number.
-- Password and confirmation.
+- Choose one contact method: email address OR phone number.
+- If email is chosen, send the verification code to that email address.
+- If phone is chosen, send the verification code through WhatsApp.
+- Required password and confirmation fields for email/phone registration.
 - Required Terms and Privacy Policy acceptance.
 - Optional product updates consent, unchecked by default.
 
 **Step 2 — Contact verification**
-- Same verification pattern as Owner registration.
+- Same mutually exclusive Email or Phone/WhatsApp choice and verification pattern as Owner registration. A password and confirmation are mandatory for this email/phone registration path.
 
 **Step 3 — Investor profile**
 - Investor type/profile description, using approved non-sensitive categories.
@@ -280,19 +282,19 @@ Ask for only the fields relevant to the selected stage:
 
 ## 9. Google OAuth behavior
 
-- Google is an alternative authentication method, not a shortcut around role assignment.
-- Start OAuth from the role-specific login or registration context.
-- On callback, the backend validates state, nonce where applicable, issuer, audience, signature, expiry, and redirect URI.
-- If the identity is new, continue the correct role-specific registration flow.
-- If the Google identity is already linked to an account with a different primary role, stop and offer the correct login path; do not silently change account role.
-- Account linking requires proof of control of both identities. Never auto-link accounts solely because two providers return a matching email without an explicit safe linking policy.
-- Handle denied consent, cancelled flow, expired state, provider outage, and duplicate-link attempts.
+- Google OAuth remains available for sign-in and registration.
+- Before starting Google registration, the user must explicitly choose Owner or Investor; the choice is bound to server-side OAuth state. Google registration does not ask for a separate local password.
+- A new Google identity must still complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
+- Existing linked Google identities sign in only to their existing account. The account's primary role remains immutable and determines the correct portal.
+- Never auto-link based only on matching email. Linking requires fresh proof of control of both identities.
+- Admin registration is never available through public Google OAuth.
+- Validate state, nonce, issuer, audience, signature, expiry, redirect URI, and replay protection.
 
 ## 10. Password recovery
 
 ### Request page — `/lupa-kata-sandi`
 
-- Accept email or phone.
+- Accept the account's verified email or phone as the recovery destination, with a separate recovery challenge. Registration activation codes cannot be reused.
 - Use a neutral confirmation message regardless of whether the account exists.
 - Apply rate limits and abuse monitoring.
 - Do not reveal account existence.
@@ -366,12 +368,12 @@ Do not send passwords, OTP values, raw phone/email, tokens, or sensitive form co
 - [ ] Shared form behavior is consistent.
 - [ ] Role mismatch is handled by the backend and gives a safe next step.
 - [ ] Password visibility, forgot password, loading, error, and rate-limit states are designed.
-- [ ] Google OAuth remains role-aware.
+- [ ] Google OAuth preserves mandatory role selection before new registration, separate contact verification, no separate local-password requirement, and safe identity linking.
 
 ### Registration and verification
 - [ ] Only Owner and Investor can register publicly.
 - [ ] Account creation is separate from longer onboarding.
-- [ ] Verification states, resend cooldown, expiry, and attempt limits are defined.
+- [ ] Email OR phone/WhatsApp registration choice is explicit; selected-channel verification, resend cooldown, expiry, and attempt limits are defined.
 - [ ] Optional consent is unchecked by default.
 - [ ] Progress and recovery behavior are defined.
 

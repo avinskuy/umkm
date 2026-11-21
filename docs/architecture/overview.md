@@ -36,6 +36,10 @@ USahapintar starts as a **modular monolith**. The frontend and backend are separ
 
 These are logical boundaries, not a requirement to create empty modules in advance. Add a module when it has real behavior and a clear contract.
 
+## Identity Core decisions
+
+The approved and unresolved registration, contact-verification, and account-lifecycle decisions are tracked in [Identity Core — Registration Decisions](identity-core-registration-decisions.md). No Identity Core migration should be created until its implementation gate is satisfied.
+
 ## Database schema
 
 The proposed relational model, integrity constraints, privacy boundaries, and migration sequence are documented in [PostgreSQL Database Schema Design](database-schema-design.md). It remains a proposal until the first migration review gate is completed.
