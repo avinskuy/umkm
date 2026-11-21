@@ -73,7 +73,7 @@ Jalankan pemeriksaan yang relevan sebelum membuka pull request:
 
 ## Standar keamanan, privasi, dan tata kelola data
 
-Kebijakan keamanan dan perlindungan data dirangkum dalam [Indeks Kebijakan Keamanan, Privasi & Perlindungan Data](../security/README.md). Cakupannya meliputi kontrol akses, klasifikasi L1–L4, enkripsi, logging dan audit, API, database, infrastruktur, supply chain, privasi, persetujuan, retensi, serta pembagian data pihak ketiga.
+Kebijakan keamanan dan perlindungan data dirangkum dalam [Indeks Kebijakan Keamanan, Privasi & Perlindungan Data](../security/README.md). Cakupannya meliputi kontrol akses, klasifikasi L1–L4, enkripsi, logging dan audit, API, database, infrastruktur, supply chain, privasi, persetujuan, retensi, pembagian data pihak ketiga, notifikasi keamanan, kewenangan Admin, moderasi, banding, dan transparansi aktivitas akun.
 
 Persetujuan kebijakan merupakan baseline desain dan implementasi; hal tersebut tidak otomatis membuktikan kontrol telah diterapkan, diuji, atau tersertifikasi. Setiap perubahan harus mengikuti ruang lingkup, prioritas risiko, dan bukti penerapan yang relevan.
 
