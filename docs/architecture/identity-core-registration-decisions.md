@@ -1,6 +1,6 @@
 # Identity Core — Registration Decisions
 
-> Status: partial product decision record; implementation is blocked until the open decisions below are approved.
+> Status: product decisions substantially approved; see [Identity Core Final Technical Review](identity-core-final-technical-review.md) for the consolidated policy and remaining technical gates.
 
 ## Approved registration policy
 
@@ -19,7 +19,7 @@
 
 ## Role and identity invariants
 
-- Each client account has exactly one immutable primary role: owner or investor.
+- Each client account has exactly one immutable primary role: `business_owner` or `investor` (with `admin` reserved for internally provisioned accounts).
 - A person who wants the other role must register a separate account using a different, eligible, unlinked contact identity.
 - Admin accounts are provisioned internally and cannot use public registration.
 - Identity linking must prove control of both the existing account and the new identity. Matching email text alone is never sufficient.
@@ -35,7 +35,7 @@
 6. In one transaction, consume the challenge, mark the selected contact verified, and activate the account only when all account-creation conditions are satisfied.
 7. User continues to role-specific onboarding.
 
-Pending-registration expiry and cleanup must be specified before migration. Avoid leaving duplicate active pending registrations or reserving contacts indefinitely.
+Pending registrations expire after 30 minutes if required verification is not completed. Expiry cleanup must be idempotent, concurrency-safe, and must never delete an activated account. Contact reservations are released only after the pending registration is safely expired.
 
 ## Data-model implications (proposal only)
 
@@ -61,15 +61,34 @@ Google OAuth remains part of the product for sign-in and registration. A new use
 ### Password and login model — decided
 Email- or phone-based registration requires a local password; normal password login uses the registered email or phone plus that password. Google OAuth registration does not require a separate local password and Google sign-in is used to authenticate that linked identity. A new Google registrant must choose Owner or Investor before OAuth begins; the selected role is bound to server-side state and cannot be supplied or changed by the callback. Email/WhatsApp codes are only for initial account activation/contact verification and anti-bot protection; they are not login credentials and remain required for new Google registrations. Registration OTPs cannot be reused for password recovery. A later local-password setup for a Google-only account is not yet specified.
 
-### Account lifecycle
-Before migration, define pending-registration expiry and cleanup; suspension, closure, and deletion states; retention of identity/contact records and audit history after closure; whether and under what verified process a closed account's email/phone can ever be reused; and recovery when a user loses access to the selected contact channel.
+### Account lifecycle — baseline approved
+
+- Pending registration expires after 30 minutes if activation requirements are not completed.
+- Temporary deactivation and permanent deletion are separate user-initiated flows.
+- Temporary deactivation hides the public profile and restricts normal access while retaining account data; role remains immutable. Reactivation requires login and security verification.
+- Permanent deletion requires explicit confirmation and fresh authentication, followed by a 30-day waiting period. During the waiting period the account is hidden/restricted and the user may cancel with fresh security verification.
+- After the waiting period, deletion processing begins. Legally or security-required records and backups follow a documented retention schedule; do not claim immediate erasure of every backup.
+- Identity/contact reuse after closure or deletion must not happen automatically. Define eligibility only after retention and verification requirements are reviewed.
+- Cleanup must be idempotent, concurrency-safe, and must never delete an activated account.
 
 ### Provider operations
-Select email and WhatsApp Business/API providers. Confirm sender/template requirements, delivery monitoring, cost controls, retries, and operational ownership. Keep credentials server-side.
 
-### Security parameters
-Approve OTP lifetime, attempt cap, resend cooldown, rate-limit windows, pending-registration lifetime, session idle/absolute expiry, and password hashing parameters through security/configuration review. Do not invent production constants in code or UI.
+Provider selection remains an operational decision. Use provider-independent email and WhatsApp delivery interfaces, server-side credentials, delivery monitoring, bounded retries, cost/throughput controls, and operational ownership. Confirm sender/template requirements and Indonesian delivery reliability before production. Never put credentials in source control, frontend configuration, chat, or logs.
+
+### Security parameters — approved baseline, subject to security review
+
+- OTP validity: 10 minutes.
+- Failed verification attempts: maximum 5 per verification session/code lifecycle; after the fifth failure, lock that verification session for 1 hour.
+- Resend cooldown: 60 seconds.
+- Send limit: maximum 5 OTP sends per hour per contact, with additional IP/network and suspicious-pattern throttling.
+- Issuing a new OTP invalidates the previous OTP immediately. Resend must not reset the failed-attempt lock.
+- Pending registration lifetime: 30 minutes.
+- Browser session idle timeout: 7 days; absolute timeout: 30 days.
+- Remember this device may preserve a browser session across browser restarts but never bypasses idle/absolute expiry or server-side revocation.
+- Multiple concurrent sessions are allowed. Users can view/revoke individual sessions and log out all devices. Suspicious sessions may be revoked using risk signals.
+- Exact Argon2id parameters, distributed rate-limit implementation, and operational thresholds remain subject to environment-specific security review.
+- All counters, timers, locks, expiry, and revocation are enforced server-side, not by client clocks.
 
 ## Implementation gate
 
-Identity Core migrations and runtime endpoints may begin only after pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. Google OAuth is retained under the constraints in this document.
+The product-policy decisions above are approved as a revisable baseline. Identity Core migrations and runtime endpoints may begin only after the schema review document, provider integration boundaries, concurrency/expiry/cleanup/privacy review, and test plans are approved. See [Identity Core Final Technical Review](identity-core-final-technical-review.md). Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. Google OAuth is retained under the constraints in this document.
