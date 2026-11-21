@@ -14,7 +14,7 @@ Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx m
 Migration pertama hanya membangun:
 
 1. `users` sebagai sumber kebenaran akun, role utama, lifecycle, kontak utama, dan referensi kredensial lokal.
-2. `user_identities` untuk identitas provider eksternal yang stabil, dimulai dari Google OAuth.
+2. `user_identities` untuk identitas provider eksternal yang stabil, dimulai dari Google OAuth. Tabel ini masuk slice pertama karena Google OAuth sudah menjadi metode registrasi/login yang disetujui dan stable provider subject harus dilindungi keunikannya sejak akun pertama dibuat.
 
 Migration pertama **tidak** membangun:
 
@@ -232,7 +232,7 @@ Sebelum SQL migration dibuat, review harus memastikan:
 - [ ] Nama kolom dan tipe data final telah disetujui.
 - [ ] Constraint dan partial unique index telah dipetakan ke aturan lifecycle secara tepat.
 - [ ] Jalur pembuatan akun klien dan provisioning Admin memiliki batas privilege yang dapat ditegakkan.
-- [ ] Keputusan apakah tabel `user_identities` masuk migration pertama telah dikonfirmasi terhadap kebutuhan Google OAuth.
+- [x] Tabel `user_identities` masuk migration pertama karena Google OAuth merupakan metode registrasi/login yang sudah disetujui.
 - [ ] Foreign key dan perilaku terminal deletion tidak menghapus history yang wajib dipertahankan.
 - [ ] Tes PostgreSQL untuk constraint, role immutability, dan concurrency siap ditulis.
 - [ ] Tidak ada kebutuhan verifikasi, session, recovery, atau audit yang terselip ke migration pertama.
