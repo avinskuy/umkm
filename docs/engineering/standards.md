@@ -1,66 +1,67 @@
-# Engineering Standards
+# Standar Engineering
 
-## General
+## Umum
 
-- Prefer simple, explicit, maintainable solutions.
-- One file should have one clear primary responsibility.
-- Keep modules cohesive and APIs small.
-- Avoid premature abstractions and empty placeholder directories.
-- Avoid giant files; split by responsibility when a module becomes difficult to navigate.
-- Do not duplicate business rules across frontend and backend. The backend is authoritative.
+- Utamakan solusi yang sederhana, eksplisit, dan mudah dipelihara.
+- Setiap file harus memiliki satu tanggung jawab utama yang jelas.
+- Jaga agar modul tetap kohesif dan API tidak terlalu besar.
+- Hindari abstraksi yang dibuat terlalu dini serta direktori placeholder yang belum memiliki fungsi.
+- Hindari file raksasa; pisahkan berdasarkan tanggung jawab ketika modul mulai sulit dipahami atau dinavigasi.
+- Jangan menggandakan aturan bisnis antara frontend dan backend. Backend menjadi sumber kebenaran.
 
-## Naming
+## Penamaan
 
-- React components and component files: PascalCase.
+- Komponen React dan nama file komponennya: PascalCase.
 - Hooks: `useSomething`.
-- TypeScript variables and functions: camelCase.
-- Rust modules, functions, and variables: snake_case.
-- Rust types and traits: PascalCase.
-- Use domain language consistently.
+- Variabel dan fungsi TypeScript: camelCase.
+- Modul, fungsi, dan variabel Rust: snake_case.
+- Tipe dan trait Rust: PascalCase.
+- Gunakan istilah domain secara konsisten.
 
 ## Frontend
 
-- TypeScript strict mode.
-- Feature-first structure under `src/features/<feature>`.
-- Reusable, domain-neutral primitives under `src/shared/ui`.
-- Route composition under `src/app`.
-- API access and external integrations under explicit service modules.
-- Prefer CSS Modules for component/page styles.
-- Keep global CSS limited to design tokens, reset, and global document rules.
-- Avoid one application-wide stylesheet containing feature-specific selectors.
-- Components should not own unrelated network, domain, and presentation concerns.
-- Provide accessible labels, keyboard behavior, and clear loading/error/empty states.
+- Aktifkan TypeScript strict mode.
+- Gunakan struktur feature-first di dalam `src/features/<feature>`.
+- Tempatkan komponen dasar yang dapat digunakan ulang dan tidak terikat domain di `src/shared/ui`.
+- Tempatkan komposisi route di `src/app`.
+- Tempatkan akses API dan integrasi eksternal dalam modul service dengan tanggung jawab yang jelas.
+- Utamakan CSS Modules untuk style komponen dan halaman.
+- Batasi CSS global pada design tokens, reset, dan aturan dokumen global.
+- Hindari satu stylesheet seluruh aplikasi yang berisi selector khusus untuk banyak fitur.
+- Komponen tidak boleh menangani urusan jaringan, domain, dan presentasi yang tidak saling berkaitan.
+- Sediakan label yang aksesibel, dukungan keyboard, serta state loading, error, dan empty yang jelas.
 
 ## Backend
 
-- Keep handlers thin: parse transport input, call application behavior, map results to HTTP.
-- Validate untrusted input at boundaries.
-- Enforce authorization and resource ownership in backend application paths.
-- Use typed errors and predictable API responses.
-- Avoid `unwrap()` and `expect()` in normal request paths.
-- Keep database queries and external provider clients behind infrastructure boundaries.
-- Never return internal secrets or sensitive fields.
+- Jaga handler tetap tipis: baca input transport, panggil perilaku application, lalu petakan hasilnya ke HTTP.
+- Validasi input yang tidak tepercaya pada batas masuk sistem.
+- Tegakkan otorisasi dan kepemilikan sumber daya pada jalur application backend.
+- Gunakan error bertipe dan respons API yang konsisten.
+- Hindari `unwrap()` dan `expect()` pada jalur request normal.
+- Tempatkan query database dan client penyedia eksternal di balik batas infrastructure.
+- Jangan pernah mengembalikan rahasia internal atau field sensitif.
 
-## Styling ownership
+## Kepemilikan style
 
-- Global tokens: `src/styles/tokens/`.
-- Global reset/document styles: `src/styles/base/`.
-- Component styles: colocated `.module.css`.
-- Feature page styles: colocated with the owning page/feature.
-- Do not create a new global stylesheet to fix a local component issue.
+- Design tokens global: `src/styles/tokens/`.
+- Reset dan style dokumen global: `src/styles/base/`.
+- Style komponen: file `.module.css` yang diletakkan berdekatan dengan komponennya.
+- Style halaman fitur: diletakkan bersama halaman atau fitur yang memilikinya.
+- Jangan membuat stylesheet global baru hanya untuk memperbaiki masalah pada satu komponen lokal.
 
-## Testing
+## Pengujian
 
-- Unit-test domain logic and reusable UI behavior.
-- Integration-test API, persistence, and authorization boundaries.
-- Add regression tests for every fixed bug.
-- Test both allowed and denied role/resource access.
-- E2E-test critical user journeys when those journeys exist.
+- Uji logika domain dan perilaku UI yang dapat digunakan ulang melalui unit test.
+- Uji API, persistence, dan batas otorisasi melalui integration test.
+- Tambahkan regression test untuk setiap bug yang diperbaiki.
+- Uji akses role/sumber daya yang diizinkan maupun yang harus ditolak.
+- Tambahkan E2E test untuk alur pengguna yang penting ketika alur tersebut sudah tersedia.
 
-## Quality gates
+## Gerbang kualitas
 
-Run the relevant checks before a pull request:
-- Frontend formatting, lint, typecheck, tests, and production build.
-- Backend rustfmt, Clippy with warnings denied, tests, and build.
-- Review dependency changes and generated lockfiles.
-- CI must be green before merge.
+Jalankan pemeriksaan yang relevan sebelum membuka pull request:
+
+- Frontend: pemeriksaan format, lint, typecheck, test, dan production build.
+- Backend: rustfmt, Clippy dengan peringatan dianggap gagal, test, dan build.
+- Tinjau perubahan dependency dan lockfile yang dihasilkan.
+- Seluruh CI harus berstatus hijau sebelum merge.

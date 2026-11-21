@@ -1,29 +1,29 @@
-# ADR 0001: Start with a Modular Monolith
+# ADR 0001: Memulai dengan Modular Monolith
 
-- Status: Accepted
-- Date: 2026-11-21
+- Status: Disetujui
+- Tanggal: 2026-11-21
 
-## Context
+## Konteks
 
-USahapintar is at the beginning of implementation. The product has several domains, but there is no operational need to deploy each domain independently.
+USahapintar masih berada pada tahap awal implementasi. Produk memiliki beberapa domain, tetapi belum ada kebutuhan operasional untuk men-deploy setiap domain secara terpisah.
 
-## Decision
+## Keputusan
 
-Build one Rust backend service organized into explicit domain modules, plus a separate React frontend. Use PostgreSQL as the planned primary database. Keep domain boundaries clear without introducing microservices.
+Bangun satu layanan backend Rust yang disusun ke dalam modul-modul domain dengan batas tanggung jawab yang jelas, serta satu aplikasi frontend React yang terpisah. Gunakan PostgreSQL sebagai database utama yang direncanakan. Pertahankan batas domain yang jelas tanpa memperkenalkan microservices.
 
-## Consequences
+## Konsekuensi
 
-### Positive
+### Dampak positif
 
-- Lower deployment and operational complexity.
-- Easier local development and integration testing.
-- Domain boundaries can be extracted later if real scaling or ownership needs justify it.
+- Kompleksitas deployment dan operasional lebih rendah.
+- Pengembangan lokal dan pengujian integrasi lebih mudah.
+- Domain dapat dipisahkan di kemudian hari jika kebutuhan skala atau kepemilikan tim benar-benar membenarkannya.
 
-### Trade-offs
+### Kompromi
 
-- Module boundaries must be maintained through code review and tests.
-- A single backend deployment scales as one unit initially.
+- Batas antar-modul harus dijaga melalui code review dan pengujian.
+- Pada tahap awal, seluruh backend di-deploy dan diskalakan sebagai satu kesatuan.
 
-## Revisit when
+## Tinjau kembali jika
 
-Independent scaling, deployment cadence, team ownership, or isolation requirements provide measurable reasons to split a domain.
+Kebutuhan penskalaan, frekuensi deployment, kepemilikan tim, atau isolasi layanan memberikan alasan yang terukur untuk memisahkan suatu domain.
