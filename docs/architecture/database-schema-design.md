@@ -66,7 +66,7 @@ The product's shorter labels “Owner” and “Investor” are display language
 - Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
 - Verification challenges must support rate limiting, attempt caps, short expiry, resend cooldown, and invalidation of superseded challenges. OTP hashing must use a keyed construction suitable for short numeric codes.
 - Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
-- Pending registrations expire after 30 minutes; cleanup must be idempotent, concurrency-safe, and unable to delete activated accounts.
+- Pendaftaran tertunda kedaluwarsa setelah 30 menit. Proses pembersihan harus idempotent, aman terhadap proses bersamaan, dan tidak boleh menghapus akun yang sudah aktif.
 - Data sesi harus mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut, fitur “Ingat perangkat ini” tanpa melewati kedua batas, pencabutan sesi individual, dan logout dari semua perangkat.
 - Kontak pemulihan bersifat opsional setelah aktivasi dan diverifikasi secara terpisah. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Kasus pemulihan alternatif harus mempertimbangkan sinyal perangkat/sesi tepercaya dan pemeriksaan manual oleh petugas berwenang khusus jika bukti otomatis belum cukup.
 - Rancangan status akun harus membedakan penonaktifan sementara dan penghapusan permanen. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus ditetapkan berdasarkan kategori data.
@@ -232,43 +232,43 @@ Do not implement all domains in one large initial migration. Introduce reviewed,
 
 Each migration must be immutable after application to a shared database. Include forward migration tests against a disposable PostgreSQL instance. Add rollback guidance where safe; do not promise down migrations for destructive or data-transforming changes without a recovery plan.
 
-## 8. Identity Core decisions and remaining schema decisions
+## 8. Keputusan Identity Core dan keputusan skema yang masih tersisa
 
-### Approved Identity Core policy baseline
+### Batas awal kebijakan Identity Core yang telah disetujui
 
-The first Identity Core migration must represent these approved policies:
+Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui berikut:
 
-- Canonical immutable roles: `business_owner`, `investor`, and internally provisioned `admin`.
-- One selected initial registration contact (email or phone/WhatsApp); the other contact may be added and independently verified later.
-- Email/phone registration requires a local password; Google-only registration may have a nullable `password_hash` and still requires a separately selected and verified registration contact.
+- Role kanonis yang tidak dapat diubah: `business_owner`, `investor`, dan `admin` yang dibuat melalui proses internal.
+- Satu kontak dipilih saat pendaftaran awal (email atau nomor HP/WhatsApp); kontak lainnya dapat ditambahkan dan diverifikasi secara terpisah setelah akun aktif.
+- Pendaftaran menggunakan email/nomor HP wajib memiliki kata sandi lokal. Pendaftaran yang hanya menggunakan Google boleh memiliki `password_hash` bernilai null, tetapi tetap wajib memilih dan memverifikasi kontak pendaftaran secara terpisah.
 - Pending registration expires after 30 minutes. Cleanup must be idempotent, concurrency-safe, release eligible pending reservations, and never delete an activated account.
 - Baseline OTP: kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, maksimal lima percobaan gagal per sesi verifikasi, terkunci satu jam setelah kegagalan kelima, jeda kirim ulang 60 detik, dan maksimal lima pengiriman per alamat tujuan dalam satu jam. Kode baru membatalkan kode sebelumnya, tetapi tidak menghapus status penguncian atau batas pengiriman. Batas tambahan berdasarkan IP/jaringan/akun/tujuan tetap diperlukan.
-- Multiple sessions are allowed. Initial idle timeout is seven days and absolute timeout is 30 days. Remember-device persistence cannot bypass either limit or server-side revocation. Active-session listing, individual revocation, and logout-all are required.
-- Temporary deactivation and permanent deletion are separate. Permanent deletion has a 30-day cancellation/waiting period before deletion processing; retention and backup handling must be documented.
-- Recovery supports forgot-password and forgot-email through verified recovery contacts. Full primary email may be revealed only after successful verification of a linked recovery contact. If both primary and recovery contacts are lost, use risk-based alternative recovery with trusted-device/session evidence and escalation to specially authorized manual review. High-risk recovery may be delayed or rejected; all actions are audited and role never changes.
-- Recovery contacts are optional at registration, added after activation, and independently verified.
+- Beberapa sesi aktif diperbolehkan. Batas awal tanpa aktivitas adalah tujuh hari dan batas absolut adalah 30 hari. Sesi persisten melalui fitur Ingat perangkat tidak boleh melewati kedua batas atau pencabutan dari server. Sistem wajib menyediakan daftar sesi aktif, pencabutan individual, dan logout dari semua perangkat.
+- Penonaktifan sementara dan penghapusan permanen merupakan proses terpisah. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus didokumentasikan.
+- Pemulihan mendukung alur lupa kata sandi dan lupa email melalui kontak pemulihan yang sudah diverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Jika kontak utama dan pemulihan sama-sama tidak dapat diakses, gunakan pemulihan alternatif berbasis risiko dengan bukti perangkat/sesi tepercaya dan eskalasi ke pemeriksaan manual oleh petugas berwenang khusus. Pemulihan berisiko tinggi dapat ditunda atau ditolak; seluruh tindakan diaudit dan role tidak pernah berubah.
+- Kontak pemulihan bersifat opsional saat pendaftaran, ditambahkan setelah aktivasi, dan diverifikasi secara terpisah.
 
-### Remaining Identity Core schema decisions
+### Keputusan skema Identity Core yang masih perlu ditetapkan
 
-Resolve these in migration review rather than inventing them in SQL:
+Tetapkan hal-hal berikut saat peninjauan migrasi; jangan mengarang keputusan langsung di SQL:
 
-- Exact table and state design for temporary deactivation, deletion request/cancellation, deletion processing, and retention/legal holds.
-- Contact reuse policy and uniqueness reservation behavior during pending registration, deactivation, deletion waiting period, and post-deletion retention.
-- Exact schema for recovery evidence, manual review assignments, reviewer scopes, audit events, and dual-control where required.
-- Provider configuration and delivery-attempt/outbox model for email and WhatsApp, including idempotency and failure handling.
-- Distributed rate-limit storage and how counters survive application restarts and multiple instances.
-- Exact password hashing parameters, retention schedules, Admin MFA/recovery, and Google-only local-password setup if later offered.
+- Rancangan tabel dan status yang tepat untuk penonaktifan sementara, permintaan/pembatalan penghapusan, proses penghapusan, serta penahanan data untuk kebutuhan retensi/hukum.
+- Kebijakan penggunaan kembali kontak dan perilaku reservasi keunikan selama pendaftaran tertunda, penonaktifan, masa tunggu penghapusan, serta retensi setelah penghapusan.
+- Skema untuk bukti pemulihan, penugasan pemeriksaan manual, cakupan kewenangan pemeriksa, peristiwa audit, dan persetujuan dua pihak jika diperlukan.
+- Konfigurasi penyedia layanan dan model antrean/outbox serta percobaan pengiriman email dan WhatsApp, termasuk idempotensi dan penanganan kegagalan.
+- Penyimpanan pembatasan permintaan terdistribusi serta cara mempertahankan penghitung setelah aplikasi dimulai ulang dan saat berjalan di beberapa instance.
+- Parameter hashing kata sandi, jadwal retensi, MFA/pemulihan Admin, dan pengaturan kata sandi lokal untuk akun yang hanya menggunakan Google jika kelak disediakan.
 
-### Deferred decisions outside the Identity Core slice
+### Keputusan di luar cakupan Identity Core yang ditunda
 
-Owner/Investor profile fields and onboarding stages; business ownership and verification lifecycle; consent scopes and exported-data treatment; opportunity draft/edit/archive rules; connection expiry/cancellation/repeat cooldown/block behavior; conversation cardinality and message retention/attachments/editing/deletion; numeric Free/Premium quotas and billing lifecycle; and broader moderation/Admin permission design. These do not block the Identity Core migration unless a concrete dependency is discovered.
+Kolom profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; cakupan persetujuan serta penanganan ekspor data; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/k jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta rancangan izin moderasi/Admin yang lebih luas. Hal-hal ini tidak menghalangi migrasi Identity Core kecuali ditemukan ketergantungan yang nyata.
 
 ## 9. Review and implementation gate
 
 Before creating `0001_*.sql`:
 
 1. Review this model against the product sitemap, authentication security design, membership policy, and engineering standards.
-2. Resolve the remaining Identity Core schema decisions in Section 8 for this slice only; deferred product domains can remain open.
+2. Tetapkan keputusan skema Identity Core yang masih tersisa pada Bagian 8 untuk cakupan ini saja; keputusan domain produk yang ditunda boleh tetap terbuka.
 3. Confirm canonical role/status names and all ownership/consent invariants.
 4. Review exact PostgreSQL types, constraints, partial indexes, and SQLx migration naming.
 5. Add integration tests for uniqueness, immutable role, foreign keys, expiry/one-time use, and safe transaction behavior.
