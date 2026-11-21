@@ -1,11 +1,11 @@
-# Authentication & Identity — Architecture and Security Design
+# Autentikasi & Identitas — Rancangan Arsitektur dan Keamanan
 
-> Status: skema akun, verifikasi, dan sesi tersedia; runtime autentikasi masih belum diimplementasikan  
-> Product reference: `docs/product/public-and-auth-uiux-spec.md`  
-> Wireframe reference: `docs/product/low-fidelity-public-auth-wireframes.md`  
-> Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 foundation is available. Account, contact-verification, and session schema migrations are implemented; recovery schema and authentication runtime flows remain unimplemented.
+> Status: migration Identity Core 0001–0005 tersedia; runtime autentikasi lengkap belum diimplementasikan  
+> Referensi produk: `docs/product/public-and-auth-uiux-spec.md`  
+> Referensi wireframe: `docs/product/low-fidelity-public-auth-wireframes.md`  
+> Fondasi backend: Rust + Axum, PostgreSQL 16, dan SQLx 0.8. Skema akun, verifikasi, sesi, recovery, dan audit sudah tersedia sebagai migration.
 
-This document defines the authentication architecture for USahapintar. The account, contact-verification, and authentication-session database slices are implemented, but authentication endpoints, cookie handling, middleware, and runtime database integration are not. This is not a claim of a production-ready or security-audited system. Provider choices, operational secrets, retention periods, and final controls must be reviewed before production use.
+Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity Core 0001–0005 sudah menyediakan skema akun, verifikasi, sesi, pemulihan, dan audit. Backend juga sudah memiliki pool database saat startup serta akses terbatas untuk membuat akun pending dan menambahkan audit event. Namun, alur registrasi dan aktivasi lengkap, OTP runtime, endpoint login/logout, pengelolaan cookie, middleware autentikasi, pemulihan akun, dan integrasi penyedia layanan belum tersedia. Status ini bukan pernyataan bahwa sistem siap produksi atau telah diaudit keamanannya. Penyedia layanan, secret operasional, masa retensi, dan kontrol akhir tetap harus ditinjau sebelum digunakan di produksi.
 
 ## 1. Scope and invariants
 
@@ -48,7 +48,7 @@ This document defines the authentication architecture for USahapintar. The accou
 
 ## Membership and authorization boundary
 
-Membership is a separate entitlement dimension and never changes the immutable primary role. A Free or Premium plan cannot grant Owner or Investor capabilities to the other role, bypass account status, ownership, consent, moderation, or Admin permission checks, or reveal private business information. The backend evaluates authentication, account status, role, resource permission, safety/moderation state, and only then membership entitlement and quota. See [Membership & Entitlements Policy](../product/membership-and-entitlements.md) for the plan capability baseline, quota rules, downgrade behavior, and test requirements.
+Keanggotaan merupakan dimensi hak akses tersendiri dan tidak mengubah role utama yang bersifat tetap. Paket Free atau Premium tidak boleh memberikan kemampuan Owner kepada Investor atau sebaliknya, melewati pemeriksaan status akun, kepemilikan, consent, moderasi, maupun izin Admin, atau membuka informasi bisnis privat. Backend memeriksa autentikasi, status akun, role, izin terhadap sumber daya, dan status keamanan/moderasi sebelum mengevaluasi entitlement serta kuota keanggotaan. Lihat [Kebijakan Keanggotaan & Hak Fitur](../product/membership-and-entitlements.md) untuk kemampuan paket, aturan kuota, perilaku downgrade, dan kebutuhan pengujian.
 
 ## 2. Identity and role model
 
@@ -79,7 +79,7 @@ Do not implement authorization as scattered frontend conditions. Use shared back
 
 ## 3. Proposed data model
 
-PostgreSQL 16 is the selected relational baseline. The first SQLx migration for account identity and Google provider identity is implemented and covered by PostgreSQL integration tests. The HTTP server still does not initialize the database at startup. Verification, session, recovery, audit, and product-domain migrations remain separate future slices. Migrations must be versioned and immutable after application to a shared database. Use UUID primary keys and `timestamptz`.
+PostgreSQL 16 merupakan baseline database relasional. Migration SQLx Identity Core 0001–0005 untuk akun, verifikasi, sesi, recovery, dan audit sudah tersedia serta tercakup dalam pengujian integrasi PostgreSQL. HTTP server menginisialisasi pool database saat startup melalui principal aplikasi; migration tetap dijalankan secara eksplisit oleh proses terpisah. Backend baru membuka operasi terbatas untuk membuat akun pending dan menambahkan audit event, belum menyediakan alur autentikasi lengkap. Migration harus berversi dan tidak boleh diubah setelah diterapkan pada database bersama. Gunakan primary key UUID dan `timestamptz`.
 
 ### `users`
 
@@ -512,8 +512,8 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 
 ## 13. Implementation sequence
 
-1. **Dependency reproducibility:** commit `frontend/package-lock.json` and change CI to `npm ci`; keep the current npm compatibility configuration only if the lockfile and CI prove it is still required.
-2. **Database baseline:** PostgreSQL/SQLx configuration, migrator, and first account/Google-identity migration are implemented and covered by integration tests; next is the separate verification migration.
+1. **Reproducibilitas dependency — selesai:** lockfile frontend/backend tersedia dan CI menggunakan instalasi dependency yang terkunci.
+2. **Fondasi database — selesai:** pool PostgreSQL runtime, pemisahan principal aplikasi/migrator, migration Identity Core 0001–0005, serta akses terbatas untuk pembuatan akun pending dan penambahan audit event sudah tersedia. Migration produksi tetap merupakan operasi terpisah.
 3. **Domain types:** define User, PrimaryRole, AccountStatus, Session, VerificationChallenge, and typed error codes.
 4. **Registration:** implement Owner/Investor registration with validation and safe pending state.
 5. **Verification:** implement email and phone challenge lifecycle behind provider interfaces.

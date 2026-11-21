@@ -1,12 +1,12 @@
-# PostgreSQL Database Schema Design
+# Rancangan Skema Database PostgreSQL
 
-> Status: Partially implemented — Identity Core account slice exists; remaining domain schemas are proposals  
-> Scope: relational model, integrity constraints, privacy boundaries, and migration sequencing  
-> Runtime baseline: PostgreSQL 16 + SQLx 0.8
+> Status: skema Identity Core migration 0001–0005 tersedia; skema domain produk lainnya masih berupa rancangan  
+> Cakupan: model relasional, constraint integritas, batas privasi, dan urutan migration  
+> Baseline runtime: PostgreSQL 16 + SQLx 0.8
 
-This document translates the approved USahapintar product and authentication policies into a relational model. The first Identity Core account slice has been implemented as a SQLx migration and verified in CI; the remaining domain schemas are still design proposals. The migration has not been applied to production and does not activate runtime registration or authentication.
+Dokumen ini menerjemahkan kebijakan produk dan autentikasi USahapintar ke dalam model relasional. Migration Identity Core 0001–0005 sudah tersedia sebagai SQLx migration dan diuji di CI. Skema untuk domain produk lainnya masih berupa rancangan. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi atau alur registrasi dan autentikasi sudah aktif.
 
-The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions. The account-slice contract is documented in [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md) and implemented by `backend/migrations/20261121170000_create_identity_accounts.sql`. The next verification slice is specified separately in [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md); it remains a review draft and is not yet implemented.
+Tinjauan teknis Identity Core tersedia di [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Baca bersama keputusan registrasi dan kontak pemulihan bersama. Kontrak migration 0001–0005 masing-masing menjelaskan skema akun, verifikasi, sesi, pemulihan, dan audit; seluruh migration tersebut sudah tersedia di `backend/migrations/`. Migration tidak dijalankan otomatis oleh HTTP server dan belum tentu sudah diterapkan pada database produksi.
 
 ## 1. Design principles
 
@@ -45,7 +45,7 @@ The product's shorter labels “Owner” and “Investor” are display language
 
 ## 3. Proposed domain model
 
-### A. Identity and authentication
+### A. Identitas dan autentikasi
 
 | Table | Responsibility | Important constraints |
 | --- | --- | --- |
@@ -59,9 +59,9 @@ The product's shorter labels “Owner” and “Investor” are display language
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
 
-**Important identity rules**
+**Aturan penting identitas**
 
-- `users.primary_role` is assigned at account creation and cannot be updated. The first migration enforces this with a database trigger; the client-creation function only accepts `business_owner` or `investor` and is not executable by PUBLIC.
+- `users.primary_role` ditetapkan saat akun dibuat dan tidak dapat diubah. Migration 0001 menegakkannya melalui database trigger; fungsi pembuatan akun hanya menerima `business_owner` atau `investor` dan tidak dapat dijalankan oleh `PUBLIC`.
 - A user who wants the other client role must create a separate account using identities not linked elsewhere.
 - Unique indexes should be partial for nullable email/phone columns, and normalization must happen before insert.
 - Provider identity is keyed by the provider's stable subject, not email text.
@@ -290,30 +290,30 @@ Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui beri
 - Pemulihan mendukung alur lupa kata sandi dan lupa email melalui kontak pemulihan yang sudah diverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Jika kontak utama dan pemulihan sama-sama tidak dapat diakses, gunakan pemulihan alternatif berbasis risiko dengan bukti perangkat/sesi tepercaya dan eskalasi ke pemeriksaan manual oleh petugas berwenang khusus. Pemulihan berisiko tinggi dapat ditunda atau ditolak; seluruh tindakan diaudit dan role tidak pernah berubah.
 - Kontak pemulihan bersifat opsional saat pendaftaran, ditambahkan setelah aktivasi, dan diverifikasi secara terpisah.
 
-### Keputusan skema Identity Core yang masih perlu ditetapkan
+### Keputusan teknis lanjutan yang masih perlu ditinjau
 
 Tetapkan hal-hal berikut saat peninjauan migrasi; jangan mengarang keputusan langsung di SQL:
 
 - Status dan transisi teknis yang tepat untuk `account_deletion_requests`, `data_retention_records`, dan penonaktifan sementara; kebijakan produk telah memutuskan pemisahan entitas dan masa tunggu 30 hari, sedangkan nilai retensi numerik tetap menunggu tinjauan hukum/infrastruktur.
-- Kebijakan penggunaan kembali kontak dan perilaku reservasi keunikan selama pendaftaran tertunda, penonaktifan, masa tunggu penghapusan, serta retensi setelah penghapusan.
+- Detail teknis reservasi dan pelepasan kontak pada transisi lifecycle harus tetap mengikuti kebijakan akun yang telah disetujui; jangan mengubah aturan keunikan kontak utama atau kontak pemulihan bersama tanpa review.
 - Struktur metadata bukti pemulihan, penugasan pemeriksaan manual, cakupan kewenangan petugas khusus, dan kebutuhan persetujuan tambahan untuk tindakan berisiko tinggi.
 - Konfigurasi penyedia layanan dan model antrean/outbox serta percobaan pengiriman email dan WhatsApp, termasuk idempotensi dan penanganan kegagalan.
 - Penyimpanan pembatasan permintaan terdistribusi serta cara mempertahankan penghitung setelah aplikasi dimulai ulang dan saat berjalan di beberapa instance.
-- Parameter hashing kata sandi, jadwal retensi, MFA/pemulihan Admin, dan pengaturan kata sandi lokal untuk akun yang hanya menggunakan Google jika kelak disediakan.
+- Benchmark dan batas operasional Argon2id sebelum autentikasi publik, jadwal retensi numerik, MFA/pemulihan Admin, serta pengaturan kata sandi lokal untuk akun yang hanya menggunakan Google jika kelak disediakan.
 
 ### Keputusan di luar cakupan Identity Core yang ditunda
 
 Detail field profil dan tahapan onboarding Owner/Investor; kepemilikan bisnis dan siklus verifikasinya; status dan metadata consent/export/deletion yang tepat; aturan draf/edit/arsip peluang; kedaluwarsa/pembatalan/jeda pengajuan ulang/pemblokiran koneksi; jumlah peserta percakapan serta retensi/lampiran/edit/penghapusan pesan; kuota Free/Premium dan siklus penagihan; serta pemetaan izin Admin ke tabel dan policy enforcement. Kebijakan produk untuk privasi, consent, export, lifecycle, Admin enforcement, moderasi, banding, notifikasi, dan riwayat aktivitas telah ditetapkan; detail skema dan implementasinya tetap memerlukan review domain sebelum migration.
 
-## 9. Review and implementation gate
+## 9. Gerbang peninjauan migration domain berikutnya
 
-Before creating `0001_*.sql`:
+Sebelum membuat migration SQLx untuk domain produk berikutnya:
 
-1. Review this model against the product sitemap, authentication security design, membership policy, and engineering standards.
-2. Tetapkan keputusan skema Identity Core yang masih tersisa pada Bagian 8 untuk cakupan ini saja; keputusan domain produk yang ditunda boleh tetap terbuka.
-3. Confirm canonical role/status names and all ownership/consent invariants.
-4. Review exact PostgreSQL types, constraints, partial indexes, and SQLx migration naming.
-5. Add integration tests for uniqueness, immutable role, foreign keys, expiry/one-time use, and safe transaction behavior.
-6. Run formatting, Clippy, unit/integration tests, migration checks, and workspace build in CI.
+1. Cocokkan model dengan sitemap produk, rancangan keamanan autentikasi, kebijakan keanggotaan, dan standar engineering.
+2. Pastikan keputusan domain yang masih terbuka telah disetujui; jangan memasukkan keputusan baru langsung ke SQL.
+3. Pastikan nama role/status kanonis serta seluruh invariant kepemilikan dan consent konsisten.
+4. Tinjau tipe PostgreSQL, constraint, partial index, foreign key, dan penamaan migration SQLx.
+5. Tambahkan integration test untuk keunikan, relasi, expiry, penggunaan satu kali, isolasi akses, dan transaksi yang aman.
+6. Jalankan formatting, Clippy, unit/integration test, pemeriksaan migration, dan workspace build di CI.
 
-Only after this gate should the first identity migration be implemented. This proposal does not authorize production deployment or use of a live production database.
+Migration Identity Core 0001–0005 sudah tersedia. Gerbang ini berlaku untuk migration domain berikutnya dan tidak mengizinkan penerapan ke database produksi. Migration, provisioning principal, dan deployment produksi tetap merupakan operasi terpisah.
