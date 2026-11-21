@@ -53,7 +53,7 @@ Fungsi `create_client_user` adalah SECURITY DEFINER dan hanya aman diberikan kep
 ## 5. Backup, monitoring, dan audit reader
 
 - `usahapintar_backup_login` menjadi anggota `usahapintar_backup`, yang mewarisi role bawaan `pg_read_all_data`. Ini memberikan akses baca lintas tabel/sequences, bukan tulis dan bukan BYPASSRLS. Perilaku backup terhadap row-level security harus diuji; jangan menambah BYPASSRLS otomatis.
-- `usahapintar_monitor_login` menjadi anggota `usahapintar_monitor`, yang mewarisi `pg_monitor`. Role ini ditujukan untuk statistik/monitoring, bukan membaca data bisnis.
+- `usahapintar_monitor_login` menjadi anggota `usahapintar_monitor`, yang mewarisi `pg_monitor`. Role ini ditujukan untuk statistik/monitoring, bukan membaca data bisnis. Karena `pg_monitor` juga mencakup akses baca konfigurasi dan statistik yang lebih luas, batasi host, credential, dan operatornya; jangan menyimpan secret di parameter konfigurasi PostgreSQL.
 - `usahapintar_audit_reader` adalah NOLOGIN dan hanya dapat membaca `identity_audit_events`. Belum ada anggota; pemberian akses kepada fungsi/Admin tertentu memerlukan keputusan dan grant terpisah.
 
 ## 6. Default privilege dan deny-by-default
