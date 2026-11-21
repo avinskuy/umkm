@@ -8,4 +8,4 @@ mod audit;
 mod registration;
 
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
-pub use registration::{create_client_user, ClientRegistration, ContactChannel, ClientRole};
+pub use registration::{create_client_user, ClientRegistration, ClientRole, ContactChannel};
