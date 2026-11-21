@@ -1,6 +1,6 @@
 # Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP
 
-> Status: migration 0002 telah lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL; siap digabung setelah review akhir
+> Status: migration 0002 telah lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL; patch final tetap melalui review sebelum merge
 
 Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, operasi enkripsi/HMAC, atau koneksi database pada HTTP startup.
 
@@ -224,15 +224,15 @@ Semua tes race/concurrency harus memakai beberapa koneksi PostgreSQL nyata, buka
 
 ## 9. Gate sebelum implementasi
 
-Implementasi SQL 0002 harus memenuhi gate review berikut sebelum dianggap siap:
+Migration SQL 0002 telah dibuat dan diuji. Bagian ini mencatat gerbang lanjutan sebelum runtime OTP diaktifkan:
 
 - [ ] Kontrak purpose dan channel sesuai alur produk yang disetujui.
 - [ ] Representasi ciphertext/HMAC/key version cocok dengan abstraksi key provider yang akan dipakai backend.
 - [ ] Operasi advisory lock dan rotasi HMAC tidak membuka bypass untuk pengiriman maupun percobaan verifikasi.
 - [x] Ambang percobaan gagal lintas sesi ditetapkan: 5 kegagalan per kontak dalam jendela bergulir 60 menit. Runtime tetap wajib menegakkan limit ini secara atomik sebelum OTP diaktifkan.
-- [ ] Semua constraint, partial index, FK, dan state transition sudah ditinjau.
+- [x] Constraint, partial index, FK, dan state transition dasar telah ditinjau serta diuji di CI; enforcement transaksi/concurrency runtime tetap menjadi pekerjaan implementasi berikutnya.
 - [ ] Rencana transaksi resend, verifikasi, reset lock, dan cleanup jelas.
-- [ ] Tes PostgreSQL untuk concurrency dan batas waktu sudah dirancang.
+- [x] Tes PostgreSQL memvalidasi constraint dan state dasar; tes concurrency untuk enforcement runtime OTP tetap wajib sebelum fitur diaktifkan.
 - [ ] Tidak ada key, OTP, tujuan plaintext, atau data produksi dalam migration/test fixture.
 - [ ] Migration tetap terpisah dari runtime endpoint, provider, login session, recovery case, dan deployment.
 
