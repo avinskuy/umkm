@@ -1,10 +1,10 @@
 # Kontrak Skema Migration 0005 — Peristiwa Audit Identity Core
 
-> Status: implementasi pada branch `feat/identity-audit-events-0005`; menunggu CI dan review PR
+> Status: diimplementasikan sebagai migration SQLx dan lulus CI, termasuk pengujian integrasi PostgreSQL.
 > Tanggal: 22 November 2026
 > Cakupan: jejak audit identitas dan keamanan yang append-only
 
-Dokumen ini menerjemahkan baseline audit Identity Core ke dalam skema PostgreSQL. Migration ini hanya menyediakan penyimpanan dan perlindungan struktur data; backend belum otomatis menulis event dan belum ada principal runtime yang memperoleh grant.
+Dokumen ini menerjemahkan baseline audit Identity Core ke dalam skema PostgreSQL. Migration ini menyediakan penyimpanan dan perlindungan struktur data. Backend telah menyediakan API terkontrol untuk menambahkan event audit; hak INSERT aplikasi baru tersedia setelah skrip bootstrap privilege dijalankan. Event tidak ditulis otomatis tanpa pemanggilan API tersebut.
 
 ## 1. Batas implementasi
 

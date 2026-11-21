@@ -1,6 +1,6 @@
 # Kontrak Skema Migration 0004 — Pemulihan Akun
 
-> Status: implementasi pada branch `feat/identity-account-recovery-0004`; menunggu CI dan review PR
+> Status: diimplementasikan sebagai migration SQLx dan lulus CI, termasuk pengujian integrasi PostgreSQL.
 > Tanggal: 22 November 2026
 > Cakupan: kontak pemulihan bersama, kasus pemulihan akun, dan token reset kata sandi
 
