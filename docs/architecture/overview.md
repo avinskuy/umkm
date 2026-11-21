@@ -36,6 +36,10 @@ USahapintar starts as a **modular monolith**. The frontend and backend are separ
 
 These are logical boundaries, not a requirement to create empty modules in advance. Add a module when it has real behavior and a clear contract.
 
+## Database schema
+
+The proposed relational model, integrity constraints, privacy boundaries, and migration sequence are documented in [PostgreSQL Database Schema Design](database-schema-design.md). It remains a proposal until the first migration review gate is completed.
+
 ## Data access and privacy
 
 Business owners control which business information is shared. Investor-facing data must be explicitly permitted and must not include customer-level transaction details. Data should carry provenance, reporting period, update time, and verification status.
