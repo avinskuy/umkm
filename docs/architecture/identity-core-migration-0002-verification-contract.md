@@ -1,10 +1,10 @@
 # Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP
 
-> Status: rancangan teknis untuk review sebelum migration SQL dibuat
+> Status: kontrak skema diimplementasikan pada branch `feat/identity-verification-migration-0002`; menunggu pengujian PostgreSQL dan review PR
 
-Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Dokumen ini belum mengimplementasikan tabel, endpoint, provider OTP, enkripsi, atau koneksi database pada HTTP startup.
+Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, operasi enkripsi/HMAC, atau koneksi database pada HTTP startup.
 
-Migration 0002 hanya mencakup sesi verifikasi, challenge OTP, dan event pengiriman untuk rate limit kontak lintas sesi/instance. Recovery contacts, account recovery cases, password reset, login sessions, audit, dan notifikasi tetap berada pada slice terpisah.
+Migration 0002 mencakup sesi verifikasi, challenge OTP, event percobaan verifikasi lintas sesi, dan event pengiriman untuk rate limit kontak lintas sesi/instance. Recovery contacts, account recovery cases, password reset, login sessions, audit, dan notifikasi tetap berada pada slice terpisah.
 
 ## 1. Tujuan dan batas
 
@@ -229,7 +229,7 @@ Migration SQL 0002 baru boleh dibuat setelah review memastikan:
 - [ ] Kontrak purpose dan channel sesuai alur produk yang disetujui.
 - [ ] Representasi ciphertext/HMAC/key version cocok dengan abstraksi key provider yang akan dipakai backend.
 - [ ] Operasi advisory lock dan rotasi HMAC tidak membuka bypass untuk pengiriman maupun percobaan verifikasi.
-- [ ] Ambang dan jendela percobaan gagal lintas sesi ditetapkan sebelum runtime OTP diaktifkan.
+- [x] Ambang percobaan gagal lintas sesi ditetapkan: 5 kegagalan per kontak dalam jendela bergulir 60 menit. Runtime tetap wajib menegakkan limit ini secara atomik sebelum OTP diaktifkan.
 - [ ] Semua constraint, partial index, FK, dan state transition sudah ditinjau.
 - [ ] Rencana transaksi resend, verifikasi, reset lock, dan cleanup jelas.
 - [ ] Tes PostgreSQL untuk concurrency dan batas waktu sudah dirancang.
