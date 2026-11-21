@@ -5,6 +5,7 @@ DO $ownership_guard$
 DECLARE
     v_function_owner TEXT;
     v_users_owner TEXT;
+    v_identities_owner TEXT;
     v_audit_owner TEXT;
     v_database_owner TEXT;
     v_owner_is_privileged BOOLEAN;
@@ -33,14 +34,20 @@ BEGIN
      WHERE c.oid = 'public.users'::pg_catalog.regclass;
 
     SELECT pg_catalog.pg_get_userbyid(c.relowner)
+      INTO v_identities_owner
+      FROM pg_catalog.pg_class AS c
+     WHERE c.oid = 'public.user_identities'::pg_catalog.regclass;
+
+    SELECT pg_catalog.pg_get_userbyid(c.relowner)
       INTO v_audit_owner
       FROM pg_catalog.pg_class AS c
      WHERE c.oid = 'public.identity_audit_events'::pg_catalog.regclass;
 
     IF v_users_owner IS DISTINCT FROM 'usahapintar_migrator'
+       OR v_identities_owner IS DISTINCT FROM 'usahapintar_migrator'
        OR v_audit_owner IS DISTINCT FROM 'usahapintar_migrator' THEN
         RAISE EXCEPTION
-            'Refusing application grants: Identity Core tables must be owned by usahapintar_migrator';
+            'Refusing application grants: users, user_identities, and audit tables must be owned by usahapintar_migrator';
     END IF;
 
     SELECT r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole
