@@ -147,6 +147,8 @@ Content:
 - A small existing-account link routes to the role-specific login choice.
 - No Admin option.
 - Role choice must be stored as part of the registration flow and validated by the backend; the user cannot self-select Admin.
+- The selected client role is permanent for that account. Explain before submission that an account cannot switch between Business Owner and Investor later.
+- If a person wants to use the other role, they must register a separate new account using login identities that are not already linked to another account. Do not offer a role-switch control or a support-based role migration path.
 
 ## 5. Owner login — `/masuk/pemilik`
 
@@ -174,11 +176,11 @@ Content:
 
 ### Role mismatch behavior
 
-If an Investor attempts to sign in through the Owner portal, show a neutral message such as:
+The account role is fixed at registration. If an Investor attempts to sign in through the Owner portal, show a neutral message such as:
 
 **Akun ini tidak dapat masuk melalui halaman Pemilik Usaha. Coba halaman masuk Investor.**
 
-Provide a link to the Investor login page. The server must enforce the role match; hiding routes in the frontend is not authorization.
+Provide a link to the Investor login page. The server must enforce the role match; hiding routes in the frontend is not authorization. Do not offer to convert the account to Owner. A person who wants an Owner account must complete a separate registration with eligible, unlinked login identities.
 
 ### Error and recovery states
 

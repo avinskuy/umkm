@@ -12,7 +12,7 @@ This document defines the first authentication architecture for USahapintar. It 
 ### In scope
 
 - Public registration for Business Owner and Investor only.
-- One primary account role per user in the MVP.
+- Exactly one immutable primary client role (`owner` or `investor`) per account.
 - Separate Owner and Investor login entry points.
 - Email/password and phone OTP authentication.
 - Google OAuth sign-in and carefully controlled account linking.
@@ -34,15 +34,17 @@ This document defines the first authentication architecture for USahapintar. It 
 ### Non-negotiable invariants
 
 1. The backend is authoritative for identity, primary role, account status, and permissions.
-2. The frontend never grants access based only on route visibility or local state.
-3. An Owner account cannot authenticate through the Investor portal and vice versa.
-4. Admin accounts are provisioned internally; no public endpoint can create an Admin.
-5. A conversation requires an accepted connection between its participants.
-6. Free membership does not block messaging after connection approval.
-7. OAuth does not silently change an account's role or merge identities.
-8. Passwords, OTPs, access tokens, session secrets, and reset tokens are never written to application logs.
-9. Every sensitive mutation is validated against the authenticated user and target resource.
-10. The system must not reveal whether an email or phone number belongs to an account through unauthenticated recovery or registration responses.
+2. Each client account has exactly one primary role, selected at registration; the role is immutable for the lifetime of that account.
+3. A person who wants the other client role must create a separate new account using login identities not already linked to an existing account.
+4. The frontend never grants access based only on route visibility or local state.
+5. An Owner account cannot authenticate through the Investor portal and vice versa.
+6. Admin accounts are provisioned internally; no public endpoint can create an Admin.
+7. A conversation requires an accepted connection between its participants.
+8. Free membership does not block messaging after connection approval.
+9. OAuth does not silently change an account's role or merge identities.
+10. Passwords, OTPs, access tokens, session secrets, and reset tokens are never written to application logs.
+11. Every sensitive mutation is validated against the authenticated user and target resource.
+12. The system must not reveal whether an email or phone number belongs to an account through unauthenticated recovery or registration responses.
 
 ## 2. Identity and role model
 
@@ -54,9 +56,9 @@ Use a single primary role for the MVP:
 - `investor`
 - `admin`
 
-The role is assigned during registration for Owner/Investor and is immutable through ordinary profile editing. Admin is assigned only through an internal provisioning workflow.
+The role is assigned during registration for Owner/Investor and is immutable for the lifetime of the account. Admin is assigned only through an internal provisioning workflow. No profile endpoint, support process, administrative migration, or OAuth flow may change an existing account's primary role.
 
-A role change is an explicit account migration/support operation requiring identity verification, data ownership review, and audit logging. It is not a normal self-service toggle.
+A person who wants to operate as the other client role must create a separate new account. Registration must reject login identities that are already linked to another account without disclosing which account owns them. Releasing an identity from a closed account, if ever supported, must follow a separately defined account-closure, verification, and retention policy; it must never silently transfer an identity or merge accounts.
 
 ### Authorization layers
 
@@ -336,7 +338,7 @@ Account linking rules:
 | Investor login portal | No session | Reject mismatch | Investor only | Internal Admin portal only |
 | Manage own business profile | No | Own resources | No | Only with explicit review permission |
 | Publish Owner promotion post | No | Yes, subject to quota/moderation | No | Moderation only |
-| Publish partnership-seeking post | No | Only if product policy later allows | Yes, subject to quota/moderation | Moderation only |
+| Publish partnership-seeking post | No | No | Yes, subject to Investor quota/moderation | Moderation only |
 | Discover eligible opportunities | Public preview only | Authenticated | Authenticated | Operational review |
 | Request connection | No | Yes | Yes | Not as an ordinary user |
 | Accept/reject own connection request | No | Own requests | Own requests | No routine impersonation |
@@ -396,6 +398,9 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Password hash/verify behavior.
 - Email and phone normalization.
 - Role parsing and expected-role comparison.
+- Primary role is immutable after account creation; no profile, support, or admin workflow can mutate it.
+- Separate registration is required to create an account for the other client role.
+- Duplicate email, phone, or provider identities cannot be linked to a second account.
 - Verification challenge expiry, attempt limits, and one-time consumption.
 - Password reset token expiry and single-use behavior.
 - Session expiry and revocation.
@@ -416,7 +421,8 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Suspended accounts cannot use existing sessions.
 - OAuth state mismatch/expired state/invalid audience/invalid issuer are rejected.
 - Duplicate provider subject cannot be linked to a second user.
-- Account linking requires fresh proof of both identities.
+- Account linking requires fresh proof of both identities and cannot change the account's primary role.
+- OAuth login with a role context that differs from the linked account is rejected; it must not silently create a second account using the same provider subject.
 - Unauthorized user cannot read/update another user's business or profile.
 - Non-participant cannot read a conversation.
 - Chat access is granted only after a connection is accepted.
