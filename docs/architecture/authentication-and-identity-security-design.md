@@ -14,9 +14,9 @@ This document defines the first authentication architecture for USahapintar. It 
 - Public registration for Business Owner and Investor only.
 - Exactly one immutable primary client role (`owner` or `investor`) per account.
 - Separate Owner and Investor login entry points.
-- Email/password and phone OTP authentication.
-- Google OAuth sign-in and carefully controlled account linking.
-- Email and phone verification.
+- Email/password and phone OTP authentication remain proposed login capabilities, subject to the login-model decision in the Identity Core decision record.
+- Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
+- Google OAuth behavior is unresolved; do not implement OAuth account creation or linking until approved.
 - Password recovery.
 - Session lifecycle and logout.
 - Server-side role and resource authorization.
@@ -87,13 +87,14 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | --- | --- |
 | `id` | UUID primary key |
 | `full_name` | Display name |
-| `email_normalized` | Normalized email, nullable until collected/verified according to registration policy |
-| `phone_e164` | Normalized phone number, nullable |
-| `password_hash` | Argon2id password hash; nullable for provider-only accounts |
+| `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
+| `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
+| `password_hash` | Argon2id password hash; nullability depends on the still-open password/login policy |
 | `primary_role` | Owner, Investor, or Admin |
 | `account_status` | Pending verification, active, suspended, or closed |
-| `email_verified_at` | Verification timestamp |
-| `phone_verified_at` | Verification timestamp |
+| `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
+| `email_verified_at` | Verification timestamp, independently nullable |
+| `phone_verified_at` | Verification timestamp, independently nullable |
 | `created_at`, `updated_at` | Audit timestamps |
 | `closed_at` | Account closure timestamp, if applicable |
 
@@ -152,7 +153,7 @@ Supports email and phone verification without storing usable codes.
 | --- | --- |
 | `id` | UUID primary key |
 | `user_id` | Related user, nullable only for pre-account registration flow if necessary |
-| `channel` | Email or phone |
+| `channel` | email or whatsapp; phone is the normalized destination, WhatsApp is the delivery channel |
 | `destination_hash` | Hash or protected reference to destination |
 | `code_hash` | Hash of a high-entropy one-time code |
 | `purpose` | Registration verification or contact change |
@@ -203,8 +204,8 @@ All routes are versioned under `/api/v1`. JSON request/response shapes should be
 | POST | `/auth/register/investor` | Create Investor account in pending-verification state |
 | POST | `/auth/verification/email/request` | Request/resend email verification |
 | POST | `/auth/verification/email/confirm` | Confirm email challenge |
-| POST | `/auth/verification/phone/request` | Request/resend phone OTP |
-| POST | `/auth/verification/phone/confirm` | Confirm phone OTP |
+| POST | `/auth/verification/whatsapp/request` | Request/resend a phone verification code delivered through WhatsApp |
+| POST | `/auth/verification/whatsapp/confirm` | Confirm the WhatsApp-delivered phone verification code |
 
 There is intentionally no `/auth/register/admin` endpoint.
 
@@ -224,15 +225,9 @@ There is intentionally no `/auth/register/admin` endpoint.
 
 The login endpoints must check the expected role on the server. A mismatch returns a generic role-portal guidance response without exposing additional account details.
 
-### Google OAuth
+### Google OAuth — decision pending
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| GET | `/auth/oauth/google/start?role=owner` | Begin Owner-context OAuth |
-| GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
-| GET | `/auth/oauth/google/callback` | Validate provider response and complete or continue the flow |
-
-OAuth state and nonce are generated and validated server-side. The role context is integrity-protected and cannot be changed by an untrusted callback parameter. Use an exact allowlist of redirect URIs.
+Google OAuth routes are not approved for implementation yet. The product decision record must establish whether Google can create an account, only link to an already verified account, or is excluded from the MVP. Until then, do not expose Google registration/sign-in actions or implement OAuth callbacks. If later approved, state, nonce, issuer, audience, signature, expiry, role context, and exact redirect URI validation remain mandatory.
 
 ### Admin authentication
 
@@ -321,7 +316,7 @@ On callback, validate at minimum:
 - Provider subject is present and stable.
 - The requested role context is the same as the initiated flow.
 
-If provider identity is already linked, authenticate the linked account only if its role matches the selected portal. If the identity is new, continue the same role-specific registration flow.
+Google OAuth account creation and login behavior are unresolved. Do not implement the prior proposed behavior of continuing registration for a new provider identity until the Identity Core decision record is approved.
 
 Account linking rules:
 1. Require an authenticated session on the existing account.
