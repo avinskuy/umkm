@@ -63,7 +63,7 @@ Existing linked Google identities authenticate only their existing account. Neve
 - Issuing a new OTP immediately invalidates the prior code for the same purpose and destination.
 - A new code does not clear the verification-session failure lock or delivery rate limits.
 - All counters, expiry, invalidation, and cooldown enforcement are server-side and concurrency-safe. Client countdowns are presentation only.
-- OTPs are six-digit numeric codes for the initial baseline, generated cryptographically, stored only as keyed hashes, never logged in plaintext, bound to a purpose and destination, and consumed atomically once.
+- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode dibuat secara acak dengan sumber kriptografis yang aman, disimpan sebagai keyed hash, tidak pernah dicatat dalam log sebagai teks asli, terikat pada tujuan dan alamat penerima, serta hanya dapat digunakan satu kali secara atomik.
 - Delivery failure never marks a contact verified. Responses must not reveal whether a contact is already registered.
 - Pending registration lifetime is **30 minutes**, independently of the 10-minute OTP lifetime. Expiry cleanup must be idempotent and must never delete an activated account.
 
@@ -102,4 +102,4 @@ Email and WhatsApp Business/API providers are not yet selected. Keep provider ad
 
 ## Implementation gate
 
-Identity Core migrations and runtime endpoints may begin after this approved policy baseline is translated into reviewed schema constraints, provider boundaries are defined, concurrency/expiry/cleanup/privacy design is reviewed, and the test plan is approved. Provider selection, exact operational thresholds, retention schedules, and Google-only local-password setup remain open technical/product items. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. All policies remain revisable through explicit product/security review.
+Migration Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan yang sudah disetujui diterjemahkan menjadi batasan skema yang ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. All policies remain revisable through explicit product/security review.
