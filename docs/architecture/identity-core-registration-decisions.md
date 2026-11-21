@@ -1,6 +1,6 @@
 # Identity Core — Registration Decisions
 
-> Status: approved product-policy baseline for Identity Core; detailed technical design, provider selection, and security review remain required before implementation.
+> Status: batas awal kebijakan produk Identity Core telah disetujui; rancangan teknis terperinci, pemilihan penyedia layanan, dan tinjauan keamanan tetap harus diselesaikan sebelum implementasi.
 
 ## Approved registration policy
 
@@ -19,7 +19,7 @@
 
 ## Role and identity invariants
 
-- Each client account has exactly one immutable persisted primary role: `business_owner` or `investor`.
+- Setiap akun klien hanya memiliki satu role utama yang disimpan secara permanen dan tidak dapat diubah: `business_owner` atau `investor`.
 - A person who wants the other role must register a separate account using a different, eligible, unlinked contact identity.
 - Admin accounts are provisioned internally and cannot use public registration.
 - Identity linking must prove control of both the existing account and the new identity. Matching email text alone is never sufficient.
@@ -35,7 +35,7 @@
 6. In one transaction, consume the challenge, mark the selected contact verified, and activate the account only when all account-creation conditions are satisfied.
 7. User continues to role-specific onboarding.
 
-Pending registration expires after **30 minutes** if required contact verification is not completed. Expiry and cleanup must be atomic and idempotent, safely release eligible pending contact reservations, and never delete an activated account. Prevent duplicate active pending registrations and reservation races.
+Pendaftaran tertunda kedaluwarsa setelah **30 menit** jika verifikasi kontak yang diwajibkan belum selesai. Proses kedaluwarsa dan pembersihan harus atomik serta idempotent, melepaskan reservasi kontak tertunda yang memenuhi syarat dengan aman, dan tidak pernah menghapus akun yang sudah aktif. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
 
 ## Data-model implications (proposal only)
 
@@ -100,6 +100,6 @@ Dukung alur **lupa kata sandi** dan **lupa email** melalui email pemulihan dan/a
 
 Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia yang dapat diganti, simpan kredensial di sisi server, dan tetapkan pemantauan pengiriman, percobaan ulang, batas biaya, persyaratan pengirim/template, penanggung jawab operasional, serta penanganan insiden sebelum produksi. Parameter hashing kata sandi, konfigurasi penyedia, jadwal retensi, MFA/pemulihan Admin, dan ambang operasional juga harus ditetapkan melalui tinjauan keamanan. Jangan membuat kredensial produksi atau menyimpan rahasia di source control.
 
-## Implementation gate
+## Gerbang implementasi
 
-Migration Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan yang sudah disetujui diterjemahkan menjadi batasan skema yang ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. All policies remain revisable through explicit product/security review.
+Migrasi Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan yang disetujui diterjemahkan menjadi batasan skema yang telah ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
