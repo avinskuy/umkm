@@ -53,7 +53,7 @@ CREATE TABLE public.users (
         ),
 
     CONSTRAINT users_password_hash_check
-        CHECK (password_hash IS NULL OR length(btrim(password_hash)) > 0),
+        CHECK (password_hash IS NULL OR (length(btrim(password_hash)) > 0 AND password_hash = btrim(password_hash))),
 
     CONSTRAINT users_account_state_check
         CHECK (
@@ -160,7 +160,7 @@ CREATE TABLE public.user_identities (
         CHECK (provider = 'google'),
 
     CONSTRAINT user_identities_provider_subject_check
-        CHECK (length(btrim(provider_subject)) > 0),
+        CHECK (length(btrim(provider_subject)) > 0 AND provider_subject = btrim(provider_subject)),
 
     CONSTRAINT user_identities_provider_subject_uidx
         UNIQUE (provider, provider_subject)
@@ -175,6 +175,16 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog
 AS $$
 BEGIN
+    IF NEW.id IS DISTINCT FROM OLD.id THEN
+        RAISE EXCEPTION 'user id is immutable'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+        RAISE EXCEPTION 'user created_at is immutable'
+            USING ERRCODE = '23514';
+    END IF;
+
     IF NEW.primary_role IS DISTINCT FROM OLD.primary_role THEN
         RAISE EXCEPTION 'primary_role is immutable'
             USING ERRCODE = '23514';
@@ -262,9 +272,11 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog
 AS $$
 BEGIN
-    IF NEW.user_id IS DISTINCT FROM OLD.user_id
+    IF NEW.id IS DISTINCT FROM OLD.id
+       OR NEW.user_id IS DISTINCT FROM OLD.user_id
        OR NEW.provider IS DISTINCT FROM OLD.provider
-       OR NEW.provider_subject IS DISTINCT FROM OLD.provider_subject THEN
+       OR NEW.provider_subject IS DISTINCT FROM OLD.provider_subject
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
         RAISE EXCEPTION 'provider identity binding is immutable'
             USING ERRCODE = '23514';
     END IF;
@@ -403,12 +415,14 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    IF p_password_hash IS NOT NULL AND length(btrim(p_password_hash)) = 0 THEN
+    IF p_password_hash IS NOT NULL
+       AND (length(btrim(p_password_hash)) = 0 OR p_password_hash <> btrim(p_password_hash)) THEN
         RAISE EXCEPTION 'password hash cannot be empty'
             USING ERRCODE = '22023';
     END IF;
 
-    IF p_google_subject IS NOT NULL AND length(btrim(p_google_subject)) = 0 THEN
+    IF p_google_subject IS NOT NULL
+       AND (length(btrim(p_google_subject)) = 0 OR p_google_subject <> btrim(p_google_subject)) THEN
         RAISE EXCEPTION 'Google provider subject cannot be empty'
             USING ERRCODE = '22023';
     END IF;
