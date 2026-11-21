@@ -32,7 +32,7 @@ Invariant:
 
 1. Insert hanya diterima bila sesi verifikasi sudah `verified`, purpose-nya `recovery_contact_add`, akun dan kanal cocok, serta HMAC dan versi key sama dengan sesi.
 2. Database menetapkan `verified_at` dari sesi verifikasi; caller tidak dapat mengklaim waktu verifikasi sendiri.
-3. Unique partial index mencegah satu akun memiliki dua kontak aktif dengan kanal dan fingerprint yang sama.
+3. Unique partial index mencegah satu akun memiliki dua kontak aktif dengan kanal dan fingerprint yang sama. Indeks non-unik terpisah mendukung pencarian fingerprint setelah verifikasi untuk menemukan akun-akun yang terkait.
 4. Tidak ada unique constraint global pada fingerprint. Kontak yang sama boleh terhubung ke beberapa akun; hal ini hanya membuktikan kendali atas kontak, bukan kepemilikan semua akun.
 5. Data identitas dan bukti verifikasi tidak dapat diubah setelah dibuat. Pencabutan bersifat satu arah; penambahan kembali memerlukan verifikasi baru.
 6. Kontak utama pendaftaran tetap mengikuti unique reservation pada `users`; kebijakan berbagi ini hanya berlaku untuk kontak pemulihan opsional.
