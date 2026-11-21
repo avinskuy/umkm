@@ -147,7 +147,7 @@ Opaque, server-managed sessions.
 | `remember_device` | Penanda persistensi cookie browser; tidak mengubah batas idle maupun absolut |
 | `revoked_at`, `revocation_reason` | Waktu dan alasan pencabutan server-side |
 | `user_agent_summary` | Ringkasan perangkat opsional, diminimalkan dan dibatasi panjangnya |
-| `ip_prefix_hash` | HMAC/hash prefix jaringan opsional; bukan alamat IP mentah |
+| `ip_prefix_hash`, `ip_prefix_hmac_key_version` | HMAC prefix jaringan opsional beserta versi key; bukan alamat IP mentah |
 
 Constraints:
 - Simpan hanya hash kriptografis token sesi berentropi tinggi, bukan token asli. Skema mensyaratkan digest 32 byte dan keunikan global.
@@ -156,7 +156,7 @@ Constraints:
 - Rotasi token dilakukan setelah autentikasi dan perubahan privilege; hash lama diganti secara atomik dan timestamp rotasi diperbarui database.
 - Pencabutan sesi harus segera berlaku dari server. Logout, pencabutan satu perangkat, logout semua perangkat, reset password, perubahan status akun, tindakan Admin, dan peristiwa keamanan memiliki reason code yang eksplisit.
 - Perubahan lifecycle akun dari `active` ke status lain otomatis mencabut seluruh sesi yang belum dicabut. Restriksi/suspensi moderasi dan peristiwa keamanan lain tetap harus memicu pencabutan melalui runtime.
-- Jangan mengumpulkan alamat IP penuh atau fingerprint perangkat lengkap tanpa kebutuhan keamanan dan kebijakan retensi yang terdokumentasi.
+- Hash prefix jaringan, jika digunakan, harus berupa HMAC berkunci dan menyimpan versi key agar rotasi dapat dikelola. Jangan mengumpulkan alamat IP penuh atau fingerprint perangkat lengkap tanpa kebutuhan keamanan dan kebijakan retensi yang terdokumentasi.
 
 ### `verification_challenges`
 
