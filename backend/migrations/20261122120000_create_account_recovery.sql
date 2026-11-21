@@ -331,6 +331,7 @@ SET search_path = pg_catalog
 AS $$
 DECLARE
     v_case_status TEXT;
+    v_case_action TEXT;
     v_case_target_user_id UUID;
     v_account_status TEXT;
 BEGIN
@@ -340,12 +341,12 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
-        SELECT status, target_user_id
-        INTO v_case_status, v_case_target_user_id
+        SELECT status, requested_action, target_user_id
+        INTO v_case_status, v_case_action, v_case_target_user_id
         FROM public.account_recovery_cases
         WHERE id = NEW.recovery_case_id;
 
-        IF NOT FOUND OR v_case_status <> 'approved' OR v_case_target_user_id IS DISTINCT FROM NEW.user_id THEN
+        IF NOT FOUND OR v_case_status <> 'approved' OR v_case_action <> 'password_reset' OR v_case_target_user_id IS DISTINCT FROM NEW.user_id THEN
             RAISE EXCEPTION 'password reset token requires an approved recovery case for the same account'
                 USING ERRCODE = '23514';
         END IF;
