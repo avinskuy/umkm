@@ -172,6 +172,16 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
+        IF NEW.failed_attempt_count > OLD.failed_attempt_count
+           AND NEW.failed_attempt_count <> OLD.failed_attempt_count + 1 THEN
+            RAISE EXCEPTION 'verification attempt counter must increase one attempt at a time'
+                USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.failed_attempt_count = 5 AND OLD.failed_attempt_count = 4 THEN
+            NEW.locked_until := clock_timestamp() + INTERVAL '1 hour';
+        END IF;
+
         IF NEW.failed_attempt_count < OLD.failed_attempt_count
            AND NOT (
                OLD.status = 'pending'
