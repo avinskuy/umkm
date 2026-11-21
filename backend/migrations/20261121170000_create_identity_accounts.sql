@@ -186,8 +186,12 @@ BEGIN
     END IF;
 
     IF OLD.initial_contact_verified_at IS NOT NULL
-       AND NEW.initial_contact_verified_at IS DISTINCT FROM OLD.initial_contact_verified_at THEN
-        RAISE EXCEPTION 'initial_contact_verified_at is immutable once set'
+       AND NEW.initial_contact_verified_at IS DISTINCT FROM OLD.initial_contact_verified_at
+       AND NOT (
+           NEW.account_status = 'closed'
+           AND NEW.initial_contact_verified_at IS NULL
+       ) THEN
+        RAISE EXCEPTION 'initial_contact_verified_at is immutable except for completed account deletion'
             USING ERRCODE = '23514';
     END IF;
 
