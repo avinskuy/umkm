@@ -174,7 +174,7 @@ Lima penghalang teknis dari tinjauan awal telah memiliki baseline keputusan dala
 
 1. **Perlindungan tujuan OTP:** ciphertext AEAD untuk kebutuhan pengiriman ulang, HMAC terpisah untuk pencarian dan pembatasan, key di luar database, serta rotasi versi secara terencana.
 2. **Rate limit lintas sesi:** event pengiriman persisten di PostgreSQL, jendela bergulir 60 menit, cooldown 60 detik, dan serialisasi transaksi per fingerprint tujuan agar berlaku lintas koneksi/instance.
-3. **Status akun final:** `pending_verification`, `active`, `suspended`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`; reservasi kontak mengikuti status dan hanya dilepas setelah transisi terminal yang sah.
+3. **Status akun final:** `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`; suspend/limit fitur dicatat terpisah sebagai enforcement agar tidak bertabrakan dengan lifecycle penghapusan. Reservasi kontak hanya dilepas setelah transisi terminal yang sah.
 4. **Provisioning Admin:** jalur internal terpisah, principal/kredensial provisioning terpisah dari runtime API publik, role immutable, audit, dan bootstrap MFA sebelum akses istimewa.
 5. **Audit boundary:** tabel audit khusus, principal aplikasi insert-only, pemilik tabel terpisah, metadata allowlist, dan larangan menyimpan rahasia atau isi privat.
 
