@@ -40,6 +40,7 @@ Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelol
 - [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md)
 - [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](../architecture/identity-core-shared-recovery-contacts.md)
 - [Authentication & Identity Security Design](../architecture/authentication-and-identity-security-design.md)
+- [Desain Integrasi Key Management Identity Core](key-management-runtime-design.md)
 - [Prinsip Pengalaman Pengguna yang Inklusif](../product/prinsip-pengalaman-pengguna.md)
 - [Kebijakan Keamanan Repository](../../SECURITY.md)
 - [Panduan Kontribusi](../../CONTRIBUTING.md)
