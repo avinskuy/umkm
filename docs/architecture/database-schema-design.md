@@ -49,8 +49,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 | --- | --- | --- |
 | `users` | Account identity, immutable primary role, account status, normalized contact values, optional password hash | Unique non-null normalized email and phone; role check; status check; role immutable after insert |
 | `user_identities` | External provider identities such as Google | Unique (`provider`, `provider_subject`); FK to user; never auto-link by matching email |
-| `sessions` | Opaque revocable server sessions | Unique token hash; expiry after creation; revocation timestamp; FK to user |
-| `verification_challenges` | Email/phone verification and approved OTP flows | Store keyed hash, purpose, expiry, attempt count and consumed timestamp; one-time use |
+| `sessions` | Opaque revocable server sessions | Unique token hash; 7-day idle and 30-day absolute expiry baseline; persistent-cookie preference; revocation timestamp; FK to user |
+| `verification_sessions` | Aggregate verification flow state across OTP resends | Five-failure budget and one-hour lockout survive replacement codes; purpose/destination binding; durable cooldown state |
+| `verification_challenges` | Individual email/WhatsApp OTP codes | Keyed hash, 10-minute expiry, supersession/consumption timestamps; one-time use; linked verification session |
+| `recovery_contacts` | Optional independently verified recovery email/phone | Normalized destination, channel, verified status/time, ownership FK, lifecycle and notification audit |
+| `account_recovery_cases` | Forgot-password, forgot-email, and alternative recovery workflow | Purpose/status, expiry, risk outcome, reviewer assignment and audit references; no raw secrets/evidence in general logs |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
 
@@ -62,6 +65,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 - Provider identity is keyed by the provider's stable subject, not email text.
 - Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
 - Verification challenges must support rate limiting, attempt caps, short expiry, resend cooldown, and invalidation of superseded challenges. OTP hashing must use a keyed construction suitable for short numeric codes.
+- Verification-session failure state must be separate from individual OTP challenge rows so resend cannot reset the five-attempt budget or one-hour lockout. Enforce 60-second resend cooldown and five sends per destination per hour durably across instances.
+- Pending registrations expire after 30 minutes; cleanup must be idempotent, concurrency-safe, and unable to delete activated accounts.
+- Session records must support a seven-day idle timeout and 30-day absolute timeout, Remember this device without bypassing either limit, individual revocation, and logout-all.
+- Recovery contacts are optional after activation and independently verified. Full primary email disclosure is permitted only after successful verification of a linked recovery contact. Alternative recovery cases need trusted-device/session signals and specially authorized manual review when automated evidence is insufficient.
+- Account status design must distinguish temporary deactivation from permanent deletion. Permanent deletion has a 30-day waiting/cancellation period before processing; retention and backup handling must be specified by data category.
 
 ### B. Profiles and business information
 
