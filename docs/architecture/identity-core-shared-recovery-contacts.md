@@ -37,9 +37,8 @@ Implikasi:
 
 - Jangan membuat unique constraint global pada nilai email maupun nomor HP pemulihan; setiap kontak dapat memiliki beberapa baris relasi pemilik.
 - Gunakan indeks non-unik berdasarkan kanal dan keyed hash kontak untuk menemukan akun-akun yang terhubung tanpa membuka nilai kontak.
-- Simpan relasi pemilik kontak melalui foreign key ke akun; relasi satu nomor HP ke beberapa akun direpresentasikan melalui beberapa baris.
+- Simpan relasi pemilik kontak melalui foreign key ke akun; relasi satu email atau nomor HP ke beberapa akun direpresentasikan melalui beberapa baris.
 - Simpan nilai kontak secara aman. Untuk pencarian dan deduplikasi, gunakan representasi normalisasi serta keyed hash yang stabil dan dikelola server. Jika nilai asli perlu dikirim ulang atau ditampilkan kepada pemiliknya, lindungi dengan enkripsi yang sesuai; jangan gunakan hash sebagai pengganti data yang harus dipulihkan.
-- Terapkan indeks non-unik untuk mencari relasi email maupun nomor HP berdasarkan kanal dan keyed hash kontak. Hindari indeks yang membuat nilai kontak terbuka atau mudah ditebak.
 - Perubahan, penghapusan, verifikasi ulang, dan pelepasan kontak harus dicatat serta diberi notifikasi yang sesuai.
 - Kontak pemulihan yang sama pada beberapa akun tidak boleh menyebabkan akun-akun tersebut digabungkan, saling berbagi sesi, atau mewarisi role.
 
@@ -79,7 +78,7 @@ Strategi penyimpanan akhir (tabel penghitung, bucket waktu, atau layanan rate-li
 - Selama masa tunggu, kontak tersebut tidak dapat dipakai untuk membuat akun baru.
 - Pembatalan penghapusan memerlukan verifikasi keamanan; akun dipulihkan sesuai pemeriksaan status dan risiko.
 - Setelah penghapusan permanen selesai, penggunaan ulang kontak mengikuti kebijakan retensi dan pelepasan identitas yang terpisah.
-- Kebijakan ini hanya berlaku pada kontak utama yang menjadi identitas pendaftaran. Jangan menerapkan unique constraint global pada nomor HP pemulihan yang boleh digunakan bersama; kebijakan email pemulihan tetap menunggu keputusan terpisah.
+- Kebijakan reservasi ini hanya berlaku pada kontak utama yang menjadi identitas pendaftaran. Email dan nomor HP pemulihan yang boleh digunakan bersama tidak tunduk pada unique constraint global.
 - Proses pembersihan harus mengunci/memeriksa status akun secara aman dan tidak boleh melepaskan reservasi jika penghapusan dibatalkan atau akun aktif kembali.
 
 Rancangan constraint dan indeks harus membedakan kontak utama pada users dari relasi di recovery_contacts. Jangan mengandalkan validasi frontend untuk menjamin reservasi.
