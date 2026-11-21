@@ -5,6 +5,8 @@
 //! append-only. Endpoint HTTP dan autentikasi belum termasuk dalam modul ini.
 
 mod audit;
+pub mod crypto;
+pub mod password;
 mod registration;
 
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
