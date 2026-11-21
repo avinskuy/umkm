@@ -71,9 +71,9 @@ Jalankan pemeriksaan yang relevan sebelum membuka pull request:
 - Seluruh CI harus berstatus hijau sebelum merge.
 - Fitur yang menyentuh alur utama pengguna harus memiliki bukti pengujian usability yang relevan atau mencatat keterbatasan serta rencana pengujian lanjutan.
 
-## Standar keamanan
+## Standar keamanan, privasi, dan tata kelola data
 
-Kebijakan keamanan dan perlindungan data yang telah disetujui dirangkum dalam [Indeks Kebijakan Keamanan](../security/README.md). Dokumen tersebut mencakup kontrol akses, klasifikasi data, enkripsi, logging dan audit, keamanan API dan integrasi, keamanan database, serta infrastruktur dan deployment.
+Kebijakan keamanan dan perlindungan data dirangkum dalam [Indeks Kebijakan Keamanan, Privasi & Perlindungan Data](../security/README.md). Cakupannya meliputi kontrol akses, klasifikasi L1–L4, enkripsi, logging dan audit, API, database, infrastruktur, supply chain, privasi, persetujuan, retensi, serta pembagian data pihak ketiga.
 
 Persetujuan kebijakan merupakan baseline desain dan implementasi; hal tersebut tidak otomatis membuktikan kontrol telah diterapkan, diuji, atau tersertifikasi. Setiap perubahan harus mengikuti ruang lingkup, prioritas risiko, dan bukti penerapan yang relevan.
 
@@ -82,6 +82,6 @@ Persetujuan kebijakan merupakan baseline desain dan implementasi; hal tersebut t
 - [Strategi Pengujian & Quality Assurance](testing-strategy-quality-assurance.md) mengatur tingkat pengujian, security testing, regression, accessibility, bukti QA, dan release quality gate.
 - [Performance, Scalability & Reliability](performance-scalability-reliability.md) mengatur pengukuran, kapasitas, ketahanan terhadap kegagalan, dan optimasi berbasis bukti.
 - [Secure Software Development Lifecycle](secure-software-development-lifecycle.md) mengatur integrasi keamanan dari perencanaan sampai pemeliharaan.
-- [Kebijakan Keamanan Dependency & Komponen Pihak Ketiga](../security/dependency-third-party-security.md) mengatur supply chain software, package, SDK, dan vendor.
+- [Kebijakan Keamanan Dependency & Komponen Pihak Ketiga](../security/dependency-third-party-security.md) mengatur supply chain software, package, SDK, dan komponen vendor.
 
 Dokumen tersebut merupakan baseline kebijakan. Status implementasi setiap kontrol harus dibuktikan melalui kode, konfigurasi, hasil pengujian, atau catatan operasional yang relevan.
