@@ -91,11 +91,14 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
 | `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
 | `primary_role` | Owner, Investor, or Admin |
-| `account_status` | Pending verification, active, suspended, or closed |
+| `account_status` | Pending verification, active, suspended, deactivated, deletion pending, deletion processing, or closed; transitions are explicit and audited |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
 | `email_verified_at` | Verification timestamp, independently nullable |
 | `phone_verified_at` | Verification timestamp, independently nullable |
 | `created_at`, `updated_at` | Audit timestamps |
+| `pending_expires_at` | 30-minute expiry for an unactivated pending registration |
+| `deactivated_at` | Temporary deactivation timestamp, if applicable |
+| `deletion_requested_at`, `deletion_due_at` | 30-day deletion waiting-period timestamps |
 | `closed_at` | Account closure timestamp, if applicable |
 
 Constraints:
@@ -134,7 +137,9 @@ Opaque, server-managed sessions.
 | `user_id` | Session owner |
 | `token_hash` | Hash of a high-entropy opaque session token |
 | `created_at`, `last_seen_at` | Activity timestamps |
-| `expires_at` | Absolute expiry |
+| `expires_at` | Absolute expiry (30 days from issuance at the initial baseline) |
+| `remember_device` | Whether the browser session uses persistent-cookie behavior; never bypasses idle/absolute expiry |
+| `last_seen_at` | Server-updated activity timestamp used to enforce the 7-day idle timeout |
 | `revoked_at` | Revocation timestamp |
 | `user_agent_summary` | Optional minimized device hint |
 | `ip_prefix_hash` | Optional privacy-preserving abuse signal, subject to retention policy |
@@ -157,17 +162,29 @@ Supports email and WhatsApp-delivered phone verification for account activation/
 | `destination_hash` | Hash or protected reference to destination |
 | `code_hash` | Hash of a high-entropy one-time code |
 | `purpose` | Registration verification or contact change |
-| `attempt_count` | Failed attempts |
-| `expires_at` | Short expiry |
+| `verification_session_id` | Parent verification flow; failure count and lockout survive OTP resend |
+| `attempt_count` | Failed attempts for this challenge |
+| `expires_at` | 10-minute expiry |
+| `superseded_at` | Set when a replacement OTP invalidates this code |
 | `consumed_at` | One-time use marker |
 | `created_at` | Creation timestamp |
 
 Controls:
+- A separate verification-session record must own the aggregate five-failure budget and one-hour lockout; issuing a new challenge must not reset it.
+- Persist or otherwise durably enforce the 60-second resend cooldown and five-send-per-hour destination limit across application instances.
 - Short expiry, one-time consumption, attempt caps, resend cooldown, and destination/account/IP rate limits.
 - Use a keyed hash/HMAC for short numeric OTPs so database disclosure alone does not make offline guessing trivial.
 - Never log code values or include them in analytics.
 - Invalidate older active challenges when a new challenge is issued for the same purpose/destination.
 - Provider delivery failures must not mark a destination as verified.
+
+### Recovery contacts and recovery cases
+
+Recovery contacts are optional and are added after account activation. Model them separately from primary login contacts so each can be independently verified, notified about, and revoked. A recovery contact must have a normalized value, channel, verification timestamp, lifecycle status, and ownership link. Enforce uniqueness/abuse policy without exposing account association.
+
+Account recovery requires a durable case/challenge lifecycle rather than a one-off boolean. Record purpose (forgot password, forgot email, or alternative recovery), status, created/expiry/review timestamps, risk outcome, and minimal audit references. Do not store submitted secrets or excessive identity evidence in general-purpose logs. Manual review assignments must reference specially authorized support principals and append-only review/audit events. Full primary email disclosure is permitted only after successful verification of a recovery contact already linked to that account.
+
+If both primary and recovery contacts are unavailable, alternative recovery must evaluate trusted-device/session signals and other ownership evidence. Insufficient automated evidence can be escalated to authorized manual review; high-risk requests can be delayed or rejected. Recovery cannot mutate the immutable primary role.
 
 ### `password_reset_tokens`
 
