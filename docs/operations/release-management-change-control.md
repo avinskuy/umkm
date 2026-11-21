@@ -1,4 +1,4 @@
-# Release Management & Change Control
+# Manajemen Rilis & Pengendalian Perubahan
 
 - **Status:** Disetujui sebagai baseline.
 - **Cakupan:** Perubahan kode, konfigurasi, schema, dependency, workflow, artifact, dan deployment.
@@ -41,7 +41,7 @@ Setiap perubahan harus menjelaskan:
 
 Perubahan yang tidak terkait sebaiknya dipisahkan agar review dan rollback lebih mudah.
 
-## 4. Review dan quality gate
+## 4. Tinjauan dan gerbang kualitas
 
 Sebelum merge atau release sesuai tahapnya:
 
@@ -65,7 +65,7 @@ Pengecualian harus menyebut alasan, dampak, mitigasi, pemilik risiko, dan masa b
 - Gunakan approval dan environment protection pada platform CI/CD jika tersedia.
 - Catat aktor, waktu, commit, artifact, environment, dan hasil release.
 
-## 6. Build dan artifact
+## 6. Build dan artefak
 
 - Build dari commit yang telah ditinjau dan diuji.
 - Catat commit SHA, versi, dependency/lockfile, hasil CI, dan artifact.
@@ -107,7 +107,7 @@ Rollback aplikasi tidak selalu berarti rollback database. Migration harus diranc
 
 Perubahan darurat harus memiliki alasan, pemilik, cakupan minimum, bukti pengujian yang memungkinkan, dan catatan tindakan. Setelah risiko terkendali, lakukan review retrospektif, lengkapi dokumentasi, dan tambahkan regression test.
 
-## 10. Release record
+## 10. Catatan rilis
 
 Catat sekurang-kurangnya:
 

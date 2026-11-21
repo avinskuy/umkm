@@ -1,4 +1,4 @@
-# Observability & Monitoring Standard
+# Standar Observabilitas & Pemantauan
 
 - **Status:** Disetujui sebagai baseline.
 - **Cakupan:** Frontend, API, backend, database, dependency, infrastruktur, dan alur operasional.
@@ -66,7 +66,7 @@ Bedakan:
 
 Health check harus ringan, tidak membocorkan konfigurasi/secret, dan tidak menghasilkan beban berlebihan. Status dependency yang tidak wajib tidak boleh selalu menjatuhkan seluruh layanan jika degradasi terbatas dapat ditangani dengan aman.
 
-## 5. Logging, privacy, dan korelasi
+## 5. Logging, privasi, dan korelasi
 
 Ikuti [Logging, Monitoring & Audit Trail Policy](../security/logging-monitoring-audit.md):
 
@@ -96,7 +96,7 @@ Dashboard sebaiknya menjawab pertanyaan operasional: apakah layanan tersedia, ap
 
 Lakukan review terhadap pola error, tren kapasitas, false positive, alert yang tidak ditindaklanjuti, dan kebutuhan instrumentasi. Frekuensi review mengikuti tingkat kritikal layanan dan kapasitas tim.
 
-## 8. Integrasi dengan incident response
+## 8. Integrasi dengan penanganan insiden
 
 Alert yang kredibel harus dapat ditautkan ke proses [Incident Response](incident-response.md). Monitoring tidak menggantikan validasi insiden, penetapan severity, atau keputusan komunikasi.
 
