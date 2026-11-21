@@ -7,9 +7,9 @@
 
 Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity Core 0001–0005 sudah menyediakan skema akun, verifikasi, sesi, pemulihan, dan audit. Backend juga sudah memiliki pool database saat startup serta akses terbatas untuk membuat akun pending dan menambahkan audit event. Namun, alur registrasi dan aktivasi lengkap, OTP runtime, endpoint login/logout, pengelolaan cookie, middleware autentikasi, pemulihan akun, dan integrasi penyedia layanan belum tersedia. Status ini bukan pernyataan bahwa sistem siap produksi atau telah diaudit keamanannya. Penyedia layanan, secret operasional, masa retensi, dan kontrol akhir tetap harus ditinjau sebelum digunakan di produksi.
 
-## 1. Scope and invariants
+## 1. Cakupan dan invariant
 
-### In scope
+### Termasuk dalam cakupan
 
 - Public registration for Business Owner and Investor only.
 - Exactly one immutable primary client role (`business_owner` or `investor`) per account.
@@ -22,7 +22,7 @@ Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity C
 - Server-side role and resource authorization.
 - Internal Admin provisioning, MFA, and audit trail foundations.
 
-### Out of scope for the first authentication slice
+### Di luar cakupan tahap awal autentikasi
 
 - Public Admin registration.
 - Multiple client roles on one account.
@@ -31,7 +31,7 @@ Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity C
 - Investment transactions, payment custody, or financial account connections.
 - A microservice split; authentication remains part of the modular monolith.
 
-### Non-negotiable invariants
+### Invariant yang wajib dipertahankan
 
 1. The backend is authoritative for identity, primary role, account status, and permissions.
 2. Each client account has exactly one primary role, selected at registration; the role is immutable for the lifetime of that account.
@@ -46,13 +46,13 @@ Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity C
 11. Every sensitive mutation is validated against the authenticated user and target resource.
 12. The system must not reveal whether an email or phone number belongs to an account through unauthenticated recovery or registration responses.
 
-## Membership and authorization boundary
+## Batas keanggotaan dan otorisasi
 
 Keanggotaan merupakan dimensi hak akses tersendiri dan tidak mengubah role utama yang bersifat tetap. Paket Free atau Premium tidak boleh memberikan kemampuan Owner kepada Investor atau sebaliknya, melewati pemeriksaan status akun, kepemilikan, consent, moderasi, maupun izin Admin, atau membuka informasi bisnis privat. Backend memeriksa autentikasi, status akun, role, izin terhadap sumber daya, dan status keamanan/moderasi sebelum mengevaluasi entitlement serta kuota keanggotaan. Lihat [Kebijakan Keanggotaan & Hak Fitur](../product/membership-and-entitlements.md) untuk kemampuan paket, aturan kuota, perilaku downgrade, dan kebutuhan pengujian.
 
-## 2. Identity and role model
+## 2. Model identitas dan role
 
-### Primary role
+### Role utama
 
 Use a single primary role for the MVP:
 
@@ -64,7 +64,7 @@ The role is assigned during registration for Owner/Investor and is immutable for
 
 A person who wants to operate as the other client role must create a separate new account. Registration must reject login identities that are already linked to another account without disclosing which account owns them. Releasing an identity from a closed account, if ever supported, must follow a separately defined account-closure, verification, and retention policy; it must never silently transfer an identity or merge accounts.
 
-### Authorization layers
+### Lapisan otorisasi
 
 Authorization is evaluated in this order:
 
@@ -77,7 +77,7 @@ Authorization is evaluated in this order:
 
 Do not implement authorization as scattered frontend conditions. Use shared backend extractors/middleware and domain-level policy functions, with tests.
 
-## 3. Proposed data model
+## 3. Rancangan model data
 
 PostgreSQL 16 merupakan baseline database relasional. Migration SQLx Identity Core 0001–0005 untuk akun, verifikasi, sesi, recovery, dan audit sudah tersedia serta tercakup dalam pengujian integrasi PostgreSQL. HTTP server menginisialisasi pool database saat startup melalui principal aplikasi; migration tetap dijalankan secara eksplisit oleh proses terpisah. Backend baru membuka operasi terbatas untuk membuat akun pending dan menambahkan audit event, belum menyediakan alur autentikasi lengkap. Migration harus berversi dan tidak boleh diubah setelah diterapkan pada database bersama. Gunakan primary key UUID dan `timestamptz`.
 
@@ -208,7 +208,7 @@ Jika kontak utama dan seluruh kontak pemulihan tidak dapat diakses, alur pemulih
 - Do not store passwords, OTPs, raw session tokens, reset tokens, or unnecessary private content.
 - Protect audit log read access separately from ordinary Admin permissions.
 
-### Additional tables only when needed
+### Tabel tambahan hanya jika diperlukan
 
 - `admin_mfa_credentials` for TOTP/passkey credential metadata and recovery state.
 - `account_link_requests` if explicit provider linking is included in the first release.
@@ -246,11 +246,11 @@ Kontak pemulihan tidak wajib saat pendaftaran. Kontak ini dapat ditambahkan sete
 
 Jika kontak utama dan seluruh kontak pemulihan sama-sama tidak dapat diakses, gunakan proses pemulihan alternatif berlapis. Periksa perangkat tepercaya, sesi sebelumnya, dan sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, teruskan kasus kepada petugas support dengan kewenangan khusus. Permintaan berisiko tinggi dapat ditunda atau ditolak. Terapkan hak akses minimum, kriteria pemeriksaan yang terdokumentasi, audit log, dan notifikasi yang sesuai. Pemulihan tidak boleh mengubah role utama. Pencabutan sesi dan perlindungan tambahan setelah pemulihan ditentukan berdasarkan tingkat risiko.
 
-## 4. API contract (proposed)
+## 4. Kontrak API (usulan)
 
 All routes are versioned under `/api/v1`. JSON request/response shapes should be defined in OpenAPI before implementation. The table below is the route inventory, not final wire-format documentation.
 
-### Registration and verification
+### Pendaftaran dan verifikasi
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -263,7 +263,7 @@ All routes are versioned under `/api/v1`. JSON request/response shapes should be
 
 There is intentionally no `/auth/register/admin` endpoint.
 
-### Password and session authentication
+### Autentikasi kata sandi dan sesi
 
 Email- and phone-based registrations must establish a local password. Google OAuth registrations do not need to create or enter a separate local password; they authenticate through their linked Google identity. Email/WhatsApp verification codes only activate the account and prove control of the selected contact; they are never accepted as login credentials.
 
@@ -279,7 +279,7 @@ Email- and phone-based registrations must establish a local password. Google OAu
 
 Login accepts the registered email or phone number together with the account password. Verification codes are not accepted by login endpoints. The login endpoints must check the expected role on the server. A mismatch returns a generic role-portal guidance response without exposing additional account details.
 
-### Google OAuth — retained
+### Google OAuth — tetap digunakan
 
 Google OAuth is supported for sign-in and registration. It does not replace mandatory role selection or contact verification; it does remove the need to create or enter a separate local password for a Google-based registration.
 
@@ -291,7 +291,7 @@ Google OAuth is supported for sign-in and registration. It does not replace mand
 
 For a new Google identity, the user must first select Owner or Investor, then complete Google OAuth and select exactly one contact method (email code or WhatsApp-delivered phone code) for separate verification before account activation. No separate local password is required. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
 
-### Admin authentication
+### Autentikasi Admin
 
 Admin authentication uses a separate internal route group and policy. Proposed routes:
 - `POST /admin/auth/login`
@@ -301,9 +301,9 @@ Admin authentication uses a separate internal route group and policy. Proposed r
 
 Admin account creation is a privileged internal operation, not a public authentication API. Admin authorization is permission-based, not just `primary_role=admin`.
 
-## 5. Session and browser security
+## 5. Keamanan sesi dan browser
 
-### Recommended browser session pattern
+### Pola sesi browser yang disarankan
 
 Prefer an opaque server-managed session delivered in a cookie:
 
@@ -316,14 +316,14 @@ Prefer an opaque server-managed session delivered in a cookie:
 
 Avoid storing long-lived bearer tokens in localStorage. If a cross-site architecture requires a different token model, document the trade-offs and add a separate security review.
 
-### CSRF and CORS
+### CSRF dan CORS
 
 - For cookie-authenticated state-changing requests, use CSRF protection appropriate to the deployment topology (token or robust origin/referer strategy).
 - Restrict CORS to exact trusted frontend origins; never combine credentialed requests with wildcard origins.
 - Validate content type and request origin for sensitive endpoints.
 - Keep production origins and OAuth redirect URIs in environment configuration, not hard-coded source.
 
-### Session lifecycle
+### Siklus hidup sesi
 
 - Login creates a new session and rotates any pre-auth session state.
 - Logout revokes the current session.
@@ -336,7 +336,7 @@ Avoid storing long-lived bearer tokens in localStorage. If a cross-site architec
 
 Enforce the approved session limits: 7 days of inactivity and 30 days absolute. Persistent-device preference must not bypass either limit or server-side revocation. Sensitive actions may require fresh authentication.
 
-## 6. Password policy
+## 6. Kebijakan kata sandi
 
 - Use Argon2id with parameters benchmarked for the deployment environment.
 - Use a well-maintained password hashing library; do not design a custom algorithm.
@@ -349,7 +349,7 @@ Enforce the approved session limits: 7 days of inactivity and 30 days absolute. 
 
 Exact Argon2id parameters and password policy values belong in configuration/security review, not guessed constants in UI code.
 
-## 7. OTP and verification abuse controls
+## 7. Kontrol penyalahgunaan OTP dan verifikasi
 
 Apply layered limits:
 - Per destination (email/phone).
@@ -369,7 +369,7 @@ Also require:
 
 Do not use a client-side countdown as the enforcement mechanism; the server owns expiry and rate limits.
 
-## 8. Google OAuth validation and account linking
+## 8. Validasi Google OAuth dan pengaitan akun
 
 On callback, validate at minimum:
 - State matches the server-issued one-time state.
@@ -390,7 +390,7 @@ Account linking rules:
 6. Never auto-merge two user records based only on matching email strings.
 7. Do not allow linking that changes the account's primary role.
 
-## 9. Authorization matrix
+## 9. Matriks otorisasi
 
 | Capability | Public | Owner | Investor | Admin |
 | --- | --- | --- | --- | --- |
@@ -411,7 +411,7 @@ Account linking rules:
 
 Admin permissions must be granular (e.g. user review, business verification, post moderation, membership operations, audit read). A broad Admin role alone is not sufficient.
 
-## 10. Error response conventions
+## 10. Konvensi respons error
 
 Use a consistent API error envelope, for example:
 
@@ -433,7 +433,7 @@ Requirements:
 - Do not return different unauthenticated recovery responses that reveal account existence.
 - Validation errors identify safe field-level issues without echoing sensitive values.
 
-## 11. Threat model and required mitigations
+## 11. Model ancaman dan mitigasi wajib
 
 | Threat | Required controls |
 | --- | --- |
@@ -453,9 +453,9 @@ Requirements:
 
 This is a baseline threat model, not a substitute for penetration testing or a formal security assessment.
 
-## 12. Required test plan
+## 12. Rencana pengujian wajib
 
-### Unit tests
+### Pengujian unit
 
 - Password hash/verify behavior.
 - Email and phone normalization.
@@ -468,7 +468,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Session expiry and revocation.
 - Authorization policy decisions.
 
-### API integration tests
+### Pengujian integrasi API
 
 - Owner can register and authenticate through Owner portal.
 - Investor can register and authenticate through Investor portal.
@@ -489,7 +489,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Chat access is granted only after a connection is accepted.
 - Free membership can chat after an accepted connection.
 
-### Security and operational tests
+### Pengujian keamanan dan operasional
 
 - Rate limiting is enforced across multiple application instances if horizontally scaled.
 - CORS rejects untrusted origins.
@@ -499,7 +499,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Admin MFA is required before protected Admin routes.
 - Audit logs are written for privileged actions and cannot be modified by ordinary Admin users.
 
-### Frontend tests
+### Pengujian frontend
 
 - Separate Owner/Investor login pages render the correct copy and destinations.
 - Password show/hide is accessible.
@@ -510,7 +510,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - OAuth cancel/failure state is recoverable.
 - Mobile layouts do not overflow horizontally.
 
-## 13. Implementation sequence
+## 13. Urutan implementasi
 
 1. **Reproducibilitas dependency — selesai:** lockfile frontend/backend tersedia dan CI menggunakan instalasi dependency yang terkunci.
 2. **Fondasi database — selesai:** pool PostgreSQL runtime, pemisahan principal aplikasi/migrator, migration Identity Core 0001–0005, serta akses terbatas untuk pembuatan akun pending dan penambahan audit event sudah tersedia. Migration produksi tetap merupakan operasi terpisah.

@@ -92,7 +92,7 @@ Sesi terkunci tetap berstatus `pending`. Setelah satu jam, counter sesi dapat di
 
 Expiry diperiksa memakai waktu database. Aktivasi ditolak jika akun pending atau challenge sudah kedaluwarsa, termasuk bila transaksi selesai setelah deadline.
 
-### 2.6 Pending registration expiry
+### 2.6 Kedaluwarsa pendaftaran tertunda
 
 Akun yang tidak selesai dalam 30 menit dipindahkan ke `pending_expired` melalui proses cleanup terkontrol. Pelepasan reservasi kontak dan pembersihan nilai identitas aktif mengikuti kontrak migration 0001 dan harus atomik. Cleanup tidak boleh memengaruhi akun aktif, sesi recovery, atau akun lain. Cleanup job dan jadwalnya merupakan komponen operasional terpisah.
 
@@ -127,7 +127,7 @@ Gunakan primitive standar dan library terawat. Jangan merancang cipher, KDF, gen
 - Jumlah digit, encoding, dan parameter keyed hash ditetapkan sebelum endpoint publik diaktifkan; jangan menganggap default UI sebagai kebijakan keamanan.
 - Kode tidak boleh masuk audit, log, URL, analytics, atau error telemetry.
 
-### 3.5 Key management
+### 3.5 Manajemen kunci
 
 Runtime bergantung pada abstraksi key provider yang menyediakan key berdasarkan purpose dan version.
 
@@ -210,7 +210,7 @@ Gunakan actor `system` untuk proses tanpa aktor pengguna terautentikasi. Metadat
 - OTP menggunakan CSPRNG dan tidak pernah disimpan plaintext.
 - Tidak ada secret/payload sensitif pada error, log, atau audit.
 
-### PostgreSQL integration
+### Integrasi PostgreSQL
 - Akun pending, sesi verifikasi, dan audit awal commit/rollback bersama.
 - Dua registrasi bersamaan dengan kontak sama hanya menghasilkan satu reservasi.
 - Challenge pending tunggal per sesi; resend supersede challenge lama.
