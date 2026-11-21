@@ -11,40 +11,40 @@ Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity C
 
 ### Termasuk dalam cakupan
 
-- Public registration for Business Owner and Investor only.
-- Exactly one immutable primary client role (`business_owner` or `investor`) per account.
-- Separate Owner and Investor login entry points.
-- Email/phone registrations require password-based login. Google OAuth registrations do not require a separate local password and authenticate through the linked Google identity. Email/WhatsApp verification codes are only for account activation/contact verification and never replace a password or Google authentication at login.
-- Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
-- Google OAuth is retained for sign-in and registration, but it never bypasses role selection or the separate email/WhatsApp registration-code verification.
+- Pendaftaran publik hanya tersedia untuk Business Owner dan Investor.
+- Setiap akun hanya memiliki satu role utama klien yang tetap (`business_owner` atau `investor`).
+- Jalur login Owner dan Investor dipisahkan.
+- Pendaftaran melalui email/telepon menggunakan login berbasis kata sandi. Pendaftaran Google OAuth tidak memerlukan kata sandi lokal terpisah dan menggunakan identitas Google yang terhubung untuk autentikasi. Kode verifikasi email/WhatsApp hanya untuk aktivasi akun/verifikasi kontak dan tidak pernah menggantikan kata sandi atau autentikasi Google saat login.
+- Kontak awal pendaftaran dipilih salah satu: email atau telepon/WhatsApp.
+- Google OAuth tetap digunakan untuk login dan pendaftaran, tetapi tidak melewati pemilihan role atau verifikasi kode pendaftaran melalui email/WhatsApp yang terpisah.
 - Password recovery.
-- Session lifecycle and logout.
-- Server-side role and resource authorization.
-- Internal Admin provisioning, MFA, and audit trail foundations.
+- Siklus hidup sesi dan logout.
+- Otorisasi role dan sumber daya di sisi server.
+- Fondasi provisioning Admin internal, MFA, dan audit trail.
 
 ### Di luar cakupan tahap awal autentikasi
 
-- Public Admin registration.
-- Multiple client roles on one account.
+- Pendaftaran Admin publik.
+- Beberapa role klien dalam satu akun.
 - Social login providers other than Google.
-- Passwordless email magic links unless separately approved.
-- Investment transactions, payment custody, or financial account connections.
-- A microservice split; authentication remains part of the modular monolith.
+- Magic link email tanpa kata sandi, kecuali disetujui secara terpisah.
+- Transaksi investasi, penitipan dana pembayaran, atau koneksi ke rekening keuangan.
+- Pemisahan menjadi microservice; autentikasi tetap menjadi bagian dari modular monolith.
 
 ### Invariant yang wajib dipertahankan
 
-1. The backend is authoritative for identity, primary role, account status, and permissions.
-2. Each client account has exactly one primary role, selected at registration; the role is immutable for the lifetime of that account.
-3. A person who wants the other client role must create a separate new account using login identities not already linked to an existing account.
-4. The frontend never grants access based only on route visibility or local state.
-5. An Owner account cannot authenticate through the Investor portal and vice versa.
-6. Admin accounts are provisioned internally; no public endpoint can create an Admin.
+1. Backend menjadi sumber kebenaran untuk identitas, role utama, status akun, dan izin.
+2. Setiap akun klien hanya memiliki satu role utama yang dipilih saat pendaftaran; role tersebut tidak dapat diubah selama akun masih ada.
+3. Pengguna yang ingin memakai role klien lainnya harus membuat akun baru yang terpisah dengan identitas login yang belum terhubung ke akun lain.
+4. Frontend tidak pernah memberikan akses hanya berdasarkan visibilitas rute atau state lokal.
+5. Akun Owner tidak dapat login melalui portal Investor, begitu pula sebaliknya.
+6. Akun Admin disediakan melalui proses internal; tidak ada endpoint publik yang dapat membuat Admin.
 7. A conversation requires an accepted connection between its participants.
-8. Free membership does not block messaging after connection approval.
-9. OAuth does not silently change an account's role or merge identities.
-10. Passwords, OTPs, access tokens, session secrets, and reset tokens are never written to application logs.
-11. Every sensitive mutation is validated against the authenticated user and target resource.
-12. The system must not reveal whether an email or phone number belongs to an account through unauthenticated recovery or registration responses.
+8. Keanggotaan Free tidak membatasi pengiriman pesan setelah koneksi disetujui.
+9. OAuth tidak boleh diam-diam mengubah role akun atau menggabungkan identitas.
+10. Kata sandi, OTP, access token, secret sesi, dan token reset tidak pernah dicatat dalam log aplikasi.
+11. Setiap perubahan sensitif divalidasi terhadap pengguna yang terautentikasi dan sumber daya yang dituju.
+12. Sistem tidak boleh mengungkap apakah suatu email atau nomor telepon terhubung ke akun melalui respons pendaftaran atau pemulihan yang belum terautentikasi.
 
 ## Batas keanggotaan dan otorisasi
 
@@ -54,28 +54,28 @@ Keanggotaan merupakan dimensi hak akses tersendiri dan tidak mengubah role utama
 
 ### Role utama
 
-Use a single primary role for the MVP:
+Gunakan satu role utama untuk MVP:
 
 - `business_owner`
 - `investor`
 - `admin`
 
-The role is assigned during registration for Owner/Investor and is immutable for the lifetime of the account. Admin is assigned only through an internal provisioning workflow. No profile endpoint, support process, administrative migration, or OAuth flow may change an existing account's primary role.
+Role Owner/Investor ditetapkan saat pendaftaran dan tidak dapat diubah selama akun masih ada. Admin hanya ditetapkan melalui proses provisioning internal. Tidak ada endpoint profil, proses bantuan, migrasi administratif, atau alur OAuth yang boleh mengubah role utama akun yang sudah ada.
 
-A person who wants to operate as the other client role must create a separate new account. Registration must reject login identities that are already linked to another account without disclosing which account owns them. Releasing an identity from a closed account, if ever supported, must follow a separately defined account-closure, verification, and retention policy; it must never silently transfer an identity or merge accounts.
+Pengguna yang ingin memakai role klien lainnya harus membuat akun baru yang terpisah. Pendaftaran harus menolak identitas login yang sudah terhubung ke akun lain tanpa mengungkap akun mana yang memilikinya. Jika pelepasan identitas dari akun yang ditutup kelak didukung, prosesnya harus mengikuti kebijakan penutupan akun, verifikasi, dan retensi yang ditetapkan secara terpisah; identitas tidak boleh dipindahkan atau digabungkan secara diam-diam.
 
 ### Lapisan otorisasi
 
-Authorization is evaluated in this order:
+Otorisasi dievaluasi dengan urutan berikut:
 
-1. Is the session valid and not revoked/expired?
-2. Is the account lifecycle active, and are there no active moderation restrictions or security locks?
-3. Does the authenticated account have the required primary role?
-4. Does the account own or participate in the requested resource?
-5. Is the requested action permitted for that resource's current state?
-6. Does membership entitlement affect the requested quota/feature? Membership never bypasses ownership or role checks.
+1. Apakah sesi valid dan belum dicabut/kedaluwarsa?
+2. Apakah siklus hidup akun berstatus aktif serta tidak memiliki pembatasan moderasi atau penguncian keamanan yang masih berlaku?
+3. Apakah akun yang terautentikasi memiliki role utama yang disyaratkan?
+4. Apakah akun memiliki atau menjadi peserta pada sumber daya yang diminta?
+5. Apakah tindakan yang diminta diizinkan untuk status sumber daya saat ini?
+6. Apakah hak fitur keanggotaan memengaruhi kuota/fitur yang diminta? Keanggotaan tidak pernah melewati pemeriksaan kepemilikan atau role.
 
-Do not implement authorization as scattered frontend conditions. Use shared backend extractors/middleware and domain-level policy functions, with tests.
+Jangan menerapkan otorisasi sebagai kondisi frontend yang tersebar. Gunakan extractor/middleware backend bersama dan fungsi kebijakan pada tingkat domain, disertai pengujian.
 
 ## 3. Rancangan model data
 
@@ -83,7 +83,7 @@ PostgreSQL 16 merupakan baseline database relasional. Migration SQLx Identity Co
 
 ### `users`
 
-The first migration implements the following account fields. Profile data and deletion-request history remain in separate future domain tables.
+Migration 0001 mengimplementasikan field akun berikut. Data profil dan riwayat permintaan penghapusan tetap berada dalam tabel domain terpisah pada tahap berikutnya.
 
 | Column | Purpose |
 | --- | --- |
@@ -99,19 +99,19 @@ The first migration implements the following account fields. Profile data and de
 | `pending_expires_at` | Immutable 30-minute deadline while registration is pending |
 | `created_at`, `updated_at`, `status_changed_at` | Database-managed timestamps |
 
-Constraints and lifecycle guards:
-- Partial unique indexes reserve non-null email and phone contacts while the account is pending, active, deactivated, deletion-pending, or deletion-processing.
-- A pending account has exactly one initial contact, not yet verified. An active account has at least one current verified primary contact.
-- The role and initial registration channel are immutable. Initial contact verification can be recorded only once during valid activation.
-- Pending registration cannot activate after 30 minutes or expire before its deadline. The pending expiry cannot be extended.
-- Deletion must wait 30 days in `deletion_pending` before entering `deletion_processing`; processing can only finish as `closed`. `pending_expired` and `closed` are terminal.
-- Suspend and feature limits are moderation/enforcement records, not `account_status` values.
-- Profile fields, deactivation/deletion request history, and retention records are not stored in this first slice.
-- Never store plaintext passwords. Do not expose raw database IDs as authorization secrets.
+Constraint dan pengaman siklus hidup:
+- Partial unique index mereservasi kontak email dan telepon yang tidak NULL selama akun berstatus pending, active, deactivated, deletion-pending, atau deletion-processing.
+- Akun pending memiliki tepat satu kontak awal yang belum diverifikasi. Akun active memiliki setidaknya satu kontak utama terverifikasi yang masih berlaku.
+- Role dan kanal pendaftaran awal tidak dapat diubah. Verifikasi kontak awal hanya dapat dicatat satu kali selama aktivasi yang sah.
+- Pendaftaran pending tidak dapat diaktifkan setelah 30 menit atau kedaluwarsa sebelum batas waktunya. Masa berlaku pending tidak dapat diperpanjang.
+- Penghapusan harus menunggu 30 hari dalam status `deletion_pending` sebelum masuk ke `deletion_processing`; proses hanya dapat berakhir pada status `closed`. `pending_expired` dan `closed` bersifat terminal.
+- Suspensi dan batas fitur dicatat sebagai record moderasi/penegakan, bukan sebagai nilai `account_status`.
+- Field profil, riwayat permintaan penonaktifan/penghapusan, dan record retensi tidak disimpan dalam tahap pertama ini.
+- Jangan pernah menyimpan kata sandi dalam bentuk teks asli. Jangan gunakan ID database mentah sebagai secret otorisasi.
 
 ### `user_identities`
 
-The first migration implements linked Google provider identities.
+Migration 0001 mengimplementasikan identitas penyedia Google yang terhubung.
 
 | Column | Purpose |
 | --- | --- |
@@ -123,13 +123,13 @@ The first migration implements linked Google provider identities.
 
 Constraints:
 - Unique composite key on (`provider`, `provider_subject`).
-- Provider subject, not email text, is the stable identity key.
-- Identity binding is immutable after insert; unlinking is a separate authenticated action.
-- Client accounts without a local password cannot unlink their last Google identity.
+- Subject dari penyedia, bukan teks email, menjadi key identitas yang stabil.
+- Pengikatan identitas tidak dapat diubah setelah insert; pelepasan tautan merupakan tindakan terautentikasi yang terpisah.
+- Akun klien tanpa kata sandi lokal tidak dapat melepas tautan identitas Google terakhirnya.
 - Terminal accounts cannot retain provider identities.
-- No provider email or OAuth access/refresh/ID tokens are stored in this table.
-- Linking requires proof of control of the existing account and the new provider identity.
-- Do not auto-link solely because provider emails appear to match.
+- Email dari penyedia maupun OAuth access/refresh/ID token tidak disimpan dalam tabel ini.
+- Pengaitan memerlukan bukti kendali atas akun yang sudah ada dan identitas penyedia yang baru.
+- Jangan mengaitkan identitas secara otomatis hanya karena email dari penyedia tampak cocok.
 
 ### `sessions`
 
