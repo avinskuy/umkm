@@ -93,14 +93,15 @@ Kontrak constraint minimum:
 1. `primary_role` hanya menerima tiga nilai role kanonis.
 2. `account_status` hanya menerima nilai lifecycle pada Bagian 2.3.
 3. `initial_contact_channel` hanya menerima `email` atau `phone`.
-4. Jika akun masih berada pada status yang memegang reservasi, kontak sesuai `initial_contact_channel` wajib tersedia.
-5. Untuk `pending_verification`, `pending_expires_at` wajib terisi; kontak awal yang dipilih belum boleh ditandai verified.
-6. Untuk status pasca-verifikasi (`active`, `deactivated`, `deletion_pending`, `deletion_processing`), kontak awal yang dipilih harus memiliki timestamp verifikasi.
-7. `pending_expires_at` harus NULL setelah akun keluar dari `pending_verification`; transisi expired dicatat melalui event/audit pada tahap terkait.
+4. `initial_contact_channel` immutable setelah INSERT karena mencatat metode registrasi awal, bukan kanal kontak yang harus dipertahankan selamanya.
+5. Selama `pending_verification`, kontak sesuai `initial_contact_channel` wajib tersedia; `pending_expires_at` wajib terisi; `initial_contact_verified_at` dan timestamp verifikasi kontak awal harus NULL.
+6. Untuk status pasca-verifikasi (`active`, `deactivated`, `deletion_pending`, `deletion_processing`), `initial_contact_verified_at` wajib terisi dan setidaknya satu kontak utama saat ini harus tersedia serta terverifikasi.
+7. Setiap kontak utama saat ini yang disimpan pada status pasca-verifikasi harus memiliki timestamp verifikasi yang sesuai. Kontak baru tidak boleh ditulis ke kolom identitas aktif sebelum diverifikasi.
 8. Timestamp verifikasi email hanya boleh terisi bila `email_normalized` tersedia; timestamp verifikasi telepon hanya boleh terisi bila `phone_e164` tersedia.
 9. Selama `pending_verification`, kontak non-awal tidak boleh terisi. Kontak kedua dapat ditambahkan setelah aktivasi melalui alur verifikasi terpisah.
-10. Pada `pending_expired` dan `closed`, kolom kontak utama, timestamp verifikasinya, dan `password_hash` harus NULL. Identitas provider yang tidak lagi diperlukan harus dilepas melalui proses terminal yang sesuai.
-11. `password_hash`, bila terisi, tidak boleh berupa string kosong.
+10. `pending_expires_at` harus NULL setelah akun keluar dari `pending_verification`; transisi expired dicatat melalui event/audit pada tahap terkait.
+11. Pada `pending_expired` dan `closed`, kolom kontak utama, timestamp verifikasi kontak, `initial_contact_verified_at`, dan `password_hash` harus NULL. Identitas provider yang tidak lagi diperlukan harus dilepas melalui proses terminal yang sesuai.
+12. `password_hash`, bila terisi, tidak boleh berupa string kosong.
 
 Constraint lintas tabel yang tidak dapat diekspresikan dengan aman sebagai CHECK (misalnya memastikan akun tanpa password hash memiliki identitas Google yang sah) harus dijaga oleh operasi backend/transaksi dan tes integrasi. Jangan membuat CHECK yang membaca tabel lain.
 
