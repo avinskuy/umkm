@@ -43,62 +43,62 @@ The eventual schema should distinguish normalized email and E.164 phone values, 
 
 Do not infer that the user supplied both contact methods. Do not create a migration until the complete Identity Core decisions and schema review gate are approved.
 
-## Approved Identity Core policies
+## Kebijakan Identity Core yang telah disetujui
 
-### Google OAuth and password model
+### Google OAuth dan model kata sandi
 
-Google OAuth is retained for sign-in and registration. A new registrant must choose exactly one immutable client role (Owner or Investor) before OAuth begins; the role is bound to server-side OAuth state. Google-only registration does not require a separate local password. A new Google registrant must still choose and verify one separate registration contact (email or phone through WhatsApp) before activation; a Google-asserted email does not waive this requirement.
+Google OAuth tetap digunakan untuk pendaftaran dan login. Pengguna baru harus memilih tepat satu role klien yang tidak dapat diubah (Owner atau Investor) sebelum memulai OAuth; pilihan role diikat ke state OAuth yang dikelola server. Pendaftaran yang hanya menggunakan Google tidak mewajibkan pembuatan kata sandi lokal. Pengguna baru tetap harus memilih dan memverifikasi satu kontak pendaftaran terpisah (email atau nomor HP melalui WhatsApp) sebelum akun diaktifkan. Email yang dinyatakan oleh Google tidak menggantikan verifikasi kontak tersebut.
 
-Email- or phone-based registration requires a local password. Normal password login uses the registered email or phone plus that password. Registration OTPs are only for contact verification/account activation and anti-bot protection; they are not login credentials and cannot be reused for password recovery. A future local-password setup flow for Google-only accounts remains a separate product decision if needed.
+Pendaftaran menggunakan email atau nomor HP wajib memiliki kata sandi lokal. Login kata sandi menggunakan email atau nomor HP terdaftar beserta kata sandinya. OTP pendaftaran hanya digunakan untuk verifikasi kontak, aktivasi akun, dan perlindungan anti-bot; OTP bukan kredensial login dan tidak dapat digunakan untuk pemulihan kata sandi. Alur penambahan kata sandi lokal untuk akun yang hanya menggunakan Google masih menjadi keputusan produk terpisah jika kelak diperlukan.
 
-Existing linked Google identities authenticate only their existing account. Never auto-link by matching email. Linking requires an authenticated session and fresh proof of control of the new identity, or an explicitly approved secure recovery process. Validate state, nonce, issuer, audience, signature, expiry, exact redirect URI, provider subject, and replay protection. Admin identities are never created through public OAuth.
+Identitas Google yang sudah terhubung hanya dapat mengautentikasi akun yang sudah terhubung tersebut. Jangan menghubungkan akun secara otomatis hanya karena alamat email cocok. Penghubungan memerlukan sesi akun yang sudah terautentikasi serta bukti terbaru atas kendali identitas baru, atau proses pemulihan aman yang secara khusus disetujui. Validasi state, nonce, issuer, audience, signature, expiry, redirect URI yang tepat, provider subject, dan perlindungan terhadap callback yang diputar ulang. Akun Admin tidak boleh dibuat melalui OAuth publik.
 
-### OTP and registration lifecycle
+### OTP dan siklus pendaftaran
 
-- OTP validity: **10 minutes**.
-- Maximum verification attempts: **5 failed attempts per verification session**.
-- After the fifth failure, lock that verification session for **1 hour**. Resending or requesting a replacement code must not reset or bypass this lock.
-- Resend cooldown: **60 seconds**.
-- Maximum delivery: **5 sends per hour per destination/contact**, with additional adaptive limits by IP/network, account, purpose, and suspicious activity.
-- Issuing a new OTP immediately invalidates the prior code for the same purpose and destination.
-- A new code does not clear the verification-session failure lock or delivery rate limits.
-- All counters, expiry, invalidation, and cooldown enforcement are server-side and concurrency-safe. Client countdowns are presentation only.
-- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode dibuat secara acak dengan sumber kriptografis yang aman, disimpan sebagai keyed hash, tidak pernah dicatat dalam log sebagai teks asli, terikat pada tujuan dan alamat penerima, serta hanya dapat digunakan satu kali secara atomik.
-- Delivery failure never marks a contact verified. Responses must not reveal whether a contact is already registered.
-- Pending registration lifetime is **30 minutes**, independently of the 10-minute OTP lifetime. Expiry cleanup must be idempotent and must never delete an activated account.
+- Masa berlaku OTP adalah **10 menit**.
+- Maksimal **5 percobaan gagal** untuk setiap sesi verifikasi.
+- Setelah kegagalan kelima, sesi verifikasi dikunci selama **1 jam**. Pengiriman ulang atau permintaan kode pengganti tidak boleh mengatur ulang atau melewati penguncian.
+- Jeda pengiriman ulang adalah **60 detik**.
+- Maksimal **5 pengiriman per jam untuk setiap alamat kontak**, ditambah pembatasan adaptif berdasarkan IP/jaringan, akun, tujuan, dan aktivitas mencurigakan.
+- Pengiriman OTP baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama.
+- Kode baru tidak menghapus status penguncian sesi verifikasi atau batas pengiriman.
+- Semua penghitung, masa berlaku, pembatalan, dan jeda harus ditegakkan di server serta aman terhadap proses bersamaan. Hitung mundur di sisi klien hanya untuk tampilan.
+- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode dibuat menggunakan sumber acak kriptografis yang aman, disimpan sebagai keyed hash, tidak pernah dicatat dalam log sebagai teks asli, terikat pada tujuan dan alamat penerima, serta hanya dapat digunakan satu kali secara atomik.
+- Kegagalan pengiriman tidak pernah menandai kontak sebagai terverifikasi. Respons tidak boleh mengungkap apakah kontak sudah terdaftar.
+- Masa berlaku pendaftaran tertunda adalah **30 menit**, terpisah dari masa berlaku OTP 10 menit. Pembersihan kedaluwarsa harus idempotent dan tidak boleh menghapus akun yang sudah aktif.
 
-### Session management
+### Pengelolaan sesi
 
-- Multiple concurrent devices are allowed.
-- Provide an Active Sessions page in Security Settings, individual session revocation, and logout-all-devices.
-- Session revocation is enforced server-side; suspicious sessions may be revoked based on risk signals.
-- Initial duration baseline: **7-day idle timeout** and **30-day absolute timeout**.
-- “Remember this device” may enable a persistent browser session but never bypasses either timeout or server-side revocation. Closing the browser alone does not terminate a deliberately persistent session.
-- Use Secure, HttpOnly cookies and an appropriate SameSite/CSRF strategy. Sensitive actions may require fresh authentication. Manual logout revokes immediately.
+- Beberapa perangkat boleh memiliki sesi aktif secara bersamaan.
+- Sediakan halaman Sesi Aktif pada Pengaturan Keamanan, pencabutan sesi individual, dan fitur logout dari semua perangkat.
+- Pencabutan sesi ditegakkan oleh server; sesi mencurigakan dapat dicabut berdasarkan sinyal risiko.
+- Batas awal sesi adalah **7 hari tanpa aktivitas** dan **30 hari secara absolut**.
+- Fitur “Ingat perangkat ini” dapat mengaktifkan sesi browser persisten, tetapi tidak boleh melewati kedua batas waktu atau pencabutan dari server. Menutup browser saja tidak mengakhiri sesi yang memang dibuat persisten.
+- Gunakan cookie Secure dan HttpOnly serta strategi SameSite/CSRF yang sesuai. Tindakan sensitif dapat meminta autentikasi ulang. Logout manual langsung mencabut sesi.
 
-### Account lifecycle
+### Siklus hidup akun
 
-- Temporary deactivation and permanent deletion are separate user-initiated flows.
-- Temporary deactivation hides the public profile and restricts normal access while retaining account data and immutable role. Reactivation requires login and security verification.
-- Permanent deletion requires explicit confirmation and fresh authentication, followed by a **30-day waiting period**. During that period the account is hidden/restricted and the user may cancel with fresh security verification.
-- After the waiting period, deletion processing begins. Legal/security-required records and backups follow a transparent, category-specific retention policy; do not promise immediate erasure from backups.
-- Contact reuse after closure/deletion is not automatic; define a verified, abuse-resistant retention and release procedure before implementing it.
+- Penonaktifan sementara dan penghapusan permanen merupakan dua alur terpisah yang dimulai oleh pengguna.
+- Penonaktifan sementara menyembunyikan profil publik dan membatasi akses normal, tetapi data akun serta role tetap disimpan. Pengaktifan kembali memerlukan login dan pemeriksaan keamanan.
+- Penghapusan permanen memerlukan konfirmasi eksplisit dan autentikasi ulang, lalu **masa tunggu 30 hari**. Selama masa tersebut, akun disembunyikan/dibatasi dan pengguna dapat membatalkan permintaan melalui pemeriksaan keamanan ulang.
+- Setelah masa tunggu, proses penghapusan dimulai. Catatan yang wajib dipertahankan untuk kebutuhan hukum/keamanan dan cadangan mengikuti kebijakan retensi transparan berdasarkan kategori data; jangan menjanjikan penghapusan seketika dari cadangan.
+- Kontak tidak otomatis dapat digunakan kembali setelah akun ditutup/dihapus. Prosedur pelepasan harus diverifikasi dan tahan terhadap penyalahgunaan sebelum diterapkan.
 
-### Account recovery
+### Pemulihan akun
 
-Support distinct flows for **forgot password** and **forgot email**, using previously verified recovery email and/or recovery phone (WhatsApp-delivered verification) where available. Recovery contacts are optional during registration, can be added after activation, and must be independently verified before use. Encourage setup during onboarding without blocking activation.
+Dukung alur **lupa kata sandi** dan **lupa email** melalui email pemulihan dan/atau nomor HP pemulihan yang sudah diverifikasi (dengan kode melalui WhatsApp). Kontak pemulihan bersifat opsional saat pendaftaran, dapat ditambahkan setelah aktivasi, dan harus diverifikasi secara terpisah sebelum digunakan. Sarankan pengguna menambahkannya saat onboarding tanpa menjadikannya syarat aktivasi.
 
-- Forgot password: verify ownership through an eligible recovery method before allowing a password reset. Registration OTPs cannot be reused as reset credentials.
-- Forgot email: after successful verification of a recovery contact linked to the account, the user may see the full primary email address. Never reveal it before verification.
-- Use uniform unauthenticated responses, rate limits, notifications, and risk assessment to prevent account enumeration and abuse.
-- Recovery is layered and risk-based. Consider trusted devices, prior sessions, previously verified recovery factors, suspicious activity, and recent recovery-factor changes. Use protective delays or additional checks when justified.
-- If the user loses access to both primary and recovery contacts, accept an alternative recovery request and assess trusted devices, prior sessions, and other ownership signals. If automated evidence is insufficient, escalate to manual review by specially authorized support staff. Delay or reject recovery when risk is too high. Notify the user through available safe channels and audit each action.
-- Manual review must use least-privilege access, documented evidence criteria, dual control for exceptional/high-risk overrides where appropriate, and immutable audit records. Support staff must never change the immutable primary role through recovery.
-- Post-recovery controls are adaptive: revoke suspicious sessions, notify the user, and require additional verification for sensitive changes when risk warrants it.
+- Lupa kata sandi: verifikasi kepemilikan melalui metode pemulihan yang memenuhi syarat sebelum mengizinkan pengaturan ulang kata sandi. OTP pendaftaran tidak dapat digunakan sebagai kredensial reset.
+- Lupa email: setelah kontak pemulihan yang terhubung ke akun berhasil diverifikasi, pengguna boleh melihat alamat email utama secara lengkap. Jangan tampilkan sebelum verifikasi berhasil.
+- Gunakan respons publik yang seragam, pembatasan permintaan, notifikasi, dan penilaian risiko untuk mencegah enumerasi akun serta penyalahgunaan.
+- Pemulihan dilakukan berlapis dan berdasarkan risiko. Pertimbangkan perangkat tepercaya, sesi sebelumnya, faktor pemulihan yang sudah diverifikasi, aktivitas mencurigakan, dan perubahan faktor pemulihan terbaru. Terapkan jeda perlindungan atau pemeriksaan tambahan jika diperlukan.
+- Jika pengguna kehilangan akses ke kontak utama dan seluruh kontak pemulihan, terima permintaan pemulihan alternatif dan periksa perangkat tepercaya, sesi sebelumnya, serta sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, eskalasikan ke pemeriksaan manual oleh petugas support dengan kewenangan khusus. Pemulihan berisiko tinggi dapat ditunda atau ditolak. Beri tahu pengguna melalui kanal aman yang tersedia dan catat setiap tindakan dalam audit.
+- Pemeriksaan manual harus menerapkan hak akses minimum, kriteria bukti yang terdokumentasi, persetujuan dua pihak untuk pengecualian/risiko tinggi jika diperlukan, serta catatan audit yang tidak dapat diubah sembarangan. Petugas support tidak boleh mengubah role utama yang bersifat tetap melalui proses pemulihan.
+- Perlindungan setelah pemulihan menyesuaikan risiko: cabut sesi mencurigakan, beri notifikasi kepada pengguna, dan minta verifikasi tambahan untuk perubahan sensitif jika diperlukan.
 
-### Provider operations and remaining technical decisions
+### Operasional penyedia layanan dan keputusan teknis tersisa
 
-Email and WhatsApp Business/API providers are not yet selected. Keep provider adapters replaceable, credentials server-side, and define delivery monitoring, retries, cost controls, sender/template requirements, operational ownership, and incident handling before production. Also finalize password hashing parameters, provider configuration, retention schedules, Admin MFA/recovery, and operational thresholds through security review. Do not invent production credentials or put secrets in source control.
+Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia yang dapat diganti, simpan kredensial di sisi server, dan tetapkan pemantauan pengiriman, percobaan ulang, batas biaya, persyaratan pengirim/template, penanggung jawab operasional, serta penanganan insiden sebelum produksi. Parameter hashing kata sandi, konfigurasi penyedia, jadwal retensi, MFA/pemulihan Admin, dan ambang operasional juga harus ditetapkan melalui tinjauan keamanan. Jangan membuat kredensial produksi atau menyimpan rahasia di source control.
 
 ## Implementation gate
 
