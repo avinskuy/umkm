@@ -21,6 +21,7 @@ Dokumen dalam direktori ini merangkum baseline keamanan USahapintar yang telah d
 | [API & Integration Security](api-integration-security.md) | Keamanan endpoint, validasi, OAuth, webhook, dan integrasi eksternal |
 | [Database Security & Data Integrity](database-security-data-integrity.md) | PostgreSQL, SQLx, privilege, transaksi, migration, backup, dan integritas |
 | [Infrastructure & Deployment Security](infrastructure-deployment-security.md) | Hardening server, jaringan, environment, CI/CD, release, dan recovery |
+| [Dependency & Third-Party Component Security](dependency-third-party-security.md) | Inventaris dependency, supply chain, advisori, SDK, dan vendor |
 
 ## Hubungan dengan dokumen lain
 
