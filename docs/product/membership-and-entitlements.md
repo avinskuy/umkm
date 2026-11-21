@@ -1,203 +1,203 @@
-# Membership & Entitlements Policy
+# Kebijakan Keanggotaan & Hak Fitur
 
-> Status: product policy baseline  
-> Scope: MVP authorization, Free/Premium entitlements, and quota enforcement  
-> This document defines product rules. It does not claim that membership billing or enforcement is implemented.
+> Status: baseline kebijakan produk  
+> Cakupan: otorisasi MVP, hak fitur paket Free/Premium, dan penegakan kuota  
+> Dokumen ini menetapkan aturan produk. Isinya tidak menyatakan bahwa penagihan atau penegakan keanggotaan sudah diimplementasikan.
 
-## 1. Core principles
+## 1. Prinsip utama
 
-1. **Free to build connections, Premium to expand and optimize connections.**
-2. Membership never changes a user's primary role or grants another role's capabilities.
-3. Free and Premium members can discover eligible opportunities, request connections, and message accepted connections.
-4. Premium improves capacity, visibility, discovery, and insight; it must not become a paywall around basic networking.
-5. Role permissions, resource ownership, consent, moderation state, and account status are enforced independently of membership.
-6. The backend is authoritative for every entitlement and quota decision. Frontend hiding or disabling controls is UX only.
+1. **Free untuk membangun koneksi, Premium untuk memperluas dan mengoptimalkan koneksi.**
+2. Keanggotaan tidak pernah mengubah role utama pengguna atau memberikan kemampuan milik role lain.
+3. Anggota Free dan Premium dapat menemukan peluang yang sesuai, mengajukan koneksi, dan mengirim pesan kepada koneksi yang sudah disetujui.
+4. Premium meningkatkan kapasitas, visibilitas, penemuan, dan wawasan; fitur ini tidak boleh menjadikan jejaring dasar sebagai layanan berbayar.
+5. Izin role, kepemilikan sumber daya, consent, status moderasi, dan status akun ditegakkan secara terpisah dari keanggotaan.
+6. Backend menjadi sumber kebenaran untuk setiap keputusan hak fitur dan kuota. Menyembunyikan atau menonaktifkan kontrol di frontend hanya bagian dari UX.
 
-## 2. Separate authorization dimensions
+## 2. Dimensi otorisasi yang terpisah
 
-Authorization is the intersection of independent checks:
+Otorisasi merupakan hasil gabungan dari pemeriksaan yang berdiri sendiri:
 
-- **Account status:** whether the account is allowed to use the platform.
-- **Primary role:** the account's one immutable client role, `business_owner` or `investor`.
-- **Resource permission:** ownership, participant status, explicit sharing consent, and moderation state.
-- **Membership entitlement:** whether the plan allows a capability or a higher quota.
-- **Usage availability:** whether the account has remaining quota for the relevant period.
+- **Status akun:** apakah akun diizinkan menggunakan platform.
+- **Role utama:** satu role klien akun yang bersifat tetap, yaitu `business_owner` atau `investor`.
+- **Izin sumber daya:** kepemilikan, status peserta, consent berbagi yang eksplisit, dan status moderasi.
+- **Hak fitur keanggotaan:** apakah paket mengizinkan suatu kemampuan atau kuota yang lebih tinggi.
+- **Ketersediaan penggunaan:** apakah akun masih memiliki kuota untuk periode terkait.
 
-A Premium subscription cannot override a role mismatch, suspended account, missing consent, denied resource permission, or moderation restriction.
+Langganan Premium tidak dapat mengesampingkan ketidaksesuaian role, akun yang ditangguhkan, consent yang tidak ada, izin sumber daya yang ditolak, atau pembatasan moderasi.
 
-Each client account has exactly one immutable primary role. A person who wants the other client role must register a separate account with eligible, unlinked identities. Membership upgrades and downgrades never change the role.
+Setiap akun klien hanya memiliki satu role utama yang bersifat tetap. Seseorang yang ingin menggunakan role klien lainnya harus mendaftar akun terpisah dengan identitas yang memenuhi syarat dan belum terhubung ke akun lain. Upgrade atau downgrade keanggotaan tidak pernah mengubah role.
 
-## 3. Role capability baseline
+## 3. Baseline kemampuan setiap role
 
-| Capability | Public visitor | Business Owner | Investor | Admin |
+| Kemampuan | Pengunjung publik | Business Owner | Investor | Admin |
 | --- | --- | --- | --- | --- |
-| View public landing, features, and membership information | Yes | Yes | Yes | Yes |
-| Register a client account | Choose Owner or Investor | No role switching | No role switching | No public registration |
-| Maintain own role-specific profile | No | Own profile/businesses | Own investor profile | Only with explicit operational permission |
-| Create Owner promotion/opportunity posts | No | Yes, within plan quota and moderation rules | No | Moderation only |
-| Create Investor partnership-seeking posts | No | No | Yes, within plan quota and moderation rules | Moderation only |
-| Discover eligible profiles/opportunities | Public preview only | Authenticated fields | Authenticated fields | Purpose-limited operational access |
-| Request a connection | No | Yes, within plan quota | Yes, within plan quota | Not as an ordinary member |
-| Accept/reject own connection requests | No | Yes | Yes | No routine impersonation |
-| Message an accepted connection | No | Yes | Yes | No routine private-chat access |
-| View private business information | No | Own data | Only information explicitly shared by the Owner | Purpose-limited, permissioned, audited |
-| Manage own membership and usage | No | Yes | Yes | Operational administration only |
-| Change a user's primary role | No | No | No | No routine role mutation; role is immutable |
+| Melihat halaman publik, fitur, dan informasi keanggotaan | Ya | Ya | Ya | Ya |
+| Mendaftar akun klien | Memilih Owner atau Investor | Tidak dapat berganti role | Tidak dapat berganti role | Tidak ada pendaftaran publik |
+| Mengelola profil sesuai role sendiri | Tidak | Profil/usaha sendiri | Profil Investor sendiri | Hanya dengan izin operasional eksplisit |
+| Membuat posting promosi/peluang Owner | Tidak | Ya, sesuai kuota paket dan aturan moderasi | Tidak | Hanya moderasi |
+| Membuat posting pencarian kemitraan Investor | Tidak | Tidak | Ya, sesuai kuota paket dan aturan moderasi | Hanya moderasi |
+| Menemukan profil/peluang yang dapat diakses | Hanya pratinjau publik | Field untuk pengguna terautentikasi | Field untuk pengguna terautentikasi | Akses operasional dengan tujuan terbatas |
+| Mengajukan koneksi | Tidak | Ya, sesuai kuota paket | Ya, sesuai kuota paket | Bukan sebagai anggota biasa |
+| Menerima/menolak permintaan koneksi sendiri | Tidak | Ya | Ya | Tidak boleh rutin menyamar sebagai pengguna |
+| Mengirim pesan kepada koneksi yang disetujui | Tidak | Ya | Ya | Tidak memiliki akses rutin ke pesan privat |
+| Melihat informasi bisnis privat | Tidak | Data sendiri | Hanya informasi yang secara eksplisit dibagikan Owner | Akses terbatas sesuai tujuan, berizin, dan diaudit |
+| Mengelola keanggotaan dan penggunaan sendiri | Tidak | Ya | Ya | Hanya administrasi operasional |
+| Mengubah role utama pengguna | Tidak | Tidak | Tidak | Tidak boleh mengubah role secara rutin; role bersifat tetap |
 
-Admin access is permission-scoped and audited. Admin is not a Free/Premium membership tier and must not be treated as a normal client role for entitlement calculations.
+Akses Admin dibatasi berdasarkan izin dan wajib diaudit. Admin bukan tingkatan keanggotaan Free/Premium dan tidak boleh diperlakukan sebagai role klien biasa dalam perhitungan hak fitur.
 
-## 4. Free and Premium membership
+## 4. Keanggotaan Free dan Premium
 
 ### Free
 
-Free is a complete entry tier for participating in the network:
+Free merupakan paket awal yang tetap lengkap untuk berpartisipasi dalam jejaring:
 
-- Create and maintain the role-appropriate profile.
-- Create role-appropriate posts within the Free posting quota.
-- Discover eligible members and opportunities using standard discovery.
-- Send and receive connection requests within the Free connection-request quota.
-- Accept or reject incoming requests.
-- Chat after a connection is accepted.
-- Use core account, privacy, and safety controls.
-- See basic activity and performance information where the product supports it.
+- Membuat dan mengelola profil sesuai role.
+- Membuat posting sesuai role dalam batas kuota posting Free.
+- Menemukan anggota dan peluang yang sesuai melalui fitur penemuan standar.
+- Mengirim dan menerima permintaan koneksi dalam batas kuota permintaan koneksi Free.
+- Menerima atau menolak permintaan masuk.
+- Mengirim pesan setelah koneksi disetujui.
+- Menggunakan kontrol inti akun, privasi, dan keamanan.
+- Melihat informasi dasar aktivitas dan performa jika didukung produk.
 
 ### Premium
 
-Premium retains all Free capabilities and adds higher capacity and optimization:
+Premium mempertahankan seluruh kemampuan Free serta menambahkan kapasitas dan optimalisasi:
 
-- Higher role-appropriate posting quota.
-- Higher connection-request quota.
-- Priority visibility or featured promotion, subject to transparent ranking rules and moderation eligibility.
-- Richer profile presentation and enhanced profile features.
-- Advanced discovery filters.
-- More detailed analytics and performance insights.
+- Kuota posting sesuai role yang lebih tinggi.
+- Kuota permintaan koneksi yang lebih tinggi.
+- Prioritas visibilitas atau promosi unggulan, mengikuti aturan pemeringkatan yang transparan dan kelayakan moderasi.
+- Tampilan profil yang lebih kaya dan fitur profil tambahan.
+- Filter penemuan lanjutan.
+- Analitik dan wawasan performa yang lebih terperinci.
 
-Premium does not guarantee views, connections, investment, funding, revenue, or business outcomes. Featured placement must be labeled where appropriate and must not bypass moderation or safety ranking.
+Premium tidak menjamin jumlah tayangan, koneksi, investasi, pendanaan, pendapatan, atau hasil bisnis. Penempatan unggulan harus diberi label jika diperlukan dan tidak boleh melewati moderasi atau pemeringkatan keselamatan.
 
-### Explicitly not Premium-gated
+### Fitur yang tidak boleh dibatasi untuk Premium
 
-The following remain available to both Free and Premium members, subject to role, consent, safety, and account status:
+Kemampuan berikut tetap tersedia bagi anggota Free maupun Premium, dengan tetap mengikuti role, consent, keselamatan, dan status akun:
 
-- Creating an account and completing a role-appropriate profile.
-- Core opportunity discovery.
-- Sending and receiving connection requests (with different quotas).
-- Accepting or rejecting a connection request.
-- Messaging after a connection is accepted.
-- Blocking, reporting, privacy controls, and account security features.
-- Accessing information that another member has explicitly shared with them.
+- Membuat akun dan menyelesaikan profil sesuai role.
+- Penemuan peluang inti.
+- Mengirim dan menerima permintaan koneksi (dengan kuota yang berbeda).
+- Menerima atau menolak permintaan koneksi.
+- Mengirim pesan setelah koneksi disetujui.
+- Memblokir, melaporkan, mengatur privasi, dan menggunakan fitur keamanan akun.
+- Mengakses informasi yang secara eksplisit dibagikan anggota lain kepada mereka.
 
-Do not sell direct messaging as a Premium-only feature. Do not allow Premium status to reveal private data that the owner has not shared.
+Jangan menjual pesan langsung sebagai fitur khusus Premium. Status Premium tidak boleh membuka data privat yang belum dibagikan pemiliknya.
 
-## 5. Role-specific posting
+## 5. Posting sesuai role
 
-- Business Owners create business promotion/opportunity posts.
-- Investors create partnership-seeking / investment-interest posts using the Investor-specific format.
-- Both post types are first-class platform capabilities, not conditional role experiments.
-- Posting quota is evaluated against the creator's membership entitlements and the applicable post type.
-- Membership does not bypass content validation, publication rules, moderation, or suspension.
-- Publication state and moderation state remain separate. A published post may subsequently be flagged, reviewed, restricted, or removed under platform policy.
+- Business Owner membuat posting promosi/peluang bisnis.
+- Investor membuat posting pencarian kemitraan atau minat investasi menggunakan format khusus Investor.
+- Kedua jenis posting merupakan kemampuan utama platform, bukan eksperimen fitur berdasarkan role.
+- Kuota posting dihitung berdasarkan hak fitur keanggotaan pembuat dan jenis posting terkait.
+- Keanggotaan tidak melewati validasi konten, aturan publikasi, moderasi, atau penangguhan akun.
+- Status publikasi dan status moderasi tetap terpisah. Posting yang sudah terbit dapat ditandai, ditinjau, dibatasi, atau dihapus kemudian sesuai kebijakan platform.
 
-## 6. Connection requests and messaging
+## 6. Permintaan koneksi dan pesan
 
-- Both Free and Premium members may request connections.
-- Membership controls the number of eligible requests a member may initiate within the configured quota period; it does not determine whether a member may connect at all.
-- A request must be accepted before a conversation can be created or messaging can begin.
-- Once a connection is accepted, messaging is available to both Free and Premium participants.
-- Accepted connections and existing conversations are not automatically revoked solely because a member downgrades.
-- Blocking, reporting, abuse prevention, account suspension, and other safety controls may restrict connection or messaging regardless of plan.
-- Do not charge a separate message quota or require Premium to continue an otherwise permitted conversation in the MVP.
+- Anggota Free maupun Premium dapat mengajukan koneksi.
+- Keanggotaan menentukan jumlah permintaan yang boleh dimulai anggota dalam periode kuota yang dikonfigurasi; keanggotaan tidak menentukan apakah anggota boleh terhubung sama sekali.
+- Permintaan harus disetujui sebelum percakapan dapat dibuat atau pesan dapat dikirim.
+- Setelah koneksi disetujui, fitur pesan tersedia bagi peserta Free maupun Premium.
+- Koneksi yang telah disetujui dan percakapan yang sudah berjalan tidak otomatis dicabut hanya karena anggota melakukan downgrade.
+- Pemblokiran, pelaporan, pencegahan penyalahgunaan, penangguhan akun, dan kontrol keselamatan lainnya dapat membatasi koneksi atau pesan tanpa memandang paket.
+- Pada MVP, jangan mengenakan kuota pesan terpisah atau mewajibkan Premium untuk melanjutkan percakapan yang sudah diizinkan.
 
-## 7. Entitlement and quota model
+## 7. Model hak fitur dan kuota
 
-Represent entitlements as backend-managed plan data rather than scattered plan-name conditionals.
+Representasikan hak fitur sebagai data paket yang dikelola backend, bukan sebagai pemeriksaan nama paket yang tersebar di berbagai bagian kode.
 
-Suggested entitlement keys:
+Contoh key hak fitur:
 
-| Entitlement key | Meaning | Free | Premium |
+| Key hak fitur | Arti | Free | Premium |
 | --- | --- | --- | --- |
-| `posts.owner.monthly_limit` | Owner posts allowed in the configured period | Baseline quota | Higher quota |
-| `posts.investor.monthly_limit` | Investor posts allowed in the configured period | Baseline quota | Higher quota |
-| `connections.requests.monthly_limit` | New connection requests initiated in the configured period | Baseline quota | Higher quota |
-| `discovery.advanced_filters` | Advanced discovery filters | No | Yes |
-| `visibility.priority_eligible` | Eligibility for priority/featured visibility | No | Yes |
-| `profile.enhanced_features` | Premium profile presentation features | No | Yes |
-| `analytics.advanced` | Detailed analytics | No | Yes |
+| `posts.owner.monthly_limit` | Jumlah posting Owner yang diizinkan dalam periode yang dikonfigurasi | Kuota dasar | Kuota lebih tinggi |
+| `posts.investor.monthly_limit` | Jumlah posting Investor yang diizinkan dalam periode yang dikonfigurasi | Kuota dasar | Kuota lebih tinggi |
+| `connections.requests.monthly_limit` | Jumlah permintaan koneksi baru yang dimulai dalam periode yang dikonfigurasi | Kuota dasar | Kuota lebih tinggi |
+| `discovery.advanced_filters` | Filter penemuan lanjutan | Tidak | Ya |
+| `visibility.priority_eligible` | Kelayakan untuk visibilitas prioritas/promosi unggulan | Tidak | Ya |
+| `profile.enhanced_features` | Fitur tampilan profil Premium | Tidak | Ya |
+| `analytics.advanced` | Analitik terperinci | Tidak | Ya |
 
-Exact numeric quotas, currency/pricing, billing cycle, and quota reset policy are intentionally not fixed in this document. They require a separate product and operational decision before implementation. Do not infer numeric limits from UI copy or hard-code them in application logic.
+Jumlah kuota pasti, mata uang/harga, siklus penagihan, dan kebijakan reset kuota sengaja belum ditetapkan dalam dokumen ini. Semuanya memerlukan keputusan produk dan operasional terpisah sebelum implementasi. Jangan menyimpulkan batas numerik dari teks UI atau menanamkannya langsung dalam logika aplikasi.
 
-### Enforcement requirements
+### Persyaratan penegakan
 
-- Resolve the active plan and entitlement values on the server for every quota-sensitive action.
-- Count usage against the authenticated account, not a client-supplied user ID.
-- Make quota consumption atomic to prevent concurrent requests from exceeding limits.
-- Define whether a failed, rejected, deleted, or moderated action consumes quota before implementation; apply one consistent policy and document it.
-- Return a stable error code and safe message when a quota is exhausted, with the reset/renewal information only when known.
-- Do not reset usage based on the device clock.
-- Keep an auditable usage ledger or equivalent reliable counter history for support and dispute investigation.
-- Avoid silently deleting or hiding existing content when a plan is downgraded.
+- Backend harus menentukan paket aktif dan nilai hak fiturnya untuk setiap tindakan yang menggunakan kuota.
+- Hitung penggunaan berdasarkan akun yang terautentikasi, bukan ID pengguna yang dikirim oleh klien.
+- Konsumsi kuota harus atomik agar permintaan bersamaan tidak melampaui batas.
+- Sebelum implementasi, tetapkan apakah tindakan yang gagal, ditolak, dihapus, atau dimoderasi mengonsumsi kuota. Terapkan satu kebijakan yang konsisten dan dokumentasikan.
+- Kembalikan kode error yang stabil dan pesan aman bagi pengguna ketika kuota habis. Sertakan informasi reset/perpanjangan hanya jika waktunya diketahui.
+- Jangan mereset penggunaan berdasarkan jam perangkat.
+- Simpan ledger penggunaan yang dapat diaudit atau riwayat penghitung lain yang andal untuk kebutuhan dukungan dan investigasi sengketa.
+- Hindari menghapus atau menyembunyikan konten yang sudah ada secara diam-diam ketika paket diturunkan.
 
-## 8. Subscription lifecycle and downgrade behavior
+## 8. Siklus langganan dan perilaku downgrade
 
-The following behavior is required at the product-policy level:
+Perilaku berikut wajib diterapkan pada tingkat kebijakan produk:
 
-- A member's current effective plan and entitlement snapshot must be resolved server-side.
-- If Premium expires, is cancelled, or becomes inactive, new actions use Free entitlements from the effective downgrade time.
-- Existing posts, profiles, accepted connections, and conversations remain available unless separately restricted by moderation, account status, or another platform rule.
-- If a member exceeds the Free quota after downgrade, preserve existing content; block only additional quota-consuming actions until capacity becomes available.
-- Premium-only presentation and discovery controls may become inactive after downgrade, but must not erase member data.
-- Billing failures, grace periods, refunds, proration, and cancellation timing need a separate billing policy before payment implementation.
+- Paket efektif anggota saat ini dan snapshot hak fiturnya harus ditentukan di server.
+- Jika Premium kedaluwarsa, dibatalkan, atau tidak lagi aktif, tindakan baru menggunakan hak fitur Free sejak waktu downgrade efektif.
+- Posting, profil, koneksi yang disetujui, dan percakapan yang sudah ada tetap tersedia kecuali dibatasi secara terpisah oleh moderasi, status akun, atau aturan platform lainnya.
+- Jika penggunaan anggota melampaui kuota Free setelah downgrade, pertahankan konten yang sudah ada; blokir hanya tindakan tambahan yang mengonsumsi kuota sampai kapasitas tersedia.
+- Tampilan dan kontrol penemuan khusus Premium boleh menjadi tidak aktif setelah downgrade, tetapi tidak boleh menghapus data anggota.
+- Kegagalan pembayaran, masa tenggang, pengembalian dana, prorata, dan waktu pembatalan memerlukan kebijakan penagihan terpisah sebelum implementasi pembayaran.
 
-## 9. Authorization decision order
+## 9. Urutan keputusan otorisasi
 
-For a protected action, evaluate in this order:
+Untuk tindakan yang dilindungi, lakukan pemeriksaan dalam urutan berikut:
 
-1. Authenticate the session.
-2. Confirm the account is active and eligible for the action.
-3. Confirm the immutable primary role permits the action.
-4. Confirm ownership, participant status, consent, and resource-level permission.
-5. Confirm moderation and safety state permits the action.
-6. Resolve the effective membership plan and entitlement.
-7. Check remaining quota and atomically reserve/consume usage.
-8. Execute the action and record the outcome.
+1. Autentikasi sesi.
+2. Pastikan akun aktif dan memenuhi syarat untuk tindakan tersebut.
+3. Pastikan role utama yang bersifat tetap mengizinkan tindakan.
+4. Pastikan kepemilikan, status peserta, consent, dan izin pada tingkat sumber daya.
+5. Pastikan status moderasi dan keselamatan mengizinkan tindakan.
+6. Tentukan paket keanggotaan efektif dan hak fiturnya.
+7. Periksa sisa kuota dan lakukan reservasi/konsumsi penggunaan secara atomik.
+8. Jalankan tindakan dan catat hasilnya.
 
-A denial at any earlier step cannot be overridden by a later Premium entitlement.
+Penolakan pada tahap sebelumnya tidak dapat dikesampingkan oleh hak fitur Premium pada tahap berikutnya.
 
-## 10. Required tests
+## 10. Pengujian wajib
 
-### Role and resource authorization
+### Otorisasi role dan sumber daya
 
-- Owner cannot create Investor partnership-seeking posts.
-- Investor cannot create Owner promotion posts.
-- Owner and Investor cannot access each other's role-specific write actions by changing request payloads or routes.
-- Public visitors receive only approved public preview fields.
-- Investor cannot access private business fields without explicit Owner sharing consent.
-- Admin actions require the relevant permission and are audited.
+- Owner tidak dapat membuat posting pencarian kemitraan khusus Investor.
+- Investor tidak dapat membuat posting promosi Owner.
+- Owner dan Investor tidak dapat mengakses tindakan tulis khusus role lain dengan mengubah payload request atau rute.
+- Pengunjung publik hanya menerima field pratinjau publik yang telah disetujui.
+- Investor tidak dapat mengakses field bisnis privat tanpa consent berbagi eksplisit dari Owner.
+- Tindakan Admin memerlukan izin yang sesuai dan harus diaudit.
 
-### Membership and quotas
+### Keanggotaan dan kuota
 
-- Free and Premium can both request connections.
-- Free and Premium can both message after an accepted connection.
-- Premium has higher configured posting and connection-request limits than Free.
-- Free cannot use Premium-only advanced filters or analytics.
-- Premium cannot bypass role, ownership, consent, moderation, or account-status checks.
-- Concurrent quota-consuming requests cannot exceed the configured limit.
-- Quota exhaustion returns a stable, user-safe response.
-- Downgrade preserves existing posts, connections, and conversations.
-- Downgrade prevents additional actions above the Free quota without deleting existing content.
-- Admin membership operations cannot silently alter a member's primary role.
+- Free dan Premium sama-sama dapat mengajukan koneksi.
+- Free dan Premium sama-sama dapat mengirim pesan setelah koneksi disetujui.
+- Premium memiliki batas posting dan permintaan koneksi yang dikonfigurasi lebih tinggi daripada Free.
+- Free tidak dapat menggunakan filter lanjutan atau analitik khusus Premium.
+- Premium tidak dapat melewati pemeriksaan role, kepemilikan, consent, moderasi, atau status akun.
+- Permintaan bersamaan yang mengonsumsi kuota tidak dapat melampaui batas yang dikonfigurasi.
+- Kuota habis menghasilkan respons yang stabil dan aman bagi pengguna.
+- Downgrade mempertahankan posting, koneksi, dan percakapan yang sudah ada.
+- Downgrade mencegah tindakan tambahan yang melampaui kuota Free tanpa menghapus konten yang sudah ada.
+- Operasi keanggotaan oleh Admin tidak dapat mengubah role utama anggota secara diam-diam.
 
-## 11. Decisions required before implementation
+## 11. Keputusan yang wajib ditetapkan sebelum implementasi
 
-These values and policies remain open and must not be guessed in code:
+Nilai dan kebijakan berikut masih terbuka dan tidak boleh ditebak dalam kode:
 
-- Numeric Free and Premium post quotas for each role.
-- Numeric Free and Premium connection-request quotas.
-- Quota period and reset semantics (calendar month versus subscription/billing period).
-- Whether unused quota carries over (recommended default: no, but requires approval).
-- Exact Premium price, billing provider, tax/refund, grace-period, and cancellation behavior.
-- Which profile fields and analytics metrics are Premium-only.
-- Ranking formula and labeling for priority/featured visibility.
-- Whether a post that is removed for policy violations consumes quota, and how appeals affect usage.
-- Whether quota is refunded for platform-side failures or duplicate submissions.
+- Kuota numerik posting Free dan Premium untuk setiap role.
+- Kuota numerik permintaan koneksi Free dan Premium.
+- Periode kuota dan aturan reset (bulan kalender atau periode langganan/penagihan).
+- Apakah kuota yang tidak terpakai dapat dibawa ke periode berikutnya (rekomendasi awal: tidak, tetapi tetap memerlukan persetujuan).
+- Harga Premium, penyedia penagihan, pajak/pengembalian dana, masa tenggang, dan perilaku pembatalan.
+- Field profil dan metrik analitik yang hanya tersedia untuk Premium.
+- Rumus pemeringkatan dan label untuk visibilitas prioritas/promosi unggulan.
+- Apakah posting yang dihapus karena pelanggaran kebijakan mengonsumsi kuota, serta bagaimana banding memengaruhi penggunaan.
+- Apakah kuota dikembalikan untuk kegagalan dari sisi platform atau pengiriman duplikat.
 
-Until these decisions are approved, use configurable placeholders in design work and do not expose invented numbers as product commitments.
+Sebelum keputusan tersebut disetujui, gunakan placeholder yang dapat dikonfigurasi dalam pekerjaan desain dan jangan menampilkan angka rekaan sebagai komitmen produk.
