@@ -73,7 +73,7 @@ Aturan produk yang harus ditegakkan tetap:
 
 PostgreSQL advisory lock dipilih karena bersifat lintas koneksi dan lintas instance yang memakai database yang sama. Pengujian wajib memakai beberapa koneksi bersamaan untuk membuktikan bahwa permintaan paralel tidak melewati batas.
 
-## 2A. Batas percobaan verifikasi lintas sesi
+### Batas percobaan verifikasi lintas sesi
 
 Batas kegagalan OTP tidak boleh hanya bergantung pada `failed_attempt_count` satu sesi. Jika pengguna dapat membuat sesi baru untuk tujuan yang sama, penghitung sesi baru tidak boleh memberi anggaran percobaan kontak yang baru.
 
