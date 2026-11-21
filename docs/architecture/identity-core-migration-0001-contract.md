@@ -1,11 +1,11 @@
 # Kontrak Skema Migration 0001 — Identitas Akun
 
-> Status: rancangan teknis untuk review sebelum SQL migration
+> Status: diimplementasikan sebagai migration SQLx; dokumen ini menjadi kontrak dan referensi tes
 > Tanggal: 21 November 2026
 > Basis: keputusan teknis Identity Core yang telah disetujui sebagai baseline
 > Cakupan: akun, role permanen, kontak utama, dan identitas Google
 
-Dokumen ini menerjemahkan keputusan Identity Core menjadi kontrak skema yang dapat ditinjau. Ini belum merupakan migration SQL dan tidak menambahkan tabel atau mengubah runtime.
+Dokumen ini menetapkan kontrak skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
 
 Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`; nama file aktual akan ditentukan saat migration dibuat.
 
@@ -231,15 +231,15 @@ Semua tes concurrency menggunakan beberapa koneksi PostgreSQL nyata. Unit test a
 
 Sebelum SQL migration dibuat, review harus memastikan:
 
-- [ ] Nama kolom dan tipe data final telah disetujui.
-- [ ] Constraint dan partial unique index telah dipetakan ke aturan lifecycle secara tepat.
+- [x] Nama kolom dan tipe data final ditetapkan pada migration pertama.
+- [x] Constraint dan partial unique index telah diterapkan dan diuji terhadap aturan lifecycle.
 - [ ] Jalur pembuatan akun klien dan provisioning Admin memiliki batas privilege yang dapat ditegakkan.
 - [x] Tabel `user_identities` masuk migration pertama karena Google OAuth merupakan metode registrasi/login yang sudah disetujui.
-- [ ] Foreign key dan perilaku terminal deletion tidak menghapus history yang wajib dipertahankan.
-- [ ] Tes PostgreSQL untuk constraint, role immutability, dan concurrency siap ditulis.
-- [ ] Tidak ada kebutuhan verifikasi, session, recovery, atau audit yang terselip ke migration pertama.
+- [x] Foreign key dan perilaku terminal deletion menggunakan ON DELETE RESTRICT serta cleanup identitas eksplisit.
+- [x] Tes PostgreSQL untuk constraint, role immutability, provider identity, reservasi kontak, dan konkurensi telah dijalankan di CI.
+- [x] Tidak ada kebutuhan verifikasi, session, recovery, atau audit yang terselip ke migration pertama.
 
-Setelah gate disetujui, barulah buat satu SQLx migration untuk slice identitas akun, jalankan pada PostgreSQL sementara, uji rollback/reapply pada database disposable, review SQL dan privilege, lalu buka PR terpisah. Tidak ada database produksi atau deployment pada tahap ini.
+Migration pertama telah dibuat dan diuji pada PostgreSQL sementara. Sebelum runtime diaktifkan, tahap berikutnya tetap harus menyelesaikan bootstrap privilege untuk runtime/provisioning Admin, mengintegrasikan operasi registrasi dengan fungsi database, dan menambahkan migration verifikasi secara terpisah. Tidak ada database produksi atau deployment pada tahap ini.
 
 ## 9. Referensi
 
