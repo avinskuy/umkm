@@ -1,9 +1,7 @@
 //! Password hashing dan verifikasi menggunakan Argon2id.
 
 use argon2::{
-    password_hash::{
-        rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-    },
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Algorithm, Argon2, Params, Version,
 };
 
@@ -37,13 +35,8 @@ impl std::error::Error for PasswordError {}
 /// Hash password dengan Argon2id dan salt unik dari CSPRNG sistem.
 pub fn hash_password(password: &[u8]) -> Result<String, PasswordError> {
     let salt = SaltString::generate(&mut OsRng);
-    let params = Params::new(
-        MEMORY_COST_KIB,
-        TIME_COST,
-        PARALLELISM,
-        Some(OUTPUT_LENGTH),
-    )
-    .map_err(|_| PasswordError::HashingFailed)?;
+    let params = Params::new(MEMORY_COST_KIB, TIME_COST, PARALLELISM, Some(OUTPUT_LENGTH))
+        .map_err(|_| PasswordError::HashingFailed)?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
     argon2
@@ -54,16 +47,12 @@ pub fn hash_password(password: &[u8]) -> Result<String, PasswordError> {
 
 /// Verifikasi encoded PHC hash. Parameter dibatasi agar hash tersimpan yang
 /// rusak/tidak tepercaya tidak dapat meminta penggunaan memori atau CPU berlebihan.
-pub fn verify_password(
-    password: &[u8],
-    encoded_hash: &str,
-) -> Result<bool, PasswordError> {
+pub fn verify_password(password: &[u8], encoded_hash: &str) -> Result<bool, PasswordError> {
     if encoded_hash.len() > MAX_ENCODED_HASH_LENGTH {
         return Err(PasswordError::InvalidEncodedHash);
     }
 
-    let parsed = PasswordHash::new(encoded_hash)
-        .map_err(|_| PasswordError::InvalidEncodedHash)?;
+    let parsed = PasswordHash::new(encoded_hash).map_err(|_| PasswordError::InvalidEncodedHash)?;
 
     if parsed.algorithm.as_str() != "argon2id" || parsed.version != Some(19) {
         return Err(PasswordError::InvalidEncodedHash);
@@ -93,9 +82,7 @@ pub fn verify_password(
         return Err(PasswordError::InvalidEncodedHash);
     }
 
-    Ok(Argon2::default()
-        .verify_password(password, &parsed)
-        .is_ok())
+    Ok(Argon2::default().verify_password(password, &parsed).is_ok())
 }
 
 #[cfg(test)]
@@ -104,10 +91,10 @@ mod tests {
 
     #[test]
     fn password_hashes_are_salted_and_verifiable() {
-        let first = hash_password(b"sample-password-with-sufficient-length")
-            .expect("password should hash");
-        let second = hash_password(b"sample-password-with-sufficient-length")
-            .expect("password should hash");
+        let first =
+            hash_password(b"sample-password-with-sufficient-length").expect("password should hash");
+        let second =
+            hash_password(b"sample-password-with-sufficient-length").expect("password should hash");
 
         assert_ne!(first, second);
         assert!(first.starts_with("$argon2id$"));
