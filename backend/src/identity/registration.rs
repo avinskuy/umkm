@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::PgConnection;
 
 /// Role klien yang dapat dipilih pada registrasi publik.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,7 +47,7 @@ pub struct ClientRegistration<'a> {
 
 /// Membuat akun klien pending tanpa memberi aplikasi hak INSERT langsung ke tabel.
 pub async fn create_client_user(
-    pool: &PgPool,
+    connection: &mut PgConnection,
     registration: &ClientRegistration<'_>,
 ) -> Result<String, sqlx::Error> {
     sqlx::query_scalar::<_, String>(
@@ -59,6 +59,6 @@ pub async fn create_client_user(
     .bind(registration.phone_e164)
     .bind(registration.password_hash)
     .bind(registration.google_subject)
-    .fetch_one(pool)
+    .fetch_one(connection)
     .await
 }
