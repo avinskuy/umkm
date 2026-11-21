@@ -110,8 +110,8 @@ async fn assert_user_constraints(pool: &PgPool) {
 
     assert!(
         sqlx::query(
-            "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, pending_expires_at) \
-             VALUES ('business_owner', 'pending_verification', 'verified-too-early@example.test', 'email', now() + INTERVAL '30 minutes')"
+            "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, pending_expires_at, email_verified_at) \
+             VALUES ('business_owner', 'pending_verification', 'verified-too-early@example.test', 'email', now() + INTERVAL '30 minutes', now())"
         )
         .execute(pool)
         .await
@@ -139,6 +139,17 @@ async fn assert_user_constraints(pool: &PgPool) {
         .await
         .is_err(),
         "active accounts require verified contact and registration provenance"
+    );
+
+    assert!(
+        sqlx::query(
+            "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at) \
+             VALUES ('investor', 'active', 'missing-auth-method@example.test', 'email', now(), now())"
+        )
+        .execute(pool)
+        .await
+        .is_err(),
+        "client accounts without a password must have a Google identity in the same transaction"
     );
 
     assert!(
@@ -280,6 +291,17 @@ async fn assert_role_and_registration_provenance_are_immutable(pool: &PgPool) {
     )
     .await
     .expect("pending account should be created before activation");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.users SET initial_contact_verified_at = now() WHERE id = $1::uuid"
+        )
+        .bind(&activation_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "initial contact provenance cannot be set before the account is activated"
+    );
 
     sqlx::query(
         "UPDATE public.users \
