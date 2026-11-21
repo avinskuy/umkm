@@ -248,7 +248,7 @@ Jika kontak utama dan seluruh kontak pemulihan sama-sama tidak dapat diakses, gu
 
 ## 4. Kontrak API (usulan)
 
-All routes are versioned under `/api/v1`. JSON request/response shapes should be defined in OpenAPI before implementation. The table below is the route inventory, not final wire-format documentation.
+Semua rute menggunakan versi `/api/v1`. Bentuk request/response JSON harus ditetapkan dalam OpenAPI sebelum implementasi. Tabel di bawah merupakan inventaris rute, bukan dokumentasi format wire final.
 
 ### Pendaftaran dan verifikasi
 
@@ -265,7 +265,7 @@ There is intentionally no `/auth/register/admin` endpoint.
 
 ### Autentikasi kata sandi dan sesi
 
-Email- and phone-based registrations must establish a local password. Google OAuth registrations do not need to create or enter a separate local password; they authenticate through their linked Google identity. Email/WhatsApp verification codes only activate the account and prove control of the selected contact; they are never accepted as login credentials.
+Pendaftaran melalui email atau telepon wajib membuat kata sandi lokal. Pendaftaran Google OAuth tidak perlu membuat atau memasukkan kata sandi lokal terpisah; autentikasi dilakukan melalui identitas Google yang terhubung. Kode verifikasi email/WhatsApp hanya mengaktifkan akun dan membuktikan kendali atas kontak terpilih; kode tersebut tidak pernah diterima sebagai kredensial login.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -277,11 +277,11 @@ Email- and phone-based registrations must establish a local password. Google OAu
 | POST | `/auth/password/forgot` | Request a password reset |
 | POST | `/auth/password/reset` | Consume reset token and set a new password |
 
-Login accepts the registered email or phone number together with the account password. Verification codes are not accepted by login endpoints. The login endpoints must check the expected role on the server. A mismatch returns a generic role-portal guidance response without exposing additional account details.
+Login menerima email atau nomor telepon terdaftar beserta kata sandi akun. Endpoint login tidak menerima kode verifikasi. Endpoint login wajib memeriksa role yang diharapkan di server. Ketidaksesuaian role menghasilkan respons panduan portal yang umum tanpa mengungkap detail akun tambahan.
 
 ### Google OAuth — tetap digunakan
 
-Google OAuth is supported for sign-in and registration. It does not replace mandatory role selection or contact verification; it does remove the need to create or enter a separate local password for a Google-based registration.
+Google OAuth didukung untuk login dan pendaftaran. Metode ini tidak menggantikan kewajiban pemilihan role atau verifikasi kontak; pengguna yang mendaftar dengan Google tidak perlu membuat atau memasukkan kata sandi lokal terpisah.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -289,73 +289,73 @@ Google OAuth is supported for sign-in and registration. It does not replace mand
 | GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
 | GET | `/auth/oauth/google/callback` | Validate provider response and continue the role-bound flow |
 
-For a new Google identity, the user must first select Owner or Investor, then complete Google OAuth and select exactly one contact method (email code or WhatsApp-delivered phone code) for separate verification before account activation. No separate local password is required. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
+Untuk identitas Google baru, pengguna harus memilih Owner atau Investor terlebih dahulu, menyelesaikan Google OAuth, lalu memilih tepat satu metode kontak (kode email atau kode telepon melalui WhatsApp) untuk diverifikasi secara terpisah sebelum akun diaktifkan. Kata sandi lokal terpisah tidak diwajibkan. Email yang dinyatakan Google tidak menggantikan verifikasi ini. Konteks role diikat pada state di sisi server dan tidak dapat diubah melalui input callback. Identitas yang sudah terhubung hanya dapat login ke akun lamanya dengan role yang tetap. Jangan mengaitkan akun secara otomatis hanya karena email cocok; pengaitan memerlukan bukti terbaru atas kendali kedua identitas. Akun Admin tidak dapat dibuat melalui OAuth publik. Validasi state, nonce, issuer, audience, signature, expiry, dan redirect URI yang tepat.
 
 ### Autentikasi Admin
 
-Admin authentication uses a separate internal route group and policy. Proposed routes:
+Autentikasi Admin menggunakan kelompok rute dan kebijakan internal yang terpisah. Rute yang diusulkan:
 - `POST /admin/auth/login`
 - `POST /admin/auth/mfa/verify`
 - `POST /admin/auth/logout`
 - `GET /admin/auth/session`
 
-Admin account creation is a privileged internal operation, not a public authentication API. Admin authorization is permission-based, not just `primary_role=admin`.
+Pembuatan akun Admin merupakan operasi internal dengan hak istimewa, bukan API autentikasi publik. Otorisasi Admin berbasis izin, bukan sekadar `primary_role=admin`.
 
 ## 5. Keamanan sesi dan browser
 
 ### Pola sesi browser yang disarankan
 
-Prefer an opaque server-managed session delivered in a cookie:
+Utamakan sesi opaque yang dikelola server dan dikirim melalui cookie:
 
 - `HttpOnly`
 - `Secure` in production
-- `SameSite=Lax` or stricter where compatible with the OAuth callback design
+- `SameSite=Lax` atau lebih ketat jika tetap kompatibel dengan rancangan callback OAuth.
 - Narrow cookie path/domain
-- Explicit idle and absolute expiration
-- Session rotation after login and privilege-sensitive changes
+- Masa kedaluwarsa idle dan absolut yang ditetapkan secara eksplisit.
+- Rotasi sesi setelah login dan perubahan yang sensitif terhadap hak akses.
 
-Avoid storing long-lived bearer tokens in localStorage. If a cross-site architecture requires a different token model, document the trade-offs and add a separate security review.
+Hindari menyimpan bearer token berumur panjang di localStorage. Jika arsitektur lintas situs memerlukan model token berbeda, dokumentasikan komprominya dan lakukan tinjauan keamanan terpisah.
 
 ### CSRF dan CORS
 
-- For cookie-authenticated state-changing requests, use CSRF protection appropriate to the deployment topology (token or robust origin/referer strategy).
-- Restrict CORS to exact trusted frontend origins; never combine credentialed requests with wildcard origins.
-- Validate content type and request origin for sensitive endpoints.
-- Keep production origins and OAuth redirect URIs in environment configuration, not hard-coded source.
+- Untuk request perubahan state yang diautentikasi melalui cookie, gunakan perlindungan CSRF yang sesuai dengan topologi deployment (token atau strategi origin/referer yang kuat).
+- Batasi CORS ke origin frontend tepercaya yang ditentukan secara tepat; jangan pernah menggabungkan request berkredensial dengan wildcard origin.
+- Validasi content type dan origin request untuk endpoint sensitif.
+- Simpan origin produksi dan OAuth redirect URI dalam konfigurasi environment, bukan hard-coded di source.
 
 ### Siklus hidup sesi
 
-- Login creates a new session and rotates any pre-auth session state.
-- Logout revokes the current session.
+- Login membuat sesi baru dan merotasi state sesi pra-autentikasi yang ada.
+- Logout mencabut sesi saat ini.
 - Logout-all revokes all sessions.
 - Password reset revokes sessions.
-- Email/WhatsApp verification codes cannot be used to authenticate a login session.
-- Account suspension blocks session use even if a session token has not expired.
-- Role mismatch never creates a session.
-- Sensitive admin actions may require recent re-authentication/MFA.
+- Kode verifikasi email/WhatsApp tidak dapat digunakan untuk mengautentikasi sesi login.
+- Penangguhan akun memblokir penggunaan sesi meskipun token sesi belum kedaluwarsa.
+- Ketidaksesuaian role tidak pernah membuat sesi.
+- Tindakan Admin yang sensitif dapat mewajibkan autentikasi ulang/MFA yang masih baru.
 
-Enforce the approved session limits: 7 days of inactivity and 30 days absolute. Persistent-device preference must not bypass either limit or server-side revocation. Sensitive actions may require fresh authentication.
+Tegakkan batas sesi yang telah disetujui: 7 hari tanpa aktivitas dan 30 hari secara absolut. Preferensi perangkat persisten tidak boleh melewati kedua batas tersebut atau pencabutan di sisi server. Tindakan sensitif dapat mewajibkan autentikasi baru.
 
 ## 6. Kebijakan kata sandi
 
-- Use Argon2id with parameters benchmarked for the deployment environment.
+- Gunakan Argon2id dengan parameter yang telah diukur untuk lingkungan deployment.
 - Use a well-maintained password hashing library; do not design a custom algorithm.
-- Enforce a reasonable minimum length and allow long passphrases.
+- Terapkan panjang minimum yang wajar dan izinkan passphrase yang panjang.
 - Do not force arbitrary periodic password changes absent compromise.
 - Block known-compromised/common passwords where a safe, privacy-preserving check is available.
 - Do not silently truncate passwords.
-- Rate-limit authentication attempts and use progressive abuse controls.
-- Keep password reset tokens single-use and short-lived.
+- Terapkan rate limit pada percobaan autentikasi dan gunakan kontrol penyalahgunaan bertahap.
+- Pastikan token reset kata sandi hanya dapat digunakan satu kali dan berumur singkat.
 
-Exact Argon2id parameters and password policy values belong in configuration/security review, not guessed constants in UI code.
+Parameter Argon2id dan nilai kebijakan kata sandi yang tepat harus ditetapkan melalui tinjauan konfigurasi/keamanan, bukan ditebak sebagai konstanta dalam kode UI.
 
 ## 7. Kontrol penyalahgunaan OTP dan verifikasi
 
 Apply layered limits:
 - Per destination (email/phone).
-- Per account.
-- Per IP or network signal, with privacy-aware retention.
-- Per challenge and purpose.
+- Berdasarkan akun.
+- Berdasarkan IP atau sinyal jaringan, dengan retensi yang memperhatikan privasi.
+- Berdasarkan challenge dan tujuan penggunaannya.
 - Global provider spend/throughput guard.
 
 Also require:
@@ -363,32 +363,32 @@ Also require:
 - One-time use.
 - Bounded attempts.
 - Resend cooldown.
-- Challenge invalidation on successful verification or superseding request.
-- Uniform responses that do not confirm account existence.
-- Monitoring for repeated delivery failures, enumeration patterns, and unusual OTP request volume.
+- Pembatalan challenge setelah verifikasi berhasil atau digantikan oleh request baru.
+- Respons seragam yang tidak mengonfirmasi keberadaan akun.
+- Pemantauan kegagalan pengiriman berulang, pola enumerasi akun, dan volume permintaan OTP yang tidak wajar.
 
-Do not use a client-side countdown as the enforcement mechanism; the server owns expiry and rate limits.
+Jangan gunakan hitung mundur di sisi klien sebagai mekanisme penegakan; masa berlaku dan rate limit ditentukan server.
 
 ## 8. Validasi Google OAuth dan pengaitan akun
 
 On callback, validate at minimum:
-- State matches the server-issued one-time state.
-- Nonce matches when used by the selected flow.
-- Issuer, audience/client ID, signature, and token expiry.
+- State cocok dengan state sekali pakai yang diterbitkan server.
+- Nonce cocok jika digunakan oleh alur yang dipilih.
+- Issuer, audience/client ID, signature, dan masa berlaku token.
 - Exact redirect URI.
-- Provider subject is present and stable.
-- The requested role context is the same as the initiated flow.
+- Subject dari penyedia tersedia dan stabil.
+- Konteks role yang diminta sama dengan alur yang dimulai.
 
-For a new Google identity, continue only the role-bound registration flow and require separate email or WhatsApp contact-code verification before activation. A previously linked provider identity may authenticate only its existing account. Never change role or auto-link based on matching email.
+Untuk identitas Google baru, lanjutkan hanya alur pendaftaran yang terikat pada role dan wajibkan verifikasi kontak terpisah melalui email atau WhatsApp sebelum aktivasi. Identitas penyedia yang sudah terhubung hanya dapat mengautentikasi akun yang sudah ada. Jangan mengubah role atau mengaitkan akun otomatis berdasarkan kecocokan email.
 
-Account linking rules:
-1. Require an authenticated session on the existing account.
-2. Require fresh proof of control of the provider identity.
-3. Show which provider is being linked and ask for confirmation.
+Aturan pengaitan akun:
+1. Wajibkan sesi terautentikasi pada akun yang sudah ada.
+2. Wajibkan bukti terbaru atas kendali identitas penyedia.
+3. Tampilkan penyedia yang akan dihubungkan dan minta konfirmasi.
 4. Enforce uniqueness on provider + subject.
 5. Audit link/unlink actions.
-6. Never auto-merge two user records based only on matching email strings.
-7. Do not allow linking that changes the account's primary role.
+6. Jangan pernah menggabungkan dua record pengguna secara otomatis hanya berdasarkan kecocokan teks email.
+7. Jangan izinkan pengaitan yang mengubah role utama akun.
 
 ## 9. Matriks otorisasi
 
@@ -409,7 +409,7 @@ Account linking rules:
 | Manage membership | No | Own plan/usage | Own plan/usage | Entitlement administration |
 | Provision Admin | No | No | No | Super-admin only |
 
-Admin permissions must be granular (e.g. user review, business verification, post moderation, membership operations, audit read). A broad Admin role alone is not sufficient.
+Izin Admin harus terperinci (misalnya tinjauan pengguna, verifikasi usaha, moderasi posting, operasi keanggotaan, dan pembacaan audit). Role Admin yang luas saja tidak cukup.
 
 ## 10. Konvensi respons error
 
@@ -427,11 +427,11 @@ Use a consistent API error envelope, for example:
 
 Requirements:
 - Stable machine-readable error codes.
-- User-safe messages.
-- No stack traces, SQL errors, provider tokens, or secret values.
-- Include a correlation/request ID for support.
-- Do not return different unauthenticated recovery responses that reveal account existence.
-- Validation errors identify safe field-level issues without echoing sensitive values.
+- Pesan yang aman dan mudah dipahami pengguna.
+- Jangan sertakan stack trace, error SQL, token penyedia, atau nilai secret.
+- Sertakan correlation/request ID untuk kebutuhan dukungan.
+- Jangan memberikan respons pemulihan tanpa autentikasi yang berbeda sehingga mengungkap keberadaan akun.
+- Error validasi menjelaskan masalah pada field yang aman tanpa mengulang nilai sensitif.
 
 ## 11. Model ancaman dan mitigasi wajib
 
@@ -451,62 +451,62 @@ Requirements:
 | Abuse of verification provider | Per-destination/global rate limits, spend caps, monitoring |
 | Replay of reset/verification tokens | One-time consumption, expiry, hashed storage, atomic updates |
 
-This is a baseline threat model, not a substitute for penetration testing or a formal security assessment.
+Ini merupakan baseline model ancaman, bukan pengganti penetration test atau penilaian keamanan formal.
 
 ## 12. Rencana pengujian wajib
 
 ### Pengujian unit
 
 - Password hash/verify behavior.
-- Email and phone normalization.
-- Role parsing and expected-role comparison.
-- Primary role is immutable after account creation; no profile, support, or admin workflow can mutate it.
-- Separate registration is required to create an account for the other client role.
-- Duplicate email, phone, or provider identities cannot be linked to a second account.
-- Verification challenge expiry, attempt limits, and one-time consumption.
-- Password reset token expiry and single-use behavior.
-- Session expiry and revocation.
-- Authorization policy decisions.
+- Normalisasi email dan nomor telepon.
+- Parsing role dan perbandingan dengan role yang diharapkan.
+- Role utama tidak dapat diubah setelah akun dibuat; tidak ada alur profil, bantuan, atau Admin yang boleh mengubahnya.
+- Pendaftaran terpisah diwajibkan untuk membuat akun dengan role klien lainnya.
+- Email, nomor telepon, atau identitas penyedia yang duplikat tidak dapat dihubungkan ke akun kedua.
+- Masa berlaku challenge verifikasi, batas percobaan, dan konsumsi satu kali.
+- Masa berlaku token reset kata sandi dan perilaku penggunaan satu kali.
+- Masa berlaku dan pencabutan sesi.
+- Keputusan kebijakan otorisasi.
 
 ### Pengujian integrasi API
 
-- Owner can register and authenticate through Owner portal.
-- Investor can register and authenticate through Investor portal.
-- Owner login rejects Investor account and does not create a session.
-- Investor login rejects Owner account and does not create a session.
-- Public Admin registration does not exist and cannot be invoked.
-- Unverified contact behavior matches the approved policy.
-- OTP resend and confirmation limits are enforced server-side.
-- Recovery response does not reveal account existence.
+- Owner dapat mendaftar dan login melalui portal Owner.
+- Investor dapat mendaftar dan login melalui portal Investor.
+- Login Owner menolak akun Investor dan tidak membuat sesi.
+- Login Investor menolak akun Owner dan tidak membuat sesi.
+- Pendaftaran Admin publik tidak tersedia dan tidak dapat dipanggil.
+- Perilaku kontak yang belum diverifikasi sesuai dengan kebijakan yang disetujui.
+- Batas kirim ulang dan konfirmasi OTP ditegakkan di sisi server.
+- Respons pemulihan tidak mengungkap keberadaan akun.
 - Reset token cannot be reused.
-- Logout and logout-all revoke sessions.
+- Logout dan logout semua perangkat mencabut sesi.
 - Suspended accounts cannot use existing sessions.
 - OAuth state mismatch/expired state/invalid audience/invalid issuer are rejected.
-- Duplicate provider subject cannot be linked to a second user and linking requires fresh proof of both identities.
-- OAuth must never create a second account using a provider subject already linked to an account with another role.
-- Unauthorized user cannot read/update another user's business or profile.
+- Subject penyedia yang duplikat tidak dapat dihubungkan ke pengguna kedua dan pengaitan memerlukan bukti terbaru atas kedua identitas.
+- OAuth tidak boleh membuat akun kedua menggunakan subject penyedia yang sudah terhubung ke akun dengan role lain.
+- Pengguna tanpa izin tidak dapat membaca/memperbarui usaha atau profil milik pengguna lain.
 - Non-participant cannot read a conversation.
-- Chat access is granted only after a connection is accepted.
-- Free membership can chat after an accepted connection.
+- Akses chat hanya diberikan setelah koneksi disetujui.
+- Anggota Free dapat mengirim pesan setelah koneksi disetujui.
 
 ### Pengujian keamanan dan operasional
 
 - Rate limiting is enforced across multiple application instances if horizontally scaled.
 - CORS rejects untrusted origins.
 - Cookie flags are correct in production configuration.
-- Logs redact secrets and personal authentication values.
+- Log menyamarkan secret dan nilai autentikasi pribadi.
 - Error responses do not expose internal details.
-- Admin MFA is required before protected Admin routes.
-- Audit logs are written for privileged actions and cannot be modified by ordinary Admin users.
+- MFA Admin diwajibkan sebelum mengakses rute Admin yang dilindungi.
+- Audit log dibuat untuk tindakan dengan hak istimewa dan tidak dapat diubah oleh pengguna Admin biasa.
 
 ### Pengujian frontend
 
-- Separate Owner/Investor login pages render the correct copy and destinations.
+- Halaman login Owner/Investor yang terpisah menampilkan teks dan tujuan navigasi yang benar.
 - Password show/hide is accessible.
-- Validation and error messages are associated with fields.
-- Submit cannot be triggered repeatedly while pending.
-- OTP supports paste and keyboard navigation.
-- Registration progress and back/forward behavior are predictable.
+- Pesan validasi dan error terhubung dengan field terkait.
+- Tombol kirim tidak dapat dipicu berulang saat proses masih berjalan.
+- OTP mendukung paste dan navigasi keyboard.
+- Progres pendaftaran dan perilaku tombol kembali/lanjut dapat diprediksi.
 - OAuth cancel/failure state is recoverable.
 - Mobile layouts do not overflow horizontally.
 
@@ -514,16 +514,16 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 
 1. **Reproducibilitas dependency — selesai:** lockfile frontend/backend tersedia dan CI menggunakan instalasi dependency yang terkunci.
 2. **Fondasi database — selesai:** pool PostgreSQL runtime, pemisahan principal aplikasi/migrator, migration Identity Core 0001–0005, serta akses terbatas untuk pembuatan akun pending dan penambahan audit event sudah tersedia. Migration produksi tetap merupakan operasi terpisah.
-3. **Domain types:** define User, PrimaryRole, AccountStatus, Session, VerificationChallenge, and typed error codes.
-4. **Registration:** implement Owner/Investor registration with validation and safe pending state.
-5. **Verification:** implement email and phone challenge lifecycle behind provider interfaces.
-6. **Password auth:** implement hashing, role-specific login, session cookie, logout, and recovery.
-7. **Google OAuth:** implement role-bound sign-in/registration; new accounts must select a role before OAuth, need no separate local password, and must still complete selected email or WhatsApp contact verification.
-8. **Authorization:** add backend role/resource policies and negative tests.
-9. **Admin foundation:** provisioning, MFA, permissions, and audit trail.
-10. **Hardening:** rate-limit review, security tests, logging review, accessibility, and deployment configuration.
+3. **Tipe domain:** definisikan User, PrimaryRole, AccountStatus, Session, VerificationChallenge, dan kode error bertipe.
+4. **Pendaftaran:** implementasikan pendaftaran Owner/Investor dengan validasi dan status pending yang aman.
+5. **Verifikasi:** implementasikan siklus hidup challenge email dan telepon di balik interface penyedia.
+6. **Autentikasi kata sandi:** implementasikan hashing, login sesuai role, cookie sesi, logout, dan pemulihan akun.
+7. **Google OAuth:** implementasikan login/pendaftaran yang terikat pada role; akun baru harus memilih role sebelum OAuth, tidak memerlukan kata sandi lokal terpisah, dan tetap harus menyelesaikan verifikasi kontak terpilih melalui email atau WhatsApp.
+8. **Otorisasi:** tambahkan kebijakan role/sumber daya di backend dan pengujian negatif.
+9. **Fondasi Admin:** provisioning, MFA, izin, dan audit trail.
+10. **Penguatan keamanan:** tinjau rate limit, pengujian keamanan, logging, aksesibilitas, dan konfigurasi deployment.
 
-Implement each step as a small pull request. Do not merge until CI, focused integration tests, and the relevant security checks pass.
+Implementasikan setiap tahap melalui pull request berukuran kecil. Jangan merge sebelum CI, pengujian integrasi yang terarah, dan pemeriksaan keamanan terkait lulus.
 
 ## 14. Keputusan tersisa sebelum implementasi
 
