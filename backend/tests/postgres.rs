@@ -846,7 +846,7 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
 
     for count in 1_i16..=4 {
         sqlx::query(
-            "UPDATE public.verification_sessions SET failed_attempt_count = $2 WHERE id = $1::uuid"
+            "UPDATE public.verification_sessions SET failed_attempt_count = $2 WHERE id = $1::uuid",
         )
         .bind(&lock_session_id)
         .bind(count)
@@ -856,7 +856,7 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     }
 
     sqlx::query(
-        "UPDATE public.verification_sessions SET failed_attempt_count = 5 WHERE id = $1::uuid"
+        "UPDATE public.verification_sessions SET failed_attempt_count = 5 WHERE id = $1::uuid",
     )
     .bind(&lock_session_id)
     .execute(pool)
@@ -1048,10 +1048,10 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     let selected_user_id = insert_active_email(pool, "recovery-target@example.test").await;
     sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
         .bind(&recovery_session_id)
-    .bind(&selected_user_id)
-    .execute(pool)
-    .await
-    .expect("verified recovery session may be assigned to one selected account");
+        .bind(&selected_user_id)
+        .execute(pool)
+        .await
+        .expect("verified recovery session may be assigned to one selected account");
 
     assert!(
         sqlx::query(
