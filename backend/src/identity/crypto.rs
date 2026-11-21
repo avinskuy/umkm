@@ -75,6 +75,38 @@ pub struct KeyedDigest {
     pub digest: [u8; DIGEST_LEN],
 }
 
+/** Context yang mengikat digest OTP pada challenge, sesi, tujuan, kanal, dan kode. */
+pub struct OtpVerificationContext<'a> {
+    pub challenge_id: &'a [u8],
+    pub session_id: &'a [u8],
+    pub purpose: &'a str,
+    pub channel: &'a str,
+    pub code: &'a [u8],
+}
+
+impl OtpVerificationContext<'_> {
+    fn validate(&self) -> Result<(), CryptoError> {
+        if self.challenge_id.is_empty()
+            || self.session_id.is_empty()
+            || self.purpose.is_empty()
+            || self.channel.is_empty()
+            || self.code.is_empty()
+        {
+            return Err(CryptoError::InvalidInput);
+        }
+        Ok(())
+    }
+
+    fn append_to(&self, input: &mut Vec<u8>) -> Result<(), CryptoError> {
+        append_field(input, self.challenge_id)?;
+        append_field(input, self.session_id)?;
+        append_field(input, self.purpose.as_bytes())?;
+        append_field(input, self.channel.as_bytes())?;
+        append_field(input, self.code)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CryptoError {
     KeyUnavailable,
@@ -192,20 +224,9 @@ pub fn contact_fingerprint(
 pub fn otp_digest(
     provider: &dyn KeyProvider,
     version: Option<KeyVersion>,
-    challenge_id: &[u8],
-    session_id: &[u8],
-    purpose: &str,
-    channel: &str,
-    code: &[u8],
+    context: &OtpVerificationContext<'_>,
 ) -> Result<KeyedDigest, CryptoError> {
-    if challenge_id.is_empty()
-        || session_id.is_empty()
-        || purpose.is_empty()
-        || channel.is_empty()
-        || code.is_empty()
-    {
-        return Err(CryptoError::InvalidInput);
-    }
+    context.validate()?;
 
     let versioned_key = match version {
         Some(version) => {
@@ -215,11 +236,7 @@ pub fn otp_digest(
     };
 
     let mut input = Zeroizing::new(OTP_DOMAIN.to_vec());
-    append_field(&mut input, challenge_id)?;
-    append_field(&mut input, session_id)?;
-    append_field(&mut input, purpose.as_bytes())?;
-    append_field(&mut input, channel.as_bytes())?;
-    append_field(&mut input, code)?;
+    context.append_to(&mut input)?;
 
     let key = hmac::Key::new(hmac::HMAC_SHA256, versioned_key.key.expose());
     let tag = hmac::sign(&key, &input);
@@ -236,29 +253,14 @@ pub fn otp_digest(
 pub fn verify_otp_digest(
     provider: &dyn KeyProvider,
     version: KeyVersion,
-    challenge_id: &[u8],
-    session_id: &[u8],
-    purpose: &str,
-    channel: &str,
-    code: &[u8],
+    context: &OtpVerificationContext<'_>,
     expected_digest: &[u8; DIGEST_LEN],
 ) -> Result<bool, CryptoError> {
-    if challenge_id.is_empty()
-        || session_id.is_empty()
-        || purpose.is_empty()
-        || channel.is_empty()
-        || code.is_empty()
-    {
-        return Err(CryptoError::InvalidInput);
-    }
+    context.validate()?;
 
     let key_material = provider.key(KeyPurpose::OtpVerification, version)?;
     let mut input = Zeroizing::new(OTP_DOMAIN.to_vec());
-    append_field(&mut input, challenge_id)?;
-    append_field(&mut input, session_id)?;
-    append_field(&mut input, purpose.as_bytes())?;
-    append_field(&mut input, channel.as_bytes())?;
-    append_field(&mut input, code)?;
+    context.append_to(&mut input)?;
 
     let key = hmac::Key::new(hmac::HMAC_SHA256, key_material.expose());
     Ok(hmac::verify(&key, &input, expected_digest).is_ok())
@@ -346,37 +348,31 @@ mod tests {
     #[test]
     fn otp_digest_is_bound_to_challenge_and_session() {
         let provider = TestKeyProvider;
-        let digest = otp_digest(
-            &provider,
-            None,
-            b"challenge-a",
-            b"session-a",
-            "registration",
-            "email",
-            b"123456",
-        )
-        .unwrap();
+        let original_context = OtpVerificationContext {
+            challenge_id: b"challenge-a",
+            session_id: b"session-a",
+            purpose: "registration",
+            channel: "email",
+            code: b"123456",
+        };
+        let digest = otp_digest(&provider, None, &original_context).unwrap();
 
         assert!(verify_otp_digest(
             &provider,
             digest.key_version,
-            b"challenge-a",
-            b"session-a",
-            "registration",
-            "email",
-            b"123456",
+            &original_context,
             &digest.digest,
         )
         .unwrap());
 
+        let modified_context = OtpVerificationContext {
+            challenge_id: b"challenge-b",
+            ..original_context
+        };
         assert!(!verify_otp_digest(
             &provider,
             digest.key_version,
-            b"challenge-b",
-            b"session-a",
-            "registration",
-            "email",
-            b"123456",
+            &modified_context,
             &digest.digest,
         )
         .unwrap());
