@@ -158,7 +158,7 @@ pub fn decrypt(
         .open_in_place(
             aead::Nonce::assume_unique_for_key(payload.nonce),
             aead::Aad::from(associated_data),
-            &mut buffer,
+            &mut buffer[..],
         )
         .map_err(|_| CryptoError::AuthenticationFailed)?;
 
