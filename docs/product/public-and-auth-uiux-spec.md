@@ -157,11 +157,10 @@ Content:
 1. Brand and a short return link to the public site.
 2. Heading: **Masuk sebagai Pemilik Usaha**
 3. Supporting text: **Kelola profil usaha, bagikan peluang, dan kembangkan koneksi.**
-4. Authentication form using the login identifier/method approved by the separate login-policy decision.
-5. Registration link for new Owners.
-6. Privacy/terms links and support link.
-
-Do not show Google sign-in until its account-creation/linking policy is approved.
+4. Authentication form using the approved login identifier/method.
+5. Google sign-in action for existing linked identities and role-bound new registrations.
+6. Registration link for new Owners.
+7. Privacy/terms links and support link.
 
 ### Form fields and behavior
 
@@ -281,9 +280,15 @@ Ask for only the fields relevant to the selected stage:
 - CTA to Investor dashboard and opportunity discovery.
 - Preferences can be edited later.
 
-## 9. Google OAuth behavior — decision pending
+## 9. Google OAuth behavior
 
-Existing references to Google OAuth are not implementation approval. Whether Google can create accounts, only link after verified registration, or is excluded from the MVP remains unresolved. Do not show Google actions or implement OAuth callbacks/account linking until the decision is approved. If later approved, validate state, nonce, issuer, audience, signature, expiry, and redirect URI; never auto-link accounts on matching email alone.
+- Google OAuth remains available for sign-in and registration.
+- The user must choose Owner or Investor before starting a new Google registration flow. Role context is protected by server-side OAuth state.
+- A new Google identity must still complete the selected contact verification step: email code OR WhatsApp-delivered phone code. Google-asserted email alone does not satisfy this requirement.
+- Existing linked Google identities sign in only to their existing account. The account's primary role remains immutable and determines the correct portal.
+- Never auto-link based only on matching email. Linking requires fresh proof of control of both identities.
+- Admin registration is never available through public Google OAuth.
+- Validate state, nonce, issuer, audience, signature, expiry, redirect URI, and replay protection.
 
 ## 10. Password recovery
 
@@ -363,7 +368,7 @@ Do not send passwords, OTP values, raw phone/email, tokens, or sensitive form co
 - [ ] Shared form behavior is consistent.
 - [ ] Role mismatch is handled by the backend and gives a safe next step.
 - [ ] Password visibility, forgot password, loading, error, and rate-limit states are designed.
-- [ ] Google OAuth behavior is approved before any implementation.
+- [ ] Google OAuth preserves role-bound registration, separate contact verification, and safe identity linking.
 
 ### Registration and verification
 - [ ] Only Owner and Investor can register publicly.
