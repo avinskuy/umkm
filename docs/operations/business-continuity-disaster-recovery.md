@@ -1,4 +1,4 @@
-# Business Continuity & Disaster Recovery (BCDR)
+# Kesinambungan Bisnis & Pemulihan Bencana (BCDR)
 
 - **Status:** Disetujui sebagai baseline.
 - **Acuan utama:** NIST SP 800-34 Rev. 1.
