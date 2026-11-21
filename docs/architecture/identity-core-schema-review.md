@@ -168,17 +168,17 @@ Pilihan algoritma/jendela rate limit dan key rotation perlu ditetapkan sebelum m
 
 Tes concurrency harus menggunakan beberapa koneksi PostgreSQL, bukan hanya unit test atau mock.
 
-## 6. Keputusan teknis yang masih menjadi penghalang migration
+## 6. Penyelesaian penghalang teknis
 
-Keputusan produk utama telah disetujui. Hal berikut merupakan keputusan teknis yang belum boleh diisi dengan asumsi:
+Lima penghalang teknis dari tinjauan awal telah memiliki baseline keputusan dalam [Keputusan Teknis Identity Core](identity-core-technical-decisions.md):
 
-1. **Perlindungan tujuan pengiriman OTP:** mekanisme enkripsi nilai email/nomor yang harus dipakai ulang untuk pengiriman, lokasi/akses key, rotasi, dan pemulihan. HMAC untuk pencarian tidak dapat digunakan untuk mengirim OTP.
-2. **Rate-limit lintas sesi:** bentuk penyimpanan persisten, algoritma jendela waktu, atomic update, key versioning/rotation, dan retensi.
-3. **Status akun final:** pemetaan tepat status pending, active, suspended, deactivated, deletion pending/processing, expired, dan closed; termasuk cara melepas reservasi kontak tanpa membuka celah reuse dini.
-4. **Provisioning Admin:** jalur pembuatan akun Admin dan aturan kontak/MFA awal tanpa membuka registrasi publik.
-5. **Audit boundary:** event minimum dan pemisahan log operasional dari audit trail yang append-only.
+1. **Perlindungan tujuan OTP:** ciphertext AEAD untuk kebutuhan pengiriman ulang, HMAC terpisah untuk pencarian dan pembatasan, key di luar database, serta rotasi versi secara terencana.
+2. **Rate limit lintas sesi:** event pengiriman persisten di PostgreSQL, jendela bergulir 60 menit, cooldown 60 detik, dan serialisasi transaksi per fingerprint tujuan agar berlaku lintas koneksi/instance.
+3. **Status akun final:** `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`; suspend/limit fitur dicatat terpisah sebagai enforcement agar tidak bertabrakan dengan lifecycle penghapusan. Reservasi kontak hanya dilepas setelah transisi terminal yang sah.
+4. **Provisioning Admin:** jalur internal terpisah, principal/kredensial provisioning terpisah dari runtime API publik, role immutable, audit, dan bootstrap MFA sebelum akses istimewa.
+5. **Audit boundary:** tabel audit khusus, principal aplikasi insert-only, pemilik tabel terpisah, metadata allowlist, dan larangan menyimpan rahasia atau isi privat.
 
-Provider email/WhatsApp, jumlah digit OTP, parameter password hashing, retensi numerik, dan detail MFA Admin tetap ditangani pada tahap implementasi terkait. Tidak perlu membuka ulang kebijakan OTP yang sudah disetujui.
+Keputusan tersebut menetapkan arah desain, bukan mengklaim seluruh mekanisme sudah diimplementasikan. Library AEAD/KMS, provider OTP, detail cleanup, MFA Admin, dan retensi numerik tetap diverifikasi pada tahap implementasi terkait.
 
 ## 7. Rencana pengujian sebelum migration dianggap siap
 
@@ -216,15 +216,17 @@ Semua pengujian database harus memakai database PostgreSQL sementara yang dapat 
 
 ## 8. Gate untuk pekerjaan berikutnya
 
-Tahap desain ini selesai ketika:
+Tahap finalisasi keputusan teknis dinyatakan siap ketika:
 
-- [ ] lima penghalang teknis pada Bagian 6 memiliki keputusan dan pemilik yang jelas;
-- [ ] nama kolom/status, tipe PostgreSQL, constraint, partial index, dan foreign key untuk migration pertama ditinjau;
+- [x] lima penghalang teknis memiliki baseline keputusan dan batas implementasi;
+- [ ] nama kolom final, tipe PostgreSQL, constraint, partial index, dan foreign key untuk migration pertama ditinjau;
 - [ ] migration sequence dibatasi pada slice yang benar-benar akan diimplementasikan;
-- [ ] test plan concurrency dan integritas dapat dijalankan di CI;
-- [ ] perubahan dokumentasi selaras dengan seluruh kebijakan Identity Core yang telah disetujui.
+- [ ] test plan concurrency dan integritas diterjemahkan menjadi tes PostgreSQL yang dapat dijalankan di CI;
+- [x] perubahan dokumentasi selaras dengan kebijakan Identity Core yang telah disetujui.
 
-Setelah gate ini terpenuhi, implementasi dimulai dari migration akun/role yang paling kecil. Jangan mengaktifkan migration otomatis pada startup HTTP atau memakai database produksi sebelum ada tinjauan deployment dan persetujuan terpisah.
+Tahap berikutnya adalah **review kontrak skema migration 0001 untuk identitas akun**. Fokusnya hanya tabel akun, role immutable, status lifecycle, kontak utama, identitas provider bila benar-benar diperlukan pada slice pertama, dan reservasi kontak. Jangan memasukkan verifikasi, sesi, recovery, atau audit ke migration 0001 sebelum kontrak dan dependensinya ditinjau.
+
+Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
 ## 9. Referensi internal
 
