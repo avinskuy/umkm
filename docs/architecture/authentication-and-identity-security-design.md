@@ -3,7 +3,7 @@
 > Status: skema akun, verifikasi, dan sesi tersedia; runtime autentikasi masih belum diimplementasikan  
 > Product reference: `docs/product/public-and-auth-uiux-spec.md`  
 > Wireframe reference: `docs/product/low-fidelity-public-auth-wireframes.md`  
-> Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 foundation is available. The first account/Google-identity migration is implemented; verification, sessions, recovery, and runtime flows remain unimplemented.
+> Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 foundation is available. Account, contact-verification, and session schema migrations are implemented; recovery schema and authentication runtime flows remain unimplemented.
 
 This document defines the authentication architecture for USahapintar. The account, contact-verification, and authentication-session database slices are implemented, but authentication endpoints, cookie handling, middleware, and runtime database integration are not. This is not a claim of a production-ready or security-audited system. Provider choices, operational secrets, retention periods, and final controls must be reviewed before production use.
 
