@@ -1,6 +1,6 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration akun pertama terimplementasi; kontrak migration verifikasi 0002 sedang ditinjau
+> Status: migration akun 0001 terimplementasi; migration verifikasi 0002 tersedia pada branch implementasi dan menunggu CI/review
 > Tanggal: 21 November 2026
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
@@ -10,7 +10,7 @@ Dokumen ini adalah catatan gerbang desain teknis awal Identity Core. Dokumen ini
 
 - Backend menggunakan Rust, Axum, Tokio, dan SQLx 0.8 dengan PostgreSQL 16 sebagai baseline.
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
-- `backend/migrations/` kini memiliki migration akun Identity Core pertama untuk `users` dan `user_identities`.
+- `backend/migrations/` memiliki migration akun 0001 untuk `users` dan `user_identities`, serta migration 0002 untuk sesi verifikasi, challenge, dan event OTP pada branch implementasi.
 - HTTP server saat ini hanya menyediakan `GET /api/v1/health`. Database belum diinisialisasi oleh proses startup.
 - Tes integrasi PostgreSQL kini memeriksa constraint akun, role immutable, initial-contact provenance, deadline registrasi 30 menit, masa tunggu penghapusan 30 hari, reservasi kontak, konkurensi, Google provider identity, dan metode autentikasi.
 - Tidak ada pull request terbuka saat pemeriksaan. Tidak ada perubahan runtime atau deployment yang dilakukan dalam tahap ini.
@@ -37,7 +37,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 | Urutan | Cakupan | Isi utama |
 | --- | --- | --- |
 | 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, identitas provider, dan perlindungan role immutable |
-| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; kontrak skema sedang ditinjau di [dokumen migration 0002](identity-core-migration-0002-verification-contract.md) |
+| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; implementasi skema sedang diuji pada branch PR |
 | 0003 | Sesi autentikasi | `sessions`, token hash, idle/absolute expiry, dan pencabutan |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
 | 0005 | Audit Identity Core | audit event yang dibutuhkan untuk perubahan identitas, sesi, verifikasi, dan pemulihan |
@@ -226,7 +226,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 
 Pekerjaan berikutnya adalah meninjau kontrak [migration 0002 untuk verifikasi kontak](identity-core-migration-0002-verification-contract.md), khususnya konsistensi enkripsi/HMAC, rotasi fingerprint, serialisasi advisory lock, batas percobaan lintas sesi, dan transaksi resend/verifikasi. Migration SQL belum dibuat sampai kontrak ini lolos review. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
-Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
+Migration 0002 menunggu hasil CI dan review PR. Migration 0001 maupun 0002 tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
 ## 9. Referensi internal
 
