@@ -164,7 +164,7 @@ Content:
 
 ### Form fields and behavior
 
-- Login requires the account password. Email/WhatsApp registration codes only activate the account and are never a passwordless login method.
+- Login accepts the registered email or phone number plus the account password. Email/WhatsApp codes only activate the account and are never login credentials.
 - Password field with show/hide toggle.
 - Forgot password link.
 - Remember-device/session option only if the backend session policy supports it safely; do not imply permanent sessions.
@@ -260,7 +260,7 @@ Ask for only the fields relevant to the selected stage:
 - Choose one contact method: email address OR phone number.
 - If email is chosen, send the verification code to that email address.
 - If phone is chosen, send the verification code through WhatsApp.
-- Password and confirmation only if required by the approved login model.
+- Required password and confirmation fields for every account.
 - Required Terms and Privacy Policy acceptance.
 - Optional product updates consent, unchecked by default.
 
