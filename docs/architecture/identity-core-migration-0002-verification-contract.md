@@ -224,7 +224,7 @@ Semua tes race/concurrency harus memakai beberapa koneksi PostgreSQL nyata, buka
 
 ## 9. Gate sebelum implementasi
 
-Migration SQL 0002 baru boleh dibuat setelah review memastikan:
+Implementasi SQL 0002 harus memenuhi gate review berikut sebelum dianggap siap:
 
 - [ ] Kontrak purpose dan channel sesuai alur produk yang disetujui.
 - [ ] Representasi ciphertext/HMAC/key version cocok dengan abstraksi key provider yang akan dipakai backend.
