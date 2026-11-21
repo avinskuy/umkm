@@ -233,10 +233,9 @@ Hal berikut bukan penghalang untuk menyepakati model konseptual, tetapi harus di
 
 Keputusan ini tidak membuka ulang kebijakan OTP atau recovery yang telah disetujui; ini adalah detail implementasi dan operasi yang perlu diverifikasi sebelum rilis fitur terkait.
 
-
 ## Database principal dan privilege bootstrap
 
-Provisioning role PostgreSQL tidak dimasukkan ke SQLx schema migration. Database khusus memakai role group `usahapintar_app`, `usahapintar_backup`, `usahapintar_monitor`, dan `usahapintar_audit_reader), serta login terpisah untuk runtime, migrator, backup, dan monitoring. Semua login non-superuser dan tanpa CREATEDB/CREATEROLE/BYPASSRLS. DBA tetap dikelola di luar skrip aplikasi.
+Provisioning role PostgreSQL tidak dimasukkan ke SQLx schema migration. Database khusus memakai role group `usahapintar_app`, `usahapintar_backup`, `usahapintar_monitor`, dan `usahapintar_audit_reader`, serta login terpisah untuk runtime, migrator, backup, dan monitoring. Semua login non-superuser dan tanpa CREATEDB/CREATEROLE/BYPASSRLS. DBA tetap dikelola di luar skrip aplikasi.
 
 Semua migration harus dijalankan oleh `usahapintar_migrator`. Hal ini kritis karena fungsi `create_client_user` menggunakan SECURITY DEFINER: owner fungsi harus migrator non-superuser, tidak memiliki role membership lain, dan fungsi harus memakai `search_path=pg_catalog`. Grant aplikasi gagal tertutup jika ownership atau konfigurasi ini tidak cocok.
 
