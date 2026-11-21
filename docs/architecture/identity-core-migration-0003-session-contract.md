@@ -1,6 +1,6 @@
 # Kontrak Skema Migration 0003 — Sesi Autentikasi
 
-> Status: implementasi skema dan tes berada pada PR; belum menjadi fitur autentikasi runtime.
+> Status: skema dan tes migration telah diimplementasikan serta lulus CI; fitur autentikasi runtime belum lengkap.
 > Cakupan: PostgreSQL 16 + SQLx 0.8.
 > Migration: `20261122110000_create_identity_sessions.sql`.
 
@@ -88,7 +88,7 @@ Tes runtime terpisah tetap diperlukan untuk validasi setiap request, cookie/CSRF
 ## 7. Batas operasional
 
 - Migration belum dijalankan pada database produksi.
-- HTTP server belum menginisialisasi database pada startup.
+- HTTP server menginisialisasi pool PostgreSQL saat startup melalui `APP_DATABASE_URL`; migration tetap dijalankan secara eksplisit oleh proses terpisah.
 - Tidak ada GRANT yang dibuka oleh migration ini. Runtime application principal, migration principal, dan database administrator tetap harus dipisahkan sesuai least privilege.
 - Belum ada runtime authentication/session middleware, cookie, endpoint, audit table, cleanup/retention job, atau deployment.
 - Migration yang telah diterapkan pada database bersama tidak boleh diedit; koreksi berikutnya harus memakai migration baru.
