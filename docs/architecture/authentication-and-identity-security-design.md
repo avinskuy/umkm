@@ -217,15 +217,13 @@ Every account must establish a local password during registration, including Goo
 | --- | --- | --- |
 | POST | `/auth/login/owner` | Authenticate only an Owner account |
 | POST | `/auth/login/investor` | Authenticate only an Investor account |
-| POST | `/auth/login/phone/request` | Request a phone OTP login challenge, if approved |
-| POST | `/auth/login/phone/confirm` | Verify OTP and create a session |
 | POST | `/auth/logout` | Revoke current session |
 | POST | `/auth/logout-all` | Revoke all sessions for the authenticated account |
 | GET | `/auth/session` | Return current authenticated user and safe role/session metadata |
 | POST | `/auth/password/forgot` | Request a password reset |
 | POST | `/auth/password/reset` | Consume reset token and set a new password |
 
-The login endpoints must check the expected role on the server. A mismatch returns a generic role-portal guidance response without exposing additional account details.
+Login accepts the registered email or phone number together with the account password. Verification codes are not accepted by login endpoints. The login endpoints must check the expected role on the server. A mismatch returns a generic role-portal guidance response without exposing additional account details.
 
 ### Google OAuth — retained
 
@@ -477,7 +475,7 @@ Implement each step as a small pull request. Do not merge until CI, focused inte
 
 - PostgreSQL hosting and backup/restore approach.
 - Email delivery provider and sender/domain verification.
-- SMS/OTP provider, cost limits, and Indonesia phone delivery reliability.
+- WhatsApp Business/API provider for phone verification, cost limits, and Indonesia delivery reliability.
 - Google OAuth client setup and production callback origins.
 - Exact password and session timeout policy.
 - Password recovery contact and verification workflow details.
