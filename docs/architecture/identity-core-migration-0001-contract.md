@@ -60,7 +60,6 @@ Nilai yang diterima:
 Ketentuan:
 - Satu akun hanya memiliki satu role utama.
 - Role ditetapkan pada pembuatan akun dan tidak dapat diubah sesudah INSERT.
-- `initial_contact_channel` juga immutable karena mencatat metode kontak yang dipilih pada saat registrasi, bukan selalu kanal kontak utama yang masih digunakan saat ini.
 - Public registration hanya dapat membuat `business_owner` atau `investor`.
 - `admin` hanya dibuat melalui jalur provisioning internal dengan principal/workflow terpisah.
 - Tidak ada endpoint, dukungan operasional biasa, OAuth linking, atau proses recovery yang dapat memindahkan role.
