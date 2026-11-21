@@ -272,9 +272,9 @@ Semua poin berikut wajib selesai:
 - NIST SP 800-57, Recommendation for Key Management: https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final
 - OWASP Cryptographic Storage Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
 - Google Tink — Keysets and rotation: https://developers.google.com/tink/design/keysets
-- Google Cloud KMS — Envelope encryption: https://cloud.google.com/kms/docs/envelope-encryption
-- AWS KMS — Envelope encryption: https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#enveloping
-- Azure Key Vault — Key concepts: https://learn.microsoft.com/azure/key-vault/keys/about-keys
+- Google Cloud KMS — Envelope encryption: https://docs.cloud.google.com/kms/docs/envelope-encryption
+- AWS KMS — Envelope encryption: https://docs.aws.amazon.com/kms/latest/APIReference/API_GenerateDataKey.html
+- Azure Key Vault — Key concepts: https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys
 - HashiCorp Vault — Transit secrets engine: https://developer.hashicorp.com/vault/docs/secrets/transit
 - Rust `ring` documentation: https://docs.rs/ring/0.17.14/ring/
 - Rust `zeroize` documentation: https://docs.rs/zeroize/1.9.2/zeroize/
