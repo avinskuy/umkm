@@ -59,7 +59,7 @@ Public visitors can understand the service and membership model. The internal di
 | `/lupa-kata-sandi` | Password recovery | Request a password reset |
 | `/atur-kata-sandi` | Set new password | Complete password recovery |
 
-Supported sign-in methods are email/password, phone OTP, and Google OAuth. The selected role-specific login page must match the account's primary role; the backend rejects a role mismatch with a clear, non-revealing message. Include password visibility, loading/error states, resend cooldown, terms/privacy links, and accessible validation.
+Initial registration requires choosing exactly one contact method: email verified by a one-time code delivered to email, or phone number verified by a one-time code delivered through WhatsApp. Both contact methods are not required at signup; the other may be added and verified later. Google OAuth behavior is pending an explicit product decision. Existing role-specific login entry points remain separate, and the backend rejects a role mismatch with a clear, non-revealing message. Include password visibility, loading/error states, resend cooldown, terms/privacy links, and accessible validation.
 
 Admin uses a separate internal entry at `/admin/login`, with stronger session controls and MFA. It is not linked as a public registration role.
 
@@ -164,7 +164,7 @@ Use least-privilege permissions, MFA, strict session expiry, rate limits, and ap
 ### Owner journey
 
 1. Public landing → choose Owner registration.
-2. Select Business Owner as the account's permanent primary role, register with email, phone, or Google, and verify required contact methods.
+2. Select Business Owner as the permanent primary role, choose either email or phone/WhatsApp as the registration contact, and verify the selected contact.
 3. Complete stage-aware business onboarding.
 4. Enter Owner dashboard and complete the business profile.
 5. Publish a promotion/opportunity post within membership limits.
@@ -175,7 +175,7 @@ Use least-privilege permissions, MFA, strict session expiry, rate limits, and ap
 ### Investor journey
 
 1. Public landing → choose Investor registration.
-2. Select Investor as the account's permanent primary role, register, and verify required contact methods.
+2. Select Investor as the permanent primary role, choose either email or phone/WhatsApp as the registration contact, and verify the selected contact.
 3. Complete investor profile and discovery preferences.
 4. Enter Investor dashboard and explore opportunities.
 5. Review an opportunity and its data-source/verification labels.
