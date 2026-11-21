@@ -75,7 +75,7 @@ pub struct KeyedDigest {
     pub digest: [u8; DIGEST_LEN],
 }
 
-/** Context yang mengikat digest OTP pada challenge, sesi, tujuan, kanal, dan kode. */
+/// Context yang mengikat digest OTP pada challenge, sesi, tujuan, kanal, dan kode.
 pub struct OtpVerificationContext<'a> {
     pub challenge_id: &'a [u8],
     pub session_id: &'a [u8],
@@ -223,17 +223,11 @@ pub fn contact_fingerprint(
 /// Menghasilkan keyed digest OTP yang terikat pada challenge dan sesi.
 pub fn otp_digest(
     provider: &dyn KeyProvider,
-    version: Option<KeyVersion>,
     context: &OtpVerificationContext<'_>,
 ) -> Result<KeyedDigest, CryptoError> {
     context.validate()?;
 
-    let versioned_key = match version {
-        Some(version) => {
-            VersionedKey::new(version, provider.key(KeyPurpose::OtpVerification, version)?)
-        }
-        None => provider.active_key(KeyPurpose::OtpVerification)?,
-    };
+    let versioned_key = provider.active_key(KeyPurpose::OtpVerification)?;
 
     let mut input = Zeroizing::new(OTP_DOMAIN.to_vec());
     context.append_to(&mut input)?;
@@ -355,7 +349,7 @@ mod tests {
             channel: "email",
             code: b"123456",
         };
-        let digest = otp_digest(&provider, None, &original_context).unwrap();
+        let digest = otp_digest(&provider, &original_context).unwrap();
 
         assert!(verify_otp_digest(
             &provider,
