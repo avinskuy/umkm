@@ -4,44 +4,44 @@
 
 ## Kebijakan pendaftaran yang disetujui
 
-1. Public registration is available only for Business Owner and Investor.
-2. The registrant chooses one permanent primary role, then exactly one initial contact method:
-   - Email: a one-time code is delivered to the supplied email address.
-   - Phone: a one-time code is delivered through WhatsApp.
-3. Email and phone are alternatives. Both are not required during initial registration.
-4. Email- or phone-based registration requires a password. Registration through Google OAuth does not require the user to create or enter a separate local password.
-5. The account remains pending verification until the selected channel's code is successfully verified. Verification is an account-activation and anti-bot control, not a passwordless login method.
-6. The selected contact is normalized and uniquely reserved. A contact already associated with another account cannot be reused to create or merge an account.
-7. The non-selected contact may be added later, but must be verified independently before being treated as verified or used for security-sensitive recovery.
-8. Phone numbers use E.164 normalization. WhatsApp delivery is a server-side provider integration; credentials must never enter source control or frontend configuration.
-9. OTPs are never stored or logged in plaintext. Use keyed hashes, expiry, one-time use, bounded attempts, resend cooldown, and destination/account/network rate limits. Delivery failure never marks a contact verified.
-10. Registration and recovery responses must not reveal whether a contact is already associated with an account.
+1. Pendaftaran publik hanya tersedia bagi Business Owner dan Investor.
+2. Pendaftar memilih satu role utama yang bersifat tetap, lalu tepat satu metode kontak awal:
+   - Email: kode sekali pakai dikirim ke alamat email yang diberikan.
+   - Telepon: kode sekali pakai dikirim melalui WhatsApp.
+3. Email dan telepon merupakan pilihan alternatif. Keduanya tidak wajib diberikan saat pendaftaran awal.
+4. Pendaftaran melalui email atau telepon wajib menggunakan kata sandi. Pendaftaran melalui Google OAuth tidak mewajibkan pengguna membuat atau memasukkan kata sandi lokal terpisah.
+5. Akun tetap berstatus menunggu verifikasi sampai kode dari kanal yang dipilih berhasil diverifikasi. Verifikasi merupakan kontrol aktivasi akun dan anti-bot, bukan metode login tanpa kata sandi.
+6. Kontak yang dipilih dinormalisasi dan direservasi secara unik. Kontak yang sudah terhubung ke akun lain tidak dapat digunakan kembali untuk membuat atau menggabungkan akun.
+7. Kontak yang tidak dipilih dapat ditambahkan kemudian, tetapi harus diverifikasi secara terpisah sebelum dianggap terverifikasi atau digunakan untuk pemulihan yang sensitif terhadap keamanan.
+8. Nomor telepon dinormalisasi ke format E.164. Pengiriman WhatsApp merupakan integrasi penyedia di sisi server; kredensial tidak boleh masuk ke source control atau konfigurasi frontend.
+9. OTP tidak pernah disimpan atau dicatat dalam log sebagai teks asli. Gunakan keyed hash, masa berlaku, penggunaan satu kali, batas percobaan, jeda kirim ulang, dan rate limit berdasarkan tujuan/akun/jaringan. Kegagalan pengiriman tidak pernah menandai kontak sebagai terverifikasi.
+10. Respons pendaftaran dan pemulihan tidak boleh mengungkap apakah kontak sudah terhubung ke suatu akun.
 
 ## Invariant role dan identitas
 
 - Setiap akun klien hanya memiliki satu role utama yang disimpan secara permanen dan tidak dapat diubah: `business_owner` atau `investor`.
-- A person who wants the other role must register a separate account using a different, eligible, unlinked contact identity.
-- Admin accounts are provisioned internally and cannot use public registration.
-- Identity linking must prove control of both the existing account and the new identity. Matching email text alone is never sufficient.
-- No account merge or role mutation is permitted through registration, OAuth, support, or routine Admin operations.
+- Seseorang yang ingin menggunakan role lainnya harus mendaftar akun terpisah dengan identitas kontak berbeda yang memenuhi syarat dan belum terhubung ke akun lain.
+- Akun Admin disediakan melalui proses internal dan tidak dapat menggunakan pendaftaran publik.
+- Pengaitan identitas harus membuktikan kendali atas akun yang sudah ada dan identitas baru. Kecocokan teks alamat email saja tidak pernah cukup.
+- Penggabungan akun atau perubahan role tidak diizinkan melalui pendaftaran, OAuth, bantuan, maupun operasi Admin rutin.
 
 ## Rancangan siklus pendaftaran
 
-1. User selects Owner or Investor.
-2. User selects Email or Phone/WhatsApp.
-3. Server validates and normalizes the contact, applies abuse limits, and creates a pending registration/challenge.
-4. Server sends a one-time code through the selected delivery channel.
-5. User submits the code; the server validates expiry, attempt budget, challenge state, purpose, and destination binding. This verifies contact ownership and anti-bot eligibility; it does not authenticate a login session.
-6. In one transaction, consume the challenge, mark the selected contact verified, and activate the account only when all account-creation conditions are satisfied.
-7. User continues to role-specific onboarding.
+1. Pengguna memilih Owner atau Investor.
+2. Pengguna memilih Email atau Telepon/WhatsApp.
+3. Server memvalidasi dan menormalisasi kontak, menerapkan batas penyalahgunaan, lalu membuat pendaftaran/challenge berstatus pending.
+4. Server mengirim kode sekali pakai melalui kanal pengiriman yang dipilih.
+5. Pengguna mengirim kode; server memvalidasi masa berlaku, batas percobaan, status challenge, tujuan penggunaan, dan keterikatan ke tujuan pengiriman. Proses ini memverifikasi kendali atas kontak dan kelayakan anti-bot; bukan autentikasi sesi login.
+6. Dalam satu transaksi, konsumsi challenge, tandai kontak terpilih sebagai terverifikasi, dan aktifkan akun hanya jika seluruh persyaratan pembuatan akun terpenuhi.
+7. Pengguna melanjutkan onboarding sesuai role.
 
 Pendaftaran tertunda kedaluwarsa setelah **30 menit** jika verifikasi kontak yang diwajibkan belum selesai. Proses kedaluwarsa dan pembersihan harus atomik serta idempotent, melepaskan reservasi kontak tertunda yang memenuhi syarat dengan aman, dan tidak pernah menghapus akun yang sudah aktif. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
 
 ## Implikasi model data (usulan tahap verifikasi dan sesi)
 
-The eventual schema should distinguish normalized email and E.164 phone values, the initial registration contact method, independent verification timestamps, challenge delivery channel (email or WhatsApp), challenge purpose and destination binding, keyed code hash, attempts, expiry, consumption, and pending-registration expiry.
+Skema akhir harus membedakan nilai email yang telah dinormalisasi dan nomor telepon berformat E.164, metode kontak awal pendaftaran, timestamp verifikasi yang terpisah, kanal pengiriman challenge (email atau WhatsApp), tujuan challenge dan keterikatannya pada tujuan pengiriman, keyed hash kode, jumlah percobaan, masa berlaku, status konsumsi, serta masa berlaku pendaftaran pending.
 
-Do not infer that the user supplied both contact methods. The first account/Google-identity migration has been implemented after schema review (`backend/migrations/20261121170000_create_identity_accounts.sql`). Verification sessions, OTP challenges, recovery, and runtime endpoints remain separate implementation slices and must pass their own schema review and tests.
+Jangan mengasumsikan pengguna memberikan kedua metode kontak. Migration Identity Core 0001–0005 untuk akun, verifikasi, sesi, pemulihan, dan audit sudah tersedia di `backend/migrations/` serta tercakup dalam pengujian CI. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi. Backend telah menginisialisasi pool PostgreSQL saat startup dan menyediakan operasi terbatas untuk membuat akun pending serta menambahkan audit event. Alur registrasi/verifikasi lengkap, pengiriman OTP melalui penyedia nyata, aktivasi akun, login, middleware sesi, dan pemulihan akun pada runtime masih belum lengkap. Setiap tahap runtime tetap harus melalui review skema, implementasi, pengujian, dan persetujuan operasional sesuai cakupannya.
 
 ## Kebijakan Identity Core yang telah disetujui
 
@@ -104,7 +104,7 @@ Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia
 
 ## Gerbang implementasi
 
-Migration akun Identity Core pertama sudah selesai. Migration verifikasi/OTP, sesi, recovery, serta endpoint runtime berikutnya hanya boleh dimulai setelah batasan skema slice terkait ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
+Migration Identity Core 0001–0005 untuk akun, verifikasi, sesi, pemulihan, dan audit sudah tersedia di repository serta diuji di CI. Tahap berikutnya berfokus pada implementasi runtime secara bertahap: orkestrasi registrasi, integrasi penyedia OTP, verifikasi dan aktivasi atomik, autentikasi sesi, pemulihan akun, serta proses cleanup. Setiap tahap hanya boleh dimulai setelah kontrak API, tanggung jawab penyedia layanan, konkurensi, kedaluwarsa, cleanup, privasi, threat model, dan rencana pengujian ditinjau. Migration produksi, provisioning kredensial produksi, dan deployment tetap merupakan operasi terpisah yang memerlukan persetujuan eksplisit. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
 
 
 ## Tambahan keputusan: kontak pemulihan bersama dan UX pemilihan akun
