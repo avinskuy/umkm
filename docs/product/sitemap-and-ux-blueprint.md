@@ -21,6 +21,12 @@ It is **not** a goods marketplace or an investment transaction platform. The MVP
 
 Each client account has exactly one immutable primary client role: `owner` or `investor`. The role is selected during registration and cannot be changed later through profile settings, support requests, account migration, OAuth, or any other self-service or administrative workflow. Anyone who wants to use the other client role must register a separate new account with eligible, unlinked login identities. Owner and Investor experiences use separate login entry points and role-aware authorization. The backend is authoritative for role and resource access. Admin is a separately provisioned internal role and is not a client registration choice.
 
+### Membership model
+
+USahapintar has Free and Premium membership tiers that apply independently of the account's immutable client role. Both tiers retain core discovery, connection requests, connection approval, and messaging after an accepted connection. Premium adds higher posting and connection-request quotas, priority visibility/featured promotion, richer analytics, advanced discovery filters, and enhanced profile features. Membership never grants another role's permissions or access to private information that has not been explicitly shared.
+
+The detailed role-access baseline, entitlement keys, quota enforcement rules, downgrade behavior, and required tests are maintained in [Membership & Entitlements Policy](membership-and-entitlements.md). Exact numeric quotas and commercial terms remain open decisions and must not be invented in UI or implementation.
+
 ## 2. Global information architecture
 
 ### Public website (no login required)
