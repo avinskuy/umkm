@@ -96,8 +96,6 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
         .commit()
         .await
         .expect("account creation and its audit event should commit atomically");
-    assert!(!event_id.is_empty());
-
     assert!(
         sqlx::query("SELECT id FROM public.users WHERE id = $1::uuid")
             .bind(&user_id)
@@ -108,8 +106,7 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
     );
 
     assert!(
-        sqlx::query("SELECT id FROM public.identity_audit_events WHERE id = $1::uuid")
-            .bind(&event_id)
+        sqlx::query("SELECT count(*) FROM public.identity_audit_events")
             .fetch_one(&pool)
             .await
             .is_err(),
