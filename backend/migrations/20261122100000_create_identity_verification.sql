@@ -126,12 +126,12 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
-        IF NEW.status = 'verified' AND OLD.expires_at <= clock_timestamp() THEN
+        IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'verified' AND OLD.expires_at <= clock_timestamp() THEN
             RAISE EXCEPTION 'expired verification session cannot be verified'
                 USING ERRCODE = '23514';
         END IF;
 
-        IF NEW.status = 'expired' AND OLD.expires_at > clock_timestamp() THEN
+        IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'expired' AND OLD.expires_at > clock_timestamp() THEN
             RAISE EXCEPTION 'verification session cannot expire before its deadline'
                 USING ERRCODE = '23514';
         END IF;
@@ -343,15 +343,20 @@ DECLARE
     v_hmac_key_version TEXT;
     v_channel TEXT;
     v_purpose TEXT;
+    v_session_status TEXT;
+    v_session_expires_at TIMESTAMPTZ;
+    v_session_locked_until TIMESTAMPTZ;
     v_challenge_status TEXT;
+    v_challenge_expires_at TIMESTAMPTZ;
 BEGIN
     IF TG_OP <> 'INSERT' THEN
         RAISE EXCEPTION 'OTP verification attempt events cannot be updated'
             USING ERRCODE = '23514';
     END IF;
 
-    SELECT destination_hmac, hmac_key_version, channel, purpose
-    INTO v_destination_hmac, v_hmac_key_version, v_channel, v_purpose
+    SELECT destination_hmac, hmac_key_version, channel, purpose, status, expires_at, locked_until
+    INTO v_destination_hmac, v_hmac_key_version, v_channel, v_purpose,
+         v_session_status, v_session_expires_at, v_session_locked_until
     FROM public.verification_sessions
     WHERE id = NEW.verification_session_id;
 
@@ -364,13 +369,22 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    SELECT status INTO v_challenge_status
+    IF v_session_status <> 'pending'
+       OR v_session_expires_at <= clock_timestamp()
+       OR (v_session_locked_until IS NOT NULL AND v_session_locked_until > clock_timestamp()) THEN
+        RAISE EXCEPTION 'OTP attempt event requires an eligible verification session'
+            USING ERRCODE = '23514';
+    END IF;
+
+    SELECT status, expires_at
+    INTO v_challenge_status, v_challenge_expires_at
     FROM public.verification_challenges
     WHERE id = NEW.verification_challenge_id
       AND verification_session_id = NEW.verification_session_id;
 
-    IF v_challenge_status IS DISTINCT FROM 'pending' THEN
-        RAISE EXCEPTION 'OTP attempt event requires a pending challenge'
+    IF v_challenge_status IS DISTINCT FROM 'pending'
+       OR v_challenge_expires_at <= clock_timestamp() THEN
+        RAISE EXCEPTION 'OTP attempt event requires an unexpired pending challenge'
             USING ERRCODE = '23514';
     END IF;
 
