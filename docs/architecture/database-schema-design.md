@@ -53,7 +53,7 @@ The product's shorter labels “Owner” and “Investor” are display language
 | `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
 | `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi; satu kontak boleh terhubung ke beberapa akun |
-| `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | `target_user_id` boleh NULL sebelum akun tujuan dipilih; kasus terhubung ke sesi verifikasi dan dikaitkan ke akun terpilih secara atomik; tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
+| `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | FK `verification_session_id` wajib; `target_user_id` boleh NULL sebelum akun tujuan dipilih, lalu dikaitkan secara atomik; tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
 
@@ -150,6 +150,7 @@ erDiagram
     USERS ||--o{ SESSIONS : owns
     USERS o|--o{ VERIFICATION_SESSIONS : starts
     VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
+    VERIFICATION_SESSIONS ||--o{ ACCOUNT_RECOVERY_CASES : records
     USERS ||--o{ RECOVERY_CONTACTS : owns
     USERS o|--o{ ACCOUNT_RECOVERY_CASES : targets
     USERS ||--o{ PASSWORD_RESET_TOKENS : resets
@@ -189,7 +190,7 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
 - `recovery_contacts(user_id, status, created_at)` serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk menemukan relasi kontak bersama; jangan membuat unique constraint global pada nilai kontak pemulihan.
-- `account_recovery_cases(target_user_id, status, created_at)` untuk riwayat kasus per akun setelah target dipilih; kasus yang belum memiliki target tetap dapat dicari melalui indeks antrean berdasarkan status dan waktu pembuatan/penugasan.
+- `account_recovery_cases(target_user_id, status, created_at)` untuk riwayat kasus per akun setelah target dipilih; `account_recovery_cases(status, created_at)` untuk antrean kasus yang belum memiliki target.
 - `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
 - `business_data_shares(business_id, investor_user_id, revoked_at)`.
