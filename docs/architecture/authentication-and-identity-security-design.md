@@ -12,7 +12,7 @@ This document defines the first authentication architecture for USahapintar. It 
 ### In scope
 
 - Public registration for Business Owner and Investor only.
-- Exactly one immutable primary client role (`owner` or `investor`) per account.
+- Exactly one immutable primary client role (`business_owner` or `investor`) per account.
 - Separate Owner and Investor login entry points.
 - Email/phone registrations require password-based login. Google OAuth registrations do not require a separate local password and authenticate through the linked Google identity. Email/WhatsApp verification codes are only for account activation/contact verification and never replace a password or Google authentication at login.
 - Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
@@ -56,7 +56,7 @@ Membership is a separate entitlement dimension and never changes the immutable p
 
 Use a single primary role for the MVP:
 
-- `owner`
+- `business_owner`
 - `investor`
 - `admin`
 
@@ -191,6 +191,35 @@ Controls:
 - `user_consents` for versioned Terms/Privacy consent records.
 
 Avoid creating unused tables before a concrete feature requires them.
+
+## Approved Identity Core policy baseline
+
+The following product-policy values are approved initial baselines and must be enforced by the backend. They remain revisable after security review and are not provider guarantees.
+
+### OTP and pending registration
+
+- Six-digit numeric OTP, 10-minute validity, keyed hash at rest, one-time atomic consumption, purpose/destination binding, and no plaintext logging.
+- Five failed attempts per verification session; the fifth failure locks that verification session for one hour. Resending cannot clear or bypass the lock.
+- Resend cooldown is 60 seconds; no more than five sends per hour per destination/contact. Add adaptive limits by IP/network, account, purpose, and suspicious activity.
+- A newly issued code invalidates the previous code for the same purpose/destination. Delivery failure never verifies a contact.
+- Pending registration expires after 30 minutes, independently of OTP expiry. Cleanup is idempotent and concurrency-safe and must never delete an activated account.
+
+### Sessions
+
+- Multiple concurrent sessions are permitted. Users can view active sessions, revoke one session, or revoke all sessions.
+- Initial baseline: 7-day idle timeout and 30-day absolute timeout.
+- Remember this device enables persistent browser behavior only; it does not bypass either timeout or server-side revocation. Browser closure alone does not end a deliberately persistent session.
+- Server-side revocation applies immediately. Use Secure, HttpOnly cookies with SameSite and CSRF/origin protections. Sensitive actions can require fresh authentication.
+
+### Account lifecycle
+
+Temporary deactivation is separate from permanent deletion. Deactivation hides the public profile and restricts normal access while retaining data and immutable role; reactivation requires login and security verification. Permanent deletion requires confirmation and fresh authentication, then a 30-day waiting period. During the waiting period, the account is hidden/restricted and deletion can be cancelled with fresh security verification. Subsequent deletion processing must follow documented legal/security retention and backup handling. Contact reuse is never automatic.
+
+### Recovery
+
+Recovery contacts are optional during registration, may be added after activation, and must be independently verified. Support forgot-password and forgot-email flows through verified recovery email/phone. A full primary email may be shown only after the recovery contact has been successfully verified and linked to the account.
+
+If both primary and recovery contacts are lost, use a layered alternative recovery request: evaluate trusted devices, prior sessions, and other ownership signals; escalate insufficient automated evidence to specially authorized support staff; delay or reject high-risk requests. Apply least privilege, documented evidence criteria, audit logging, and appropriate notifications. Recovery must never change the immutable primary role. Post-recovery session revocation and additional controls are risk-based.
 
 ## 4. API contract (proposed)
 
@@ -471,17 +500,16 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 
 Implement each step as a small pull request. Do not merge until CI, focused integration tests, and the relevant security checks pass.
 
-## 14. Open decisions before implementation
+## 14. Remaining decisions before implementation
 
-- PostgreSQL hosting and backup/restore approach.
-- Email delivery provider and sender/domain verification.
-- WhatsApp Business/API provider for phone verification, cost limits, and Indonesia delivery reliability.
-- Google OAuth client setup and production callback origins.
-- Exact password and session timeout policy.
-- Password recovery contact and verification workflow details.
-- Admin MFA method and recovery procedure.
-- Consent versioning and retention periods.
-- Account closure, data export, and deletion workflow.
-- Phone/WhatsApp OTP is only a registration/contact-verification channel, not a login method.
+The following must be resolved before production readiness:
 
-Do not invent provider credentials or put secrets in chat, repository files, screenshots, or frontend environment variables. Use server-side environment/secret management and test with non-production credentials.
+- Email and WhatsApp Business/API provider selection, sender/template requirements, Indonesia delivery reliability, retries, monitoring, spend limits, and operational ownership.
+- Google OAuth client configuration, production callback origins, and secret management.
+- Exact password hashing parameters and credential recovery behavior for Google-only accounts if local-password setup is later offered.
+- Category-specific retention periods, deletion/backup handling, and contact reuse after closure.
+- Admin MFA methods, recovery process, and manual account-recovery reviewer permissions.
+- Distributed rate-limit storage and operational thresholds; enforcement must work across multiple application instances.
+- Detailed recovery evidence criteria, escalation controls, and high-risk dual-control requirements.
+
+The approved product baselines (OTP, pending-registration lifetime, session duration, deactivation/deletion waiting period, and recovery behavior) are documented above and are not undecided.
