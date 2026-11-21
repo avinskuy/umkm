@@ -1,4 +1,8 @@
-use std::{error::Error, fmt, net::IpAddr, net::SocketAddr};
+use std::{
+    error::Error,
+    fmt,
+    net::{IpAddr, SocketAddr},
+};
 
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 5000;
@@ -31,14 +35,16 @@ pub fn server_address(
     port: Option<&str>,
 ) -> Result<SocketAddr, ServerConfigError> {
     let host = host.unwrap_or(DEFAULT_HOST);
-    let port = port.unwrap_or("5000");
-
     let ip = host
         .parse::<IpAddr>()
         .map_err(|_| ServerConfigError::InvalidHost(host.to_owned()))?;
-    let port = port
-        .parse::<u16>()
-        .map_err(|_| ServerConfigError::InvalidPort(port.to_owned()))?;
+
+    let port = match port {
+        Some(port) => port
+            .parse::<u16>()
+            .map_err(|_| ServerConfigError::InvalidPort(port.to_owned()))?,
+        None => DEFAULT_PORT,
+    };
 
     if port == 0 {
         return Err(ServerConfigError::ZeroPort);
