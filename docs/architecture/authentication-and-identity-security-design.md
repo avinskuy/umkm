@@ -46,6 +46,10 @@ This document defines the first authentication architecture for USahapintar. It 
 11. Every sensitive mutation is validated against the authenticated user and target resource.
 12. The system must not reveal whether an email or phone number belongs to an account through unauthenticated recovery or registration responses.
 
+## Membership and authorization boundary
+
+Membership is a separate entitlement dimension and never changes the immutable primary role. A Free or Premium plan cannot grant Owner or Investor capabilities to the other role, bypass account status, ownership, consent, moderation, or Admin permission checks, or reveal private business information. The backend evaluates authentication, account status, role, resource permission, safety/moderation state, and only then membership entitlement and quota. See [Membership & Entitlements Policy](../product/membership-and-entitlements.md) for the plan capability baseline, quota rules, downgrade behavior, and test requirements.
+
 ## 2. Identity and role model
 
 ### Primary role
