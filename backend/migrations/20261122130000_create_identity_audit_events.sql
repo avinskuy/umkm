@@ -140,6 +140,7 @@ CREATE TRIGGER identity_audit_events_20_no_truncate
     FOR EACH STATEMENT EXECUTE FUNCTION public.guard_identity_audit_event();
 
 REVOKE ALL ON TABLE public.identity_audit_events FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_safe_identity_audit_metadata(JSONB) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.stamp_identity_audit_event() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.guard_identity_audit_event() FROM PUBLIC;
 
