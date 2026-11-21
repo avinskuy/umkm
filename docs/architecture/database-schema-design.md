@@ -6,6 +6,8 @@
 
 This document translates the approved USahapintar product and authentication policies into a proposed relational model. It is a design artifact, not a claim that these tables or features are implemented. No production migration should be created until the domain decisions and schema review are complete.
 
+The first technical review for Identity Core is documented in [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Read it together with the registration and shared-recovery decisions before creating the first identity migration.
+
 ## 1. Design principles
 
 1. PostgreSQL is the source of truth for persistent application state.
