@@ -14,7 +14,7 @@ This document defines the first authentication architecture for USahapintar. It 
 - Public registration for Business Owner and Investor only.
 - Exactly one immutable primary client role (`owner` or `investor`) per account.
 - Separate Owner and Investor login entry points.
-- Email/password and phone OTP authentication remain proposed login capabilities, subject to the login-model decision in the Identity Core decision record.
+- Password-based login is mandatory for every account. Email/WhatsApp verification codes are only for account activation/contact verification and never replace the password at login.
 - Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
 - Google OAuth is retained for sign-in and registration, but it never bypasses role selection or the separate email/WhatsApp registration-code verification.
 - Password recovery.
@@ -89,7 +89,7 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `full_name` | Display name |
 | `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
-| `password_hash` | Argon2id password hash; nullability depends on the still-open password/login policy |
+| `password_hash` | Required Argon2id password hash for every account, including Google-registered accounts |
 | `primary_role` | Owner, Investor, or Admin |
 | `account_status` | Pending verification, active, suspended, or closed |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
@@ -147,7 +147,7 @@ Constraints:
 
 ### `verification_challenges`
 
-Supports email and phone verification without storing usable codes.
+Supports email and WhatsApp-delivered phone verification for account activation/contact verification without storing usable codes. These codes are not login credentials.
 
 | Column | Purpose |
 | --- | --- |
@@ -211,6 +211,8 @@ There is intentionally no `/auth/register/admin` endpoint.
 
 ### Password and session authentication
 
+Every account must establish a local password during registration, including Google OAuth registrations. Email/WhatsApp verification codes only activate the account and prove control of the selected contact; they are never accepted as passwordless login credentials.
+
 | Method | Route | Purpose |
 | --- | --- | --- |
 | POST | `/auth/login/owner` | Authenticate only an Owner account |
@@ -227,7 +229,7 @@ The login endpoints must check the expected role on the server. A mismatch retur
 
 ### Google OAuth — retained
 
-Google OAuth is supported for sign-in and registration. It does not replace mandatory contact verification.
+Google OAuth is supported for sign-in and registration. It does not replace the mandatory local password or contact verification requirements.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -235,7 +237,7 @@ Google OAuth is supported for sign-in and registration. It does not replace mand
 | GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
 | GET | `/auth/oauth/google/callback` | Validate provider response and continue the role-bound flow |
 
-For a new Google identity, the user must still select exactly one contact method (email code or WhatsApp-delivered phone code) and verify it before account activation. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
+For a new Google identity, the user must still establish a local password, select exactly one contact method (email code or WhatsApp-delivered phone code), and verify it before account activation. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
 
 ### Admin authentication
 
@@ -275,6 +277,7 @@ Avoid storing long-lived bearer tokens in localStorage. If a cross-site architec
 - Logout revokes the current session.
 - Logout-all revokes all sessions.
 - Password reset revokes sessions.
+- Email/WhatsApp verification codes cannot be used to authenticate a login session.
 - Account suspension blocks session use even if a session token has not expired.
 - Role mismatch never creates a session.
 - Sensitive admin actions may require recent re-authentication/MFA.
@@ -477,10 +480,10 @@ Implement each step as a small pull request. Do not merge until CI, focused inte
 - SMS/OTP provider, cost limits, and Indonesia phone delivery reliability.
 - Google OAuth client setup and production callback origins.
 - Exact password and session timeout policy.
-- Whether phone OTP is a login method at MVP launch or only a verification method.
+- Password recovery contact and verification workflow details.
 - Admin MFA method and recovery procedure.
 - Consent versioning and retention periods.
 - Account closure, data export, and deletion workflow.
-- Whether phone OTP is a login method or only a registration verification channel.
+- Phone/WhatsApp OTP is only a registration/contact-verification channel, not a login method.
 
 Do not invent provider credentials or put secrets in chat, repository files, screenshots, or frontend environment variables. Use server-side environment/secret management and test with non-production credentials.
