@@ -8,6 +8,10 @@
 - Admin accounts are provisioned internally and are never offered in public registration.
 - The same email identity is globally unique; OAuth linking must not silently create a second role/account.
 
+A person's client role is permanent for that account. If they want to use the other client role, they must register a separate account with eligible identities that are not already linked to another account. No profile, support, Admin, or OAuth flow may convert an existing account's role.
+
+Membership is independent of role. Free and Premium plans do not change role permissions or grant access to resources without the required ownership, consent, and authorization checks. See [Membership & Entitlements Policy](membership-and-entitlements.md).
+
 ## Login surfaces
 
 - Business Owner: `/login/owner`
