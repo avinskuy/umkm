@@ -223,7 +223,7 @@ Each migration must be immutable after application to a shared database. Include
 The following need explicit design/product review; do not infer them in SQL:
 
 - Whether email and phone are both mandatory at registration, and when each becomes unique/verified.
-- Whether provider-only Google accounts are allowed to exist before a password is set.
+- Resolved: Google-only accounts may exist without a local password; `password_hash` is nullable. Email/phone registrations still require a password. A future local-password setup flow for Google-only accounts is not yet specified.
 - Final account-status lifecycle and account-closure/identity-retention policy.
 - Owner and Investor profile fields and onboarding stage enumerations.
 - Business ownership cardinality and business verification lifecycle.
