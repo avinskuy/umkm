@@ -52,7 +52,7 @@ The product's shorter labels “Owner” and “Investor” are display language
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
 | `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
-| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi; nomor HP pemulihan boleh terhubung ke beberapa akun, sedangkan kebijakan penggunaan ulang email pemulihan antar-akun belum diputuskan |
+| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi; email serta nomor HP pemulihan yang sudah diverifikasi boleh terhubung ke beberapa akun |
 | `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | FK `verification_session_id` wajib; `target_user_id` boleh NULL sebelum akun tujuan dipilih, lalu dikaitkan secara atomik; tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
@@ -189,7 +189,7 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `user_identities(provider, provider_subject)`: unique.
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
-- `recovery_contacts(user_id, status, created_at)` serta indeks berdasarkan kanal dan keyed hash kontak. Nomor HP pemulihan memerlukan pencarian non-unik lintas akun; aturan keunikan email pemulihan antar-akun harus diputuskan sebelum migrasi final.
+- `recovery_contacts(user_id, status, created_at)` serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk pencarian lintas akun. Jangan menerapkan unique constraint global pada email atau nomor HP pemulihan.
 - `account_recovery_cases(target_user_id, status, created_at)` untuk riwayat kasus per akun setelah target dipilih; `account_recovery_cases(status, created_at)` untuk antrean kasus yang belum memiliki target.
 - `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
