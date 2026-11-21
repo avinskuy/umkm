@@ -24,7 +24,8 @@ CREATE TABLE public.sessions (
         CHECK (
             (ip_prefix_hash IS NULL AND ip_prefix_hmac_key_version IS NULL)
             OR (
-                octet_length(ip_prefix_hash) = 32
+                ip_prefix_hash IS NOT NULL
+                AND octet_length(ip_prefix_hash) = 32
                 AND ip_prefix_hmac_key_version IS NOT NULL
                 AND length(btrim(ip_prefix_hmac_key_version)) > 0
             )
