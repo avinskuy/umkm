@@ -43,6 +43,7 @@ Satu baris mewakili satu proses verifikasi. Resend tidak membuat sesi baru.
 | `created_at` | `timestamptz` | Waktu pembuatan dari database |
 | `expires_at` | `timestamptz` | Deadline sesi yang ditentukan flow; harus setelah pembuatan |
 | `verified_at` | `timestamptz` | Terisi hanya saat status menjadi verified |
+| `expired_at` | `timestamptz` | Terisi hanya saat status menjadi expired |
 | `cancelled_at` | `timestamptz` | Terisi hanya saat status menjadi cancelled |
 
 ### Invariant
@@ -74,6 +75,7 @@ Satu baris mewakili satu kode OTP yang diterbitkan untuk sesi tertentu.
 | `created_at` | `timestamptz` | Waktu penerbitan dari database |
 | `expires_at` | `timestamptz` | Lebih dari created_at dan maksimal 10 menit setelahnya |
 | `consumed_at` | `timestamptz` | Terisi hanya untuk status consumed |
+| `expired_at` | `timestamptz` | Terisi hanya untuk status expired |
 | `superseded_at` | `timestamptz` | Terisi hanya untuk status superseded |
 | `cancelled_at` | `timestamptz` | Terisi hanya untuk status cancelled |
 
