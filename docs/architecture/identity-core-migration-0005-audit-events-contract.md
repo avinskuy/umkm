@@ -1,4 +1,4 @@
-# Kontrak Skema Migration 0005 — Identity Audit Events
+# Kontrak Skema Migration 0005 — Peristiwa Audit Identity Core
 
 > Status: implementasi pada branch `feat/identity-audit-events-0005`; menunggu CI dan review PR
 > Tanggal: 22 November 2026
@@ -44,7 +44,7 @@ Validasi struktur ini bukan pengganti validasi semantik runtime. Backend tetap w
 
 Fungsi validasi metadata bersifat murni dan tidak mengakses data; hak EXECUTE-nya tidak memberikan akses baca/tulis ke tabel audit.
 
-## 4. Append-only dan akses
+## 4. Append-only dan kontrol akses
 
 Trigger menolak UPDATE, DELETE, dan TRUNCATE. Database menetapkan ID dan waktu event pada INSERT. Tabel tidak memberi privilege kepada PUBLIC.
 
