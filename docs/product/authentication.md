@@ -1,46 +1,47 @@
-# Authentication Product Rules
+# Aturan Produk Autentikasi
 
-## Account model
+## Model akun
 
-- Public accounts have exactly one primary role: `business_owner` or `investor`.
-- Public registration requires an explicit role selection.
-- An account cannot self-switch its role.
-- Admin accounts are provisioned internally and are never offered in public registration.
-- The same email identity is globally unique; OAuth linking must not silently create a second role/account.
+- Akun publik hanya memiliki satu role utama: `business_owner` atau `investor`.
+- Pendaftaran publik wajib meminta pengguna memilih role secara eksplisit.
+- Pengguna tidak dapat mengganti role akunnya sendiri.
+- Akun Admin disediakan melalui proses internal dan tidak pernah ditawarkan dalam pendaftaran publik.
+- Identitas email yang sama bersifat unik secara global; proses penghubungan OAuth tidak boleh diam-diam membuat akun atau role kedua.
 
-A person's client role is permanent for that account. If they want to use the other client role, they must register a separate account with eligible identities that are not already linked to another account. No profile, support, Admin, or OAuth flow may convert an existing account's role.
+Role klien seseorang bersifat tetap untuk akun tersebut. Jika ingin menggunakan role klien yang lain, pengguna harus mendaftar akun terpisah dengan identitas yang memenuhi syarat dan belum terhubung ke akun lain. Tidak ada alur profil, support, Admin, atau OAuth yang boleh mengubah role akun yang sudah ada.
 
-Membership is independent of role. Free and Premium plans do not change role permissions or grant access to resources without the required ownership, consent, and authorization checks. See [Membership & Entitlements Policy](membership-and-entitlements.md).
+Role dan keanggotaan merupakan dua hal terpisah. Paket Free maupun Premium tidak mengubah izin berdasarkan role dan tidak memberikan akses ke sumber daya tanpa pemeriksaan kepemilikan, persetujuan, serta otorisasi yang diwajibkan. Lihat [Kebijakan Membership dan Entitlements](membership-and-entitlements.md).
 
-## Login surfaces
+## Halaman login
 
 - Business Owner: `/login/owner`
 - Investor: `/login/investor`
 - Admin: `/admin/login`
-- Public registration: `/register`
+- Pendaftaran publik: `/register`
 
-Separate client login pages are a user-experience distinction. They must use the same backend identity system and enforce the expected role server-side.
+Halaman login klien yang terpisah merupakan kebutuhan pengalaman pengguna. Keduanya tetap harus menggunakan sistem identitas backend yang sama dan backend wajib memeriksa role yang sesuai.
 
-## Authentication requirements
+## Persyaratan autentikasi
 
-- Email verification before enabling protected account capabilities.
-- Password hashing with Argon2id.
-- Secure, revocable sessions.
-- Rate limits for login, password recovery, and verification-code requests.
-- Password recovery through short-lived, single-use tokens.
-- Google OAuth must bind to a verified identity and preserve the account's existing role.
-- Admin MFA is mandatory before production use.
+- Verifikasi kontak yang dipilih saat pendaftaran sebelum fitur akun yang dilindungi dapat digunakan. Kontak awal dapat berupa email atau nomor HP yang diverifikasi melalui WhatsApp.
+- Password harus disimpan menggunakan Argon2id.
+- Sesi harus aman dan dapat dicabut.
+- Terapkan rate limit untuk login, pemulihan password, dan permintaan kode verifikasi.
+- Pemulihan password menggunakan token sekali pakai dengan masa berlaku singkat.
+- Google OAuth harus terikat pada identitas yang terverifikasi dan mempertahankan role akun yang sudah ada.
+- MFA Admin wajib tersedia sebelum sistem digunakan di produksi.
 
-## Authorization
+## Otorisasi
 
-The backend must verify:
-1. The session is valid.
-2. The account is active.
-3. The account role matches the requested client surface.
-4. The account is permitted to access the requested resource.
+Backend wajib memeriksa:
 
-Frontend route guards improve UX but are not a security boundary.
+1. Sesi masih valid.
+2. Akun berstatus aktif.
+3. Role akun sesuai dengan halaman atau layanan klien yang diminta.
+4. Akun memiliki izin untuk mengakses sumber daya yang diminta.
 
-## Privacy
+Route guard frontend hanya membantu pengalaman pengguna dan bukan batas keamanan.
 
-Investors may only see business information the owner has explicitly shared. Customer-level transaction data is not exposed to investors.
+## Privasi
+
+Investor hanya boleh melihat informasi bisnis yang secara eksplisit dibagikan oleh pemiliknya. Data transaksi pada tingkat pelanggan tidak boleh ditampilkan kepada investor.
