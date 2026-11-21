@@ -92,7 +92,36 @@ Satu baris mewakili satu kode OTP yang diterbitkan untuk sesi tertentu.
 - Kode OTP tidak pernah disimpan atau dicatat dalam log sebagai plaintext. Panjang digit tetap konfigurasi implementasi, bukan nilai yang ditetapkan migration.
 - Perubahan status challenge harus menjaga timestamp terminal yang sesuai dan menolak reaktivasi.
 
-## 4. Tabel `otp_delivery_events`
+Tambahkan unique key komposit `(id, verification_session_id)` pada challenge agar event percobaan dapat memakai foreign key komposit yang membuktikan challenge dan sesi induknya cocok.
+
+## 4. Tabel `otp_verification_attempt_events`
+
+Tabel append-only ini mencatat percobaan verifikasi kode yang benar-benar diproses. Tujuannya agar batas percobaan per kontak tetap berlaku lintas sesi dan instance; membuat sesi baru tidak boleh mengatur ulang anggaran percobaan kontak.
+
+| Kolom | Tipe PostgreSQL | Aturan |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key |
+| `verification_session_id` | `uuid` | FK ke sesi verifikasi |
+| `verification_challenge_id` | `uuid` | FK komposit ke challenge dan sesi induknya |
+| `destination_hmac` | `bytea` | Fingerprint HMAC tujuan ternormalisasi |
+| `hmac_key_version` | `text` | Versi key fingerprint |
+| `channel` | `text` | `email` atau `whatsapp` |
+| `purpose` | `text` | Purpose sesi saat percobaan |
+| `outcome` | `text` | `failed` atau `succeeded` |
+| `attempted_at` | `timestamptz` | Waktu percobaan dari database |
+
+### Invariant dan operasi
+
+- Event dicatat hanya ketika server benar-benar memproses kode terhadap challenge pending yang sesuai. Penolakan karena sesi terkunci, kedaluwarsa, terminal, atau rate limit tidak dihitung sebagai tebakan kode.
+- Setiap tebakan kode yang diproses menghasilkan tepat satu event. `failed` menambah counter sesi induk; `succeeded` mengonsumsi challenge dan menyelesaikan sesi dalam transaksi yang sama.
+- Event `failed` menjadi sumber hitung batas percobaan per kontak lintas sesi/instance. Limit tidak boleh dipartisi berdasarkan purpose sehingga pembuatan sesi atau pergantian purpose tidak menjadi jalan bypass.
+- Event `succeeded` dicatat untuk jejak hasil, tetapi tidak mengonsumsi anggaran kegagalan.
+- Nilai tujuan disimpan hanya sebagai HMAC dan versi key; tidak ada OTP, plaintext tujuan, atau token yang disimpan.
+- Event bersifat append-only pada batas aplikasi. Penghapusan hanya melalui cleanup terkontrol setelah keluar dari jendela rate limit dan retensi operasional yang ditetapkan.
+- Ambang numerik dan jendela limit percobaan lintas sesi belum ditetapkan oleh kebijakan produk. Nilainya wajib ditetapkan pada konfigurasi backend sebelum verifikasi OTP diaktifkan; jangan mengarang angka pada migration.
+- Selama rotasi HMAC, hitung dan kunci fingerprint dari semua versi aktif secara deterministik, konsisten dengan tabel delivery events.
+
+## 5. Tabel `otp_delivery_events`
 
 Tabel ini adalah catatan percobaan penerbitan/pengiriman yang menjadi sumber kebenaran rate limit per kontak lintas sesi dan instance.
 
@@ -121,26 +150,29 @@ Tabel ini adalah catatan percobaan penerbitan/pengiriman yang menjadi sumber keb
 - Event hanya boleh dibersihkan setelah keluar dari jendela rate limit dan tidak lagi diperlukan untuk investigasi operasional yang sah. Retensi akhir ditetapkan dalam kebijakan operasional, bukan diasumsikan dari migration.
 - Rate limit per IP/network, akun, purpose, dan batas global provider adalah lapisan tambahan. Jangan menambahkan penyimpanan IP ke migration ini sebelum tujuan, minimisasi, dan retensinya ditetapkan.
 
-## 5. Indeks dan foreign key
+## 6. Indeks dan foreign key
 
 Migration SQL harus sekurang-kurangnya meninjau dan menerapkan:
 
 - FK `verification_sessions.user_id` → `users.id` dengan perilaku penghapusan yang tidak menghapus histori verifikasi secara diam-diam.
 - FK `verification_challenges.verification_session_id` → `verification_sessions.id`.
+- FK `otp_verification_attempt_events` ke sesi dan pasangan challenge/sesi dengan constraint komposit.
 - Indeks sesi berdasarkan `user_id`, `purpose`, `status`, dan waktu kedaluwarsa sesuai pola cleanup/query.
 - Partial unique index untuk satu challenge pending per sesi.
-- Indeks rate-limit berdasarkan `destination_hmac`, `channel`, dan `created_at`.
+- Indeks rate-limit pengiriman berdasarkan `destination_hmac`, `channel`, dan `created_at`.
+- Indeks percobaan verifikasi berdasarkan `destination_hmac`, `channel`, dan `attempted_at`, serta indeks relasi ke sesi/challenge.
 - Indeks pendukung cleanup challenge/session kedaluwarsa tanpa menghapus sesi yang masih dibutuhkan.
 - CHECK constraints untuk vocabulary, rentang counter, pasangan timestamp/status, pasangan ciphertext/key version/HMAC, dan batas waktu OTP. Tambahkan trigger untuk aturan lintas tabel pada sesi registrasi.
 
 Nama indeks dan detail kolom final ditetapkan saat review SQL. Jangan membuat indeks duplikat yang tidak punya kebutuhan query terukur.
 
-## 6. Transaksi wajib
+## 7. Transaksi wajib
 
 | Operasi | Batas atomik |
 | --- | --- |
 | Membuat sesi | Validasi purpose, user_id, channel, destination; simpan ciphertext/HMAC dan deadline secara konsisten |
 | Mengirim OTP | Lock fingerprint; hitung limit; perbarui cooldown; supersede challenge lama; buat challenge dan delivery event |
+| Memproses tebakan OTP | Lock fingerprint dan sesi; periksa limit lintas sesi; catat outcome; update counter atau konsumsi challenge secara atomik |
 | Verifikasi berhasil | Lock sesi/challenge; cek status, expiry, purpose, destination binding, dan lock; konsumsi challenge serta tandai sesi verified satu kali |
 | Verifikasi gagal | Lock sesi; tambah counter; kegagalan kelima menetapkan lock satu jam |
 | Membuka kembali sesi setelah lock | Periksa deadline dan status; reset counter satu kali secara atomik; jangan menghapus delivery events |
@@ -149,7 +181,7 @@ Nama indeks dan detail kolom final ditetapkan saat review SQL. Jangan membuat in
 
 Operasi yang mengirim pesan eksternal tidak boleh menahan transaksi database terbuka selama menunggu provider. Catat event dan reservasi kuota secara atomik, commit, lalu lakukan dispatch dan perbarui statusnya secara terpisah. Penanganan crash/retry provider harus menjaga idempotensi dan tidak mengirim ulang kode lama yang sudah superseded.
 
-## 7. Rencana pengujian PostgreSQL
+## 8. Rencana pengujian PostgreSQL
 
 Migration belum siap dibuat/dianggap selesai sebelum pengujian nyata membuktikan:
 
@@ -167,7 +199,8 @@ Migration belum siap dibuat/dianggap selesai sebelum pengujian nyata membuktikan
 - Lima pengiriman dalam jendela 60 menit diterima; pengiriman keenam ditolak.
 - Cooldown 60 detik ditegakkan bahkan pada sesi berbeda.
 - Limit berlaku lintas purpose dan sesi.
-- Permintaan paralel menggunakan beberapa koneksi PostgreSQL tidak dapat melampaui lima event.
+- Permintaan paralel menggunakan beberapa koneksi PostgreSQL tidak dapat melampaui lima event pengiriman.
+- Tebakan gagal paralel dari beberapa sesi pada kontak yang sama tunduk pada satu anggaran lintas sesi; membuat sesi baru atau mengganti purpose tidak meresetnya.
 - Rotasi HMAC tidak membuat bypass selama masa transisi.
 - Event gagal/unknown tetap dihitung.
 - Event yang masih diperlukan tidak dihapus cleanup.
@@ -189,13 +222,14 @@ Migration belum siap dibuat/dianggap selesai sebelum pengujian nyata membuktikan
 
 Semua tes race/concurrency harus memakai beberapa koneksi PostgreSQL nyata, bukan mock.
 
-## 8. Gate sebelum implementasi
+## 9. Gate sebelum implementasi
 
 Migration SQL 0002 baru boleh dibuat setelah review memastikan:
 
 - [ ] Kontrak purpose dan channel sesuai alur produk yang disetujui.
 - [ ] Representasi ciphertext/HMAC/key version cocok dengan abstraksi key provider yang akan dipakai backend.
-- [ ] Operasi advisory lock dan rotasi HMAC tidak membuka bypass.
+- [ ] Operasi advisory lock dan rotasi HMAC tidak membuka bypass untuk pengiriman maupun percobaan verifikasi.
+- [ ] Ambang dan jendela percobaan gagal lintas sesi ditetapkan sebelum runtime OTP diaktifkan.
 - [ ] Semua constraint, partial index, FK, dan state transition sudah ditinjau.
 - [ ] Rencana transaksi resend, verifikasi, reset lock, dan cleanup jelas.
 - [ ] Tes PostgreSQL untuk concurrency dan batas waktu sudah dirancang.
@@ -204,7 +238,7 @@ Migration SQL 0002 baru boleh dibuat setelah review memastikan:
 
 Migration ini tidak boleh dijalankan terhadap database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup.
 
-## 9. Referensi internal
+## 10. Referensi internal
 
 - [Keputusan Teknis Identity Core](identity-core-technical-decisions.md)
 - [Tinjauan Skema Identity Core](identity-core-schema-review.md)

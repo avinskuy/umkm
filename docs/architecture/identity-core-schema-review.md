@@ -37,7 +37,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 | Urutan | Cakupan | Isi utama |
 | --- | --- | --- |
 | 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, identitas provider, dan perlindungan role immutable |
-| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman persisten, serta indeks pencarian/rate limit; kontrak skema sedang ditinjau di [dokumen migration 0002](identity-core-migration-0002-verification-contract.md) |
+| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; kontrak skema sedang ditinjau di [dokumen migration 0002](identity-core-migration-0002-verification-contract.md) |
 | 0003 | Sesi autentikasi | `sessions`, token hash, idle/absolute expiry, dan pencabutan |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
 | 0005 | Audit Identity Core | audit event yang dibutuhkan untuk perubahan identitas, sesi, verifikasi, dan pemulihan |
@@ -224,7 +224,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Pekerjaan berikutnya adalah meninjau kontrak [migration 0002 untuk verifikasi kontak](identity-core-migration-0002-verification-contract.md), khususnya konsistensi enkripsi/HMAC, rotasi fingerprint, serialisasi advisory lock, dan transaksi resend/verifikasi. Migration SQL belum dibuat sampai kontrak ini lolos review. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
+Pekerjaan berikutnya adalah meninjau kontrak [migration 0002 untuk verifikasi kontak](identity-core-migration-0002-verification-contract.md), khususnya konsistensi enkripsi/HMAC, rotasi fingerprint, serialisasi advisory lock, batas percobaan lintas sesi, dan transaksi resend/verifikasi. Migration SQL belum dibuat sampai kontrak ini lolos review. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
 Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
