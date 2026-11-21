@@ -232,3 +232,14 @@ Hal berikut bukan penghalang untuk menyepakati model konseptual, tetapi harus di
 - Parameter password hashing dan konfigurasi sesi/cookie produksi.
 
 Keputusan ini tidak membuka ulang kebijakan OTP atau recovery yang telah disetujui; ini adalah detail implementasi dan operasi yang perlu diverifikasi sebelum rilis fitur terkait.
+
+
+## Database principal dan privilege bootstrap
+
+Provisioning role PostgreSQL tidak dimasukkan ke SQLx schema migration. Database khusus memakai role group `usahapintar_app`, `usahapintar_backup`, `usahapintar_monitor`, dan `usahapintar_audit_reader), serta login terpisah untuk runtime, migrator, backup, dan monitoring. Semua login non-superuser dan tanpa CREATEDB/CREATEROLE/BYPASSRLS. DBA tetap dikelola di luar skrip aplikasi.
+
+Semua migration harus dijalankan oleh `usahapintar_migrator`. Hal ini kritis karena fungsi `create_client_user` menggunakan SECURITY DEFINER: owner fungsi harus migrator non-superuser, tidak memiliki role membership lain, dan fungsi harus memakai `search_path=pg_catalog`. Grant aplikasi gagal tertutup jika ownership atau konfigurasi ini tidak cocok.
+
+Aplikasi hanya mendapat USAGE schema, EXECUTE fungsi pembuatan akun, INSERT audit event, dan EXECUTE validator metadata. Tidak ada akses langsung ke tabel akun, identitas provider, verifikasi, sesi, kontak recovery, kasus recovery, token reset, atau SELECT audit. Backup menggunakan `pg_read_all_data` tanpa BYPASSRLS; monitoring menggunakan `pg_monitor`; keduanya memakai login dan credential terpisah. Audit reader NOLOGIN belum diberikan ke Admin mana pun.
+
+Skrip dan runbook: [Database Principal Bootstrap](../security/database-principal-bootstrap.md). Bootstrap belum dijalankan pada database produksi.
