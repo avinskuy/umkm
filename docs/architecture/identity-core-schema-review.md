@@ -227,7 +227,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 
 Migration 0002 telah di-merge ke main dan lulus quality checks serta tes integrasi PostgreSQL CI. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
-Migration 0001–0003 belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
+Migration 0001–0004 belum boleh dijalankan pada database produksi. Migration 0004 sedang melalui CI dan review PR; tes khusus mencakup kontak bersama lintas akun, deduplikasi per akun, pemilihan target setelah verifikasi, approval kasus, dan konsumsi token satu kali. Runtime recovery tetap belum tersedia. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
 ## 9. Referensi internal
 
