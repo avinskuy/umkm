@@ -210,7 +210,7 @@ pub fn otp_digest(
     let versioned_key = match version {
         Some(version) => {
             VersionedKey::new(version, provider.key(KeyPurpose::OtpVerification, version)?)
-        },
+        }
         None => provider.active_key(KeyPurpose::OtpVerification)?,
     };
 
