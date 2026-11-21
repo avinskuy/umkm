@@ -178,13 +178,13 @@ Controls:
 - Invalidate older active challenges when a new challenge is issued for the same purpose/destination.
 - Provider delivery failures must not mark a destination as verified.
 
-### Recovery contacts and recovery cases
+### Kontak pemulihan dan kasus pemulihan akun
 
-Recovery contacts are optional and are added after account activation. Model them separately from primary login contacts so each can be independently verified, notified about, and revoked. A recovery contact must have a normalized value, channel, verification timestamp, lifecycle status, and ownership link. Enforce uniqueness/abuse policy without exposing account association.
+Kontak pemulihan bersifat opsional dan ditambahkan setelah akun aktif. Simpan kontak ini terpisah dari kontak utama untuk login agar masing-masing dapat diverifikasi, diberi notifikasi, dan dicabut secara terpisah. Setiap kontak pemulihan perlu memiliki nilai yang sudah dinormalisasi, jenis kanal, waktu verifikasi, status, dan relasi ke pemilik akun. Terapkan aturan keunikan serta pencegahan penyalahgunaan tanpa membocorkan hubungan kontak dengan akun.
 
-Account recovery requires a durable case/challenge lifecycle rather than a one-off boolean. Record purpose (forgot password, forgot email, or alternative recovery), status, created/expiry/review timestamps, risk outcome, and minimal audit references. Do not store submitted secrets or excessive identity evidence in general-purpose logs. Manual review assignments must reference specially authorized support principals and append-only review/audit events. Full primary email disclosure is permitted only after successful verification of a recovery contact already linked to that account.
+Pemulihan akun memerlukan alur kasus dan verifikasi yang tercatat, bukan sekadar penanda benar/salah. Catat tujuan (lupa kata sandi, lupa email, atau pemulihan alternatif), status, waktu pembuatan/kedaluwarsa/peninjauan, hasil penilaian risiko, dan referensi audit secukupnya. Jangan simpan rahasia yang dikirim pengguna atau bukti identitas berlebihan di log umum. Penugasan pemeriksaan manual harus mengacu pada petugas support dengan kewenangan khusus, dan setiap pemeriksaan dicatat dalam riwayat yang tidak dapat diubah sembarangan. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang sudah terhubung ke akun berhasil diverifikasi.
 
-If both primary and recovery contacts are unavailable, alternative recovery must evaluate trusted-device/session signals and other ownership evidence. Insufficient automated evidence can be escalated to authorized manual review; high-risk requests can be delayed or rejected. Recovery cannot mutate the immutable primary role.
+Jika kontak utama dan seluruh kontak pemulihan tidak dapat diakses, alur pemulihan alternatif harus memeriksa perangkat tepercaya, riwayat sesi, dan bukti kepemilikan lainnya. Jika pemeriksaan otomatis belum cukup, kasus dapat diteruskan kepada petugas yang berwenang. Permintaan berisiko tinggi dapat ditunda atau ditolak. Proses pemulihan tidak boleh mengubah role utama akun.
 
 ### `password_reset_tokens`
 
@@ -216,27 +216,27 @@ The following product-policy values are approved initial baselines and must be e
 ### OTP and pending registration
 
 - OTP berupa kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, disimpan sebagai keyed hash, hanya dapat digunakan satu kali secara atomik, terikat pada tujuan dan alamat penerima, serta tidak boleh dicatat dalam log sebagai teks asli.
-- Five failed attempts per verification session; the fifth failure locks that verification session for one hour. Resending cannot clear or bypass the lock.
-- Resend cooldown is 60 seconds; no more than five sends per hour per destination/contact. Add adaptive limits by IP/network, account, purpose, and suspicious activity.
-- A newly issued code invalidates the previous code for the same purpose/destination. Delivery failure never verifies a contact.
-- Pending registration expires after 30 minutes, independently of OTP expiry. Cleanup is idempotent and concurrency-safe and must never delete an activated account.
+- Maksimal lima percobaan gagal untuk setiap sesi verifikasi. Kegagalan kelima mengunci sesi tersebut selama satu jam. Pengiriman kode baru tidak boleh menghapus atau melewati penguncian.
+- Jeda sebelum mengirim ulang adalah 60 detik. Maksimal lima pengiriman per jam untuk setiap alamat kontak. Tambahkan pembatasan adaptif berdasarkan IP/jaringan, akun, tujuan, dan pola aktivitas mencurigakan.
+- Kode baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama. Kegagalan pengiriman tidak boleh dianggap sebagai keberhasilan verifikasi.
+- Pendaftaran yang belum selesai kedaluwarsa setelah 30 menit, terpisah dari masa berlaku OTP. Proses pembersihan harus aman dijalankan berulang kali dan saat ada proses bersamaan, serta tidak boleh menghapus akun yang sudah aktif.
 
 ### Sessions
 
-- Multiple concurrent sessions are permitted. Users can view active sessions, revoke one session, or revoke all sessions.
-- Initial baseline: 7-day idle timeout and 30-day absolute timeout.
-- Remember this device enables persistent browser behavior only; it does not bypass either timeout or server-side revocation. Browser closure alone does not end a deliberately persistent session.
-- Server-side revocation applies immediately. Use Secure, HttpOnly cookies with SameSite and CSRF/origin protections. Sensitive actions can require fresh authentication.
+- Pengguna boleh memiliki beberapa sesi aktif sekaligus. Pengguna dapat melihat daftar sesi, mencabut satu sesi, atau mengakhiri semua sesi.
+- Batas awal: sesi berakhir setelah 7 hari tidak aktif dan memiliki batas usia maksimal 30 hari sejak dibuat.
+- Fitur “Ingat perangkat ini” hanya membuat sesi browser bertahan. Fitur ini tidak boleh melewati kedua batas waktu atau pencabutan sesi dari server. Menutup browser tidak otomatis mengakhiri sesi yang memang dibuat persisten.
+- Pencabutan sesi dari server berlaku segera. Gunakan cookie `Secure` dan `HttpOnly`, pengaturan `SameSite`, serta perlindungan CSRF dan pemeriksaan origin. Tindakan sensitif dapat meminta verifikasi ulang.
 
 ### Account lifecycle
 
-Temporary deactivation is separate from permanent deletion. Deactivation hides the public profile and restricts normal access while retaining data and immutable role; reactivation requires login and security verification. Permanent deletion requires confirmation and fresh authentication, then a 30-day waiting period. During the waiting period, the account is hidden/restricted and deletion can be cancelled with fresh security verification. Subsequent deletion processing must follow documented legal/security retention and backup handling. Contact reuse is never automatic.
+Penonaktifan sementara berbeda dari penghapusan permanen. Saat dinonaktifkan, profil publik disembunyikan dan akses normal dibatasi, tetapi data serta role tetap disimpan. Untuk mengaktifkan kembali akun, pengguna harus login dan melewati pemeriksaan keamanan. Penghapusan permanen memerlukan konfirmasi dan autentikasi ulang, lalu masa tunggu 30 hari. Selama masa tunggu, akun disembunyikan/dibatasi dan permintaan penghapusan dapat dibatalkan melalui pemeriksaan keamanan. Setelah itu, proses penghapusan mengikuti aturan retensi data dan penanganan cadangan yang sudah didokumentasikan. Kontak tidak boleh otomatis digunakan kembali.
 
 ### Recovery
 
-Recovery contacts are optional during registration, may be added after activation, and must be independently verified. Support forgot-password and forgot-email flows through verified recovery email/phone. A full primary email may be shown only after the recovery contact has been successfully verified and linked to the account.
+Kontak pemulihan tidak wajib saat pendaftaran. Kontak ini dapat ditambahkan setelah akun aktif dan harus diverifikasi secara terpisah. Alur lupa kata sandi dan lupa email menggunakan email atau nomor HP pemulihan yang sudah terverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan berhasil diverifikasi dan terbukti terhubung ke akun.
 
-If both primary and recovery contacts are lost, use a layered alternative recovery request: evaluate trusted devices, prior sessions, and other ownership signals; escalate insufficient automated evidence to specially authorized support staff; delay or reject high-risk requests. Apply least privilege, documented evidence criteria, audit logging, and appropriate notifications. Recovery must never change the immutable primary role. Post-recovery session revocation and additional controls are risk-based.
+Jika kontak utama dan kontak pemulihan sama-sama hilang, gunakan proses pemulihan alternatif berlapis. Periksa perangkat tepercaya, sesi sebelumnya, dan sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, teruskan ke petugas support dengan kewenangan khusus. Permintaan berisiko tinggi dapat ditunda atau ditolak. Terapkan hak akses minimum, kriteria pemeriksaan yang terdokumentasi, audit log, dan notifikasi yang sesuai. Pemulihan tidak boleh mengubah role utama. Pencabutan sesi dan perlindungan tambahan setelah pemulihan ditentukan berdasarkan tingkat risiko.
 
 ## 4. API contract (proposed)
 
