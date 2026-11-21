@@ -123,12 +123,12 @@
 
 ### Landing interactions
 
-- Header Daftar opens the role-choice page.
-- Header Masuk opens a compact Owner/Investor choice.
-- Each role CTA routes directly to its matching registration page.
-- Feature and membership links scroll or navigate to their corresponding public sections/pages.
-- Mobile menu traps focus while open, closes with Escape, and restores focus to its trigger.
-- Hero media has a neutral fallback; text and CTAs do not depend on media loading.
+- Header Daftar membuka halaman pemilihan role.
+- Header Masuk membuka pilihan Owner/Investor dalam tampilan ringkas.
+- Setiap CTA role langsung mengarah ke halaman pendaftaran yang sesuai.
+- Tautan fitur dan keanggotaan menggulir halaman atau membuka bagian/halaman publik yang sesuai.
+- Saat menu mobile terbuka, fokus keyboard tetap berada di dalam menu; tombol Escape menutup menu dan fokus kembali ke pemicunya.
+- Media hero memiliki tampilan pengganti yang netral; teks dan CTA tetap berfungsi tanpa menunggu media dimuat.
 
 ## 3. Pemilihan role pendaftaran — `/daftar`
 
