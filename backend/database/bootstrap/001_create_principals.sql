@@ -140,7 +140,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE usahapintar_migrator IN SCHEMA public
     REVOKE ALL ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE usahapintar_migrator IN SCHEMA public
     REVOKE ALL ON SEQUENCES FROM PUBLIC;
-ALTER DEFAULT PRIVILEGES FOR ROLE usahapintar_migrator IN SCHEMA public
+-- EXECUTE pada function adalah default global PostgreSQL; revoke juga harus global,
+-- bukan hanya per-schema.
+ALTER DEFAULT PRIVILEGES FOR ROLE usahapintar_migrator
     REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
 COMMIT;
