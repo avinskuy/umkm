@@ -4,8 +4,7 @@
 //! harus menyediakan KeyProvider dari secret manager/KMS yang disetujui.
 
 use ring::{
-    aead,
-    hmac,
+    aead, hmac,
     rand::{SecureRandom, SystemRandom},
 };
 use zeroize::Zeroizing;
@@ -60,11 +59,7 @@ pub trait KeyProvider: Send + Sync {
     fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError>;
 
     /// Mengambil key versi tertentu untuk dekripsi/verifikasi data lama.
-    fn key(
-        &self,
-        purpose: KeyPurpose,
-        version: KeyVersion,
-    ) -> Result<SecretKey, CryptoError>;
+    fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError>;
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -213,10 +208,9 @@ pub fn otp_digest(
     }
 
     let versioned_key = match version {
-        Some(version) => VersionedKey::new(
-            version,
-            provider.key(KeyPurpose::OtpVerification, version)?,
-        ),
+        Some(version) => {
+            VersionedKey::new(version, provider.key(KeyPurpose::OtpVerification, version)?)
+        },
         None => provider.active_key(KeyPurpose::OtpVerification)?,
     };
 
@@ -289,11 +283,7 @@ mod tests {
                 .map(|key| VersionedKey::new(KeyVersion(7), key))
         }
 
-        fn key(
-            &self,
-            purpose: KeyPurpose,
-            version: KeyVersion,
-        ) -> Result<SecretKey, CryptoError> {
+        fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
             if version != KeyVersion(7) {
                 return Err(CryptoError::KeyUnavailable);
             }
