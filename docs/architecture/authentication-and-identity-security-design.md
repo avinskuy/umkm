@@ -215,7 +215,7 @@ The following product-policy values are approved initial baselines and must be e
 
 ### OTP and pending registration
 
-- Six-digit numeric OTP, 10-minute validity, keyed hash at rest, one-time atomic consumption, purpose/destination binding, and no plaintext logging.
+- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, disimpan sebagai keyed hash, hanya dapat digunakan satu kali secara atomik, terikat pada tujuan dan alamat penerima, serta tidak boleh dicatat dalam log sebagai teks asli.
 - Five failed attempts per verification session; the fifth failure locks that verification session for one hour. Resending cannot clear or bypass the lock.
 - Resend cooldown is 60 seconds; no more than five sends per hour per destination/contact. Add adaptive limits by IP/network, account, purpose, and suspicious activity.
 - A newly issued code invalidates the previous code for the same purpose/destination. Delivery failure never verifies a contact.
