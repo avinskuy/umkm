@@ -19,8 +19,6 @@ USahapintar menghubungkan pemilik usaha dengan investor melalui penemuan bisnis,
 - `frontend/` — aplikasi web React + TypeScript; lihat [panduan frontend](frontend/README.md).
 - `backend/` — API Rust/Axum dan fondasi PostgreSQL/SQLx; lihat [panduan backend](backend/README.md).
 - `docs/` — dokumentasi produk, arsitektur, keamanan, engineering, dan operasional.
-- `infra/` — aset deployment dan infrastruktur, ditambahkan saat dibutuhkan.
-- `scripts/` — tugas pengembangan dan pemeliharaan yang dapat dijalankan ulang.
 
 ## Prinsip pengembangan
 
