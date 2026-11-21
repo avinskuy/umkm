@@ -16,7 +16,7 @@ This document defines the first authentication architecture for USahapintar. It 
 - Separate Owner and Investor login entry points.
 - Email/password and phone OTP authentication remain proposed login capabilities, subject to the login-model decision in the Identity Core decision record.
 - Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
-- Google OAuth behavior is unresolved; do not implement OAuth account creation or linking until approved.
+- Google OAuth is retained for sign-in and registration, but it never bypasses role selection or the separate email/WhatsApp registration-code verification.
 - Password recovery.
 - Session lifecycle and logout.
 - Server-side role and resource authorization.
@@ -225,9 +225,17 @@ There is intentionally no `/auth/register/admin` endpoint.
 
 The login endpoints must check the expected role on the server. A mismatch returns a generic role-portal guidance response without exposing additional account details.
 
-### Google OAuth — decision pending
+### Google OAuth — retained
 
-Google OAuth routes are not approved for implementation yet. The product decision record must establish whether Google can create an account, only link to an already verified account, or is excluded from the MVP. Until then, do not expose Google registration/sign-in actions or implement OAuth callbacks. If later approved, state, nonce, issuer, audience, signature, expiry, role context, and exact redirect URI validation remain mandatory.
+Google OAuth is supported for sign-in and registration. It does not replace mandatory contact verification.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/auth/oauth/google/start?role=owner` | Begin Owner-context OAuth |
+| GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
+| GET | `/auth/oauth/google/callback` | Validate provider response and continue the role-bound flow |
+
+For a new Google identity, the user must still select exactly one contact method (email code or WhatsApp-delivered phone code) and verify it before account activation. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
 
 ### Admin authentication
 
@@ -316,7 +324,7 @@ On callback, validate at minimum:
 - Provider subject is present and stable.
 - The requested role context is the same as the initiated flow.
 
-Google OAuth account creation and login behavior are unresolved. Do not implement the prior proposed behavior of continuing registration for a new provider identity until the Identity Core decision record is approved.
+For a new Google identity, continue only the role-bound registration flow and require separate email or WhatsApp contact-code verification before activation. A previously linked provider identity may authenticate only its existing account. Never change role or auto-link based on matching email.
 
 Account linking rules:
 1. Require an authenticated session on the existing account.
@@ -418,8 +426,8 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 - Reset token cannot be reused.
 - Logout and logout-all revoke sessions.
 - Suspended accounts cannot use existing sessions.
-- If Google OAuth is approved later, OAuth state mismatch/expired state/invalid audience/invalid issuer are rejected.
-- If Google OAuth is approved later, duplicate provider subject cannot be linked to a second user and linking requires fresh proof of both identities.
+- OAuth state mismatch/expired state/invalid audience/invalid issuer are rejected.
+- Duplicate provider subject cannot be linked to a second user and linking requires fresh proof of both identities.
 - OAuth must never create a second account using a provider subject already linked to an account with another role.
 - Unauthorized user cannot read/update another user's business or profile.
 - Non-participant cannot read a conversation.
@@ -455,7 +463,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 4. **Registration:** implement Owner/Investor registration with validation and safe pending state.
 5. **Verification:** implement email and phone challenge lifecycle behind provider interfaces.
 6. **Password auth:** implement hashing, role-specific login, session cookie, logout, and recovery.
-7. **Google OAuth (conditional):** implement only after the Google account-creation/linking decision is approved.
+7. **Google OAuth:** implement role-bound sign-in/registration; new accounts must still complete the selected email or WhatsApp contact verification.
 8. **Authorization:** add backend role/resource policies and negative tests.
 9. **Admin foundation:** provisioning, MFA, permissions, and audit trail.
 10. **Hardening:** rate-limit review, security tests, logging review, accessibility, and deployment configuration.
@@ -467,12 +475,12 @@ Implement each step as a small pull request. Do not merge until CI, focused inte
 - PostgreSQL hosting and backup/restore approach.
 - Email delivery provider and sender/domain verification.
 - SMS/OTP provider, cost limits, and Indonesia phone delivery reliability.
-- Google OAuth client setup and production callback origins, only if Google OAuth is approved.
+- Google OAuth client setup and production callback origins.
 - Exact password and session timeout policy.
 - Whether phone OTP is a login method at MVP launch or only a verification method.
 - Admin MFA method and recovery procedure.
 - Consent versioning and retention periods.
 - Account closure, data export, and deletion workflow.
-- Google OAuth creation/linking policy and whether phone OTP is a login method or only a registration verification channel.
+- Whether phone OTP is a login method or only a registration verification channel.
 
 Do not invent provider credentials or put secrets in chat, repository files, screenshots, or frontend environment variables. Use server-side environment/secret management and test with non-production credentials.
