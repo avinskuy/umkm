@@ -119,3 +119,25 @@ Migrasi Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan 
 - `account_recovery_cases` boleh dibuat sebelum akun tujuan diketahui. `target_user_id` sementara NULL dan kasus tetap terhubung ke tepat satu `verification_session_id` melalui foreign key wajib dan unique. Satu sesi verifikasi hanya boleh memiliki satu kasus pemulihan; pengiriman ulang OTP menggunakan sesi/kasus yang sama, sedangkan percobaan pemulihan baru membuat sesi dan kasus baru. Setelah pemilihan akun serta pemeriksaan keamanan selesai, target dikaitkan secara atomik dan satu kali. Kasus tanpa target tetap tercatat dan dapat masuk antrean pemeriksaan tanpa membuka identitas akun.
 
 Rincian teknis dan checklist migrasi terdapat pada [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md).
+
+### Pemisahan status siklus hidup dan penguncian sesi
+
+Status siklus hidup sesi verifikasi dan kondisi penguncian sementara merupakan dua dimensi yang terpisah.
+
+Status siklus hidup yang menjadi baseline:
+- `pending`: sesi masih menunggu proses verifikasi yang sah.
+- `verified`: tujuan verifikasi telah berhasil dipenuhi; status terminal.
+- `expired`: masa berlaku sesi berakhir; status terminal.
+- `cancelled`: sesi dibatalkan; status terminal.
+
+Kondisi penguncian sementara dicatat secara terpisah melalui `failed_attempt_count` dan `locked_until`, bukan dengan mengganti status siklus hidup menjadi `locked`.
+
+Konsekuensinya:
+- Sesi `pending` tanpa penguncian dapat menerima percobaan verifikasi sesuai aturan OTP.
+- Sesi `pending` dengan `locked_until` yang masih berlaku tetap berstatus `pending`, tetapi semua percobaan verifikasi ditolak sampai waktu penguncian berakhir.
+- Setelah penguncian berakhir, server secara atomik mereset penghitung kegagalan sesi dan sesi `pending` yang sama dapat digunakan kembali. Batas pengiriman dan rate limit lintas sesi tetap berlaku.
+- Status `verified`, `expired`, dan `cancelled` tidak dapat dibuka kembali. Penguncian yang berakhir tidak menghidupkan kembali sesi atau challenge yang sudah terminal.
+- Status challenge OTP individual tetap dikelola terpisah dari status sesi verifikasi. Challenge yang kedaluwarsa, dibatalkan/digantikan, atau telah digunakan tidak diaktifkan kembali.
+
+Daftar status ini adalah baseline konseptual. Nama kolom, constraint, transisi lengkap, serta pemetaan status challenge masih harus difinalisasi dalam rancangan state machine dan tinjauan skema sebelum migrasi.
+
