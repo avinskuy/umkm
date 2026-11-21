@@ -44,8 +44,18 @@ Do not infer that the user supplied both contact methods. Do not create a migrat
 
 ## Decisions still required
 
-### Google OAuth
-Existing product documents mention Google sign-in and OAuth registration. It is not decided whether Google may create a new account, only link after an email- or WhatsApp-verified account exists, or be removed from the MVP. Until approved, do not implement Google-based account creation or linking.
+### Google OAuth — retained
+
+Google OAuth remains part of the product for sign-in and registration. It is an identity-provider authentication option, not a replacement for mandatory registration contact verification.
+
+- The user must choose Owner or Investor before starting a Google-based registration flow.
+- Role context is bound to server-side OAuth state and cannot be changed by callback parameters or client input.
+- For a new Google identity, the user must still choose exactly one registration contact: email with a code delivered to that email, OR phone with a code delivered through WhatsApp. A Google-asserted email does not waive this separate code-verification requirement.
+- The new account is created only after the selected contact has been verified and all registration requirements are met.
+- A previously linked Google identity may sign in only to its existing account. Its immutable primary role determines the correct portal; a role mismatch must never create a second account or change the existing role.
+- Never automatically link an existing account merely because Google returns an email matching the account's email. Linking requires an authenticated session plus fresh proof of control of the new identity, or an explicitly approved secure recovery process.
+- Admin identities are never created through public Google OAuth.
+- Validate OAuth state, nonce, issuer, audience, signature, expiry, and exact redirect URI. Reject duplicate provider subjects and replayed callbacks.
 
 ### Password and login model
 The existing design mentions email/password and phone OTP login. Confirm whether phone/WhatsApp is only a registration verification channel or also a passwordless login method. Password requirements and recovery behavior must match the chosen model.
@@ -61,4 +71,4 @@ Approve OTP lifetime, attempt cap, resend cooldown, rate-limit windows, pending-
 
 ## Implementation gate
 
-Identity Core migrations and runtime endpoints may begin only after Google OAuth behavior, phone OTP login behavior, pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved.
+Identity Core migrations and runtime endpoints may begin only after phone OTP login behavior, pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Google OAuth is retained under the constraints in this document.
