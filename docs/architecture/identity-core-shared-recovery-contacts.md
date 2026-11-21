@@ -31,15 +31,15 @@ Ketentuan implementasi:
 
 ## 3. Kontak pemulihan dapat digunakan bersama
 
-Satu nomor HP pemulihan yang sudah diverifikasi boleh dihubungkan ke lebih dari satu akun. Ini berbeda dari kontak utama pendaftaran, yang tetap tunduk pada kebijakan reservasi dan keunikan akun. Kebijakan apakah satu alamat email pemulihan boleh digunakan oleh beberapa akun belum diputuskan dan harus dikonfirmasi sebelum migrasi final.
+Satu email atau nomor HP pemulihan yang sudah diverifikasi boleh dihubungkan ke lebih dari satu akun. Ini berbeda dari kontak utama pendaftaran, yang tetap tunduk pada kebijakan reservasi dan keunikan akun.
 
 Implikasi:
 
-- Jangan membuat unique constraint global pada nomor HP pemulihan; satu nomor dapat memiliki beberapa baris relasi pemilik.
-- Jangan mengasumsikan email pemulihan dapat dipakai bersama atau harus unik lintas akun. Tetapkan kebijakan dan constraint email secara terpisah sebelum migrasi final.
+- Jangan membuat unique constraint global pada nilai email maupun nomor HP pemulihan; setiap kontak dapat memiliki beberapa baris relasi pemilik.
+- Gunakan indeks non-unik berdasarkan kanal dan keyed hash kontak untuk menemukan akun-akun yang terhubung tanpa membuka nilai kontak.
 - Simpan relasi pemilik kontak melalui foreign key ke akun; relasi satu nomor HP ke beberapa akun direpresentasikan melalui beberapa baris.
 - Simpan nilai kontak secara aman. Untuk pencarian dan deduplikasi, gunakan representasi normalisasi serta keyed hash yang stabil dan dikelola server. Jika nilai asli perlu dikirim ulang atau ditampilkan kepada pemiliknya, lindungi dengan enkripsi yang sesuai; jangan gunakan hash sebagai pengganti data yang harus dipulihkan.
-- Terapkan indeks non-unik untuk mencari relasi nomor HP berdasarkan kanal dan keyed hash kontak. Bentuk indeks/constraint untuk email mengikuti keputusan keunikan lintas akun yang masih terbuka. Hindari indeks yang membuat nilai kontak terbuka atau mudah ditebak.
+- Terapkan indeks non-unik untuk mencari relasi email maupun nomor HP berdasarkan kanal dan keyed hash kontak. Hindari indeks yang membuat nilai kontak terbuka atau mudah ditebak.
 - Perubahan, penghapusan, verifikasi ulang, dan pelepasan kontak harus dicatat serta diberi notifikasi yang sesuai.
 - Kontak pemulihan yang sama pada beberapa akun tidak boleh menyebabkan akun-akun tersebut digabungkan, saling berbagi sesi, atau mewarisi role.
 
@@ -89,8 +89,7 @@ Rancangan constraint dan indeks harus membedakan kontak utama pada users dari re
 - [ ] verification_sessions.user_id nullable hanya untuk purpose pemulihan sebelum pemilihan akun.
 - [ ] account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; kasus tetap terhubung ke sesi verifikasi dan target dikaitkan atomik setelah pemeriksaan.
 - [ ] Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
-- [ ] Nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
-- [ ] Kebijakan keunikan email pemulihan lintas akun diputuskan sebelum migrasi final.
+- [ ] Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
 - [ ] Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
 - [ ] Nilai kontak yang perlu dipakai kembali dilindungi dengan enkripsi yang sesuai.
 - [ ] OTP terikat pada purpose, kanal, dan kontak; tidak dapat dipakai lintas akun atau tujuan.
@@ -98,7 +97,7 @@ Rancangan constraint dan indeks harus membedakan kontak utama pada users dari re
 - [ ] Pengaitan akun tujuan atomik, satu kali, dan diaudit.
 - [ ] Rate limit berlaku lintas sesi dan instance serta tahan terhadap request bersamaan.
 - [ ] Kontak utama tetap direservasi selama masa tunggu penghapusan 30 hari.
-- [ ] Kontak pemulihan tidak ikut terkena aturan keunikan kontak utama.
+- [ ] Kontak pemulihan email dan nomor HP tidak ikut terkena aturan keunikan kontak utama.
 - [ ] Tes integrasi mencakup kontak bersama, beberapa akun, pemilihan akun, enumerasi, concurrency, penguncian, kedaluwarsa, pembatalan penghapusan, dan pelepasan reservasi.
 
 Tidak ada SQL migration yang dibuat oleh dokumen ini. Keputusan tentang state machine final, kolom tambahan, strategi rate-limit, enkripsi, dan retensi tetap memerlukan review sebelum implementasi.
