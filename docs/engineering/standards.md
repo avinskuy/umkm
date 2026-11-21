@@ -30,6 +30,7 @@
 - Hindari satu stylesheet seluruh aplikasi yang berisi selector khusus untuk banyak fitur.
 - Komponen tidak boleh menangani urusan jaringan, domain, dan presentasi yang tidak saling berkaitan.
 - Sediakan label yang aksesibel, dukungan keyboard, serta state loading, error, dan empty yang jelas.
+- Terapkan prinsip pengalaman pengguna yang inklusif dalam [Prinsip Pengalaman Pengguna yang Inklusif](../product/prinsip-pengalaman-pengguna.md).
 
 ## Backend
 
@@ -40,6 +41,7 @@
 - Hindari `unwrap()` dan `expect()` pada jalur request normal.
 - Tempatkan query database dan client penyedia eksternal di balik batas infrastructure.
 - Jangan pernah mengembalikan rahasia internal atau field sensitif.
+- Pesan error yang ditampilkan kepada pengguna harus jelas, dapat ditindaklanjuti, dan tidak membocorkan detail internal atau keberadaan akun.
 
 ## Kepemilikan style
 
@@ -56,6 +58,8 @@
 - Tambahkan regression test untuk setiap bug yang diperbaiki.
 - Uji akses role/sumber daya yang diizinkan maupun yang harus ditolak.
 - Tambahkan E2E test untuk alur pengguna yang penting ketika alur tersebut sudah tersedia.
+- Uji alur penting dari sudut pandang pengguna baru dan pengguna dengan tingkat literasi digital yang beragam; catat hambatan dan perbaikannya.
+- Periksa aksesibilitas keyboard, fokus, label, kontras, dan pembesaran teks pada komponen serta alur penting.
 
 ## Gerbang kualitas
 
@@ -65,3 +69,4 @@ Jalankan pemeriksaan yang relevan sebelum membuka pull request:
 - Backend: rustfmt, Clippy dengan peringatan dianggap gagal, test, dan build.
 - Tinjau perubahan dependency dan lockfile yang dihasilkan.
 - Seluruh CI harus berstatus hijau sebelum merge.
+- Fitur yang menyentuh alur utama pengguna harus memiliki bukti pengujian usability yang relevan atau mencatat keterbatasan serta rencana pengujian lanjutan.
