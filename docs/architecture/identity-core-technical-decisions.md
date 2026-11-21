@@ -204,15 +204,11 @@ Gerbang migration akun pertama telah dipenuhi dan hasilnya sudah di-merge ke `ma
 
 Migration 0002 telah di-merge ke `main` dan lulus CI PostgreSQL. Skema menyediakan sesi verifikasi, challenge, serta event percobaan/pengiriman. Runtime OTP, provider, abstraksi key provider, dan enforcement rate limit masih merupakan pekerjaan lanjutan; batas lima kegagalan per kontak dalam 60 menit tetap wajib ditegakkan secara atomik lintas sesi dan instance.
 
-- Konsistensi purpose/channel dan aturan nullable `user_id` khusus recovery pra-pemilihan akun.
-- Representasi ciphertext, nonce, HMAC, dan key version tidak menyimpan key material atau tujuan plaintext.
-- Rotasi HMAC dan transaction-scoped advisory lock tidak membuka bypass rate limit.
-- Constraint lifecycle sesi/challenge, partial unique index, foreign key, dan timestamp terminal lengkap.
-- Transaksi resend, konsumsi OTP, kegagalan kelima, reset lock, dan cleanup idempotent.
-- Tes PostgreSQL dengan beberapa koneksi membuktikan batas lima pengiriman, cooldown 60 detik, lock satu jam, dan one-time use.
-- Migration tidak mengaktifkan endpoint, provider, login session, recovery case, atau database startup.
+### Migration 0003 — sesi autentikasi
 
-Jangan menjalankan migration pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
+Migration 0003 tersedia pada branch implementasi dan sedang melalui review/CI. Skema menyediakan hash token sesi, batas absolut 30 hari, idle timeout 7 hari, rotasi token, pencabutan satu arah, dan pencabutan otomatis ketika status lifecycle akun berubah menjadi nonaktif. Endpoint, cookie, middleware, validasi sesi per request, audit event, serta pencabutan karena reset password/restriksi Admin tetap merupakan pekerjaan runtime.
+
+Jangan menjalankan migration 0001–0003 pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
 
 ## 8. Keputusan yang tetap ditunda
 
@@ -226,19 +222,3 @@ Hal berikut bukan penghalang untuk menyepakati model konseptual, tetapi harus di
 - Parameter password hashing dan konfigurasi sesi/cookie produksi.
 
 Keputusan ini tidak membuka ulang kebijakan OTP atau recovery yang telah disetujui; ini adalah detail implementasi dan operasi yang perlu diverifikasi sebelum rilis fitur terkait.
-
-
-### Migration 0003 — sesi autentikasi
-
-Migration 0003 menyediakan fondasi penyimpanan sesi opaque yang dikelola server.
-
-- Token sesi berentropi tinggi hanya disimpan sebagai digest SHA-256 32-byte yang unik secara global.
-- Database menetapkan waktu pembuatan, aktivitas awal, rotasi token, dan batas absolut 30 hari.
-- Backend harus memvalidasi `revoked_at IS NULL`, `expires_at > now()`, `last_seen_at > now() - interval '7 days'`, dan status akun aktif pada setiap permintaan terautentikasi.
-- Pembaruan aktivitas atau rotasi token ditolak database jika sesi telah melewati batas idle/absolut atau akun tidak lagi aktif. Rotasi token memperbarui hash, `token_rotated_at`, dan `last_seen_at` secara atomik.
-- `remember_device` tidak mengubah batas idle maupun absolut.
-- Pencabutan bersifat satu arah dan menyimpan reason code. Perubahan status lifecycle akun ke status nonaktif otomatis mencabut seluruh sesi yang belum dicabut.
-- Restriksi/suspensi moderasi, reset password, logout, logout semua perangkat, dan peristiwa keamanan harus memanggil operasi pencabutan yang sesuai dari runtime.
-- Metadata perangkat dibatasi pada ringkasan user-agent dan hash prefix jaringan opsional; alamat IP mentah tidak disimpan.
-
-Migration ini tidak membuat endpoint autentikasi, cookie, middleware, runtime session store, audit event, atau grant database. Belum ada database startup integration dan migration belum dijalankan pada database produksi.
