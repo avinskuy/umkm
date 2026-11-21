@@ -14,7 +14,7 @@ This document defines the first authentication architecture for USahapintar. It 
 - Public registration for Business Owner and Investor only.
 - Exactly one immutable primary client role (`owner` or `investor`) per account.
 - Separate Owner and Investor login entry points.
-- Password-based login is mandatory for every account. Email/WhatsApp verification codes are only for account activation/contact verification and never replace the password at login.
+- Email/phone registrations require password-based login. Google OAuth registrations do not require a separate local password and authenticate through the linked Google identity. Email/WhatsApp verification codes are only for account activation/contact verification and never replace a password or Google authentication at login.
 - Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
 - Google OAuth is retained for sign-in and registration, but it never bypasses role selection or the separate email/WhatsApp registration-code verification.
 - Password recovery.
@@ -89,7 +89,7 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `full_name` | Display name |
 | `email_normalized` | Normalized email; required and verified when email is the selected registration method, otherwise optional until added later |
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
-| `password_hash` | Required Argon2id password hash for every account, including Google-registered accounts |
+| `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
 | `primary_role` | Owner, Investor, or Admin |
 | `account_status` | Pending verification, active, suspended, or closed |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
@@ -211,7 +211,7 @@ There is intentionally no `/auth/register/admin` endpoint.
 
 ### Password and session authentication
 
-Every account must establish a local password during registration, including Google OAuth registrations. Email/WhatsApp verification codes only activate the account and prove control of the selected contact; they are never accepted as passwordless login credentials.
+Email- and phone-based registrations must establish a local password. Google OAuth registrations do not need to create or enter a separate local password; they authenticate through their linked Google identity. Email/WhatsApp verification codes only activate the account and prove control of the selected contact; they are never accepted as login credentials.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -227,7 +227,7 @@ Login accepts the registered email or phone number together with the account pas
 
 ### Google OAuth — retained
 
-Google OAuth is supported for sign-in and registration. It does not replace the mandatory local password or contact verification requirements.
+Google OAuth is supported for sign-in and registration. It does not replace mandatory role selection or contact verification; it does remove the need to create or enter a separate local password for a Google-based registration.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -235,7 +235,7 @@ Google OAuth is supported for sign-in and registration. It does not replace the 
 | GET | `/auth/oauth/google/start?role=investor` | Begin Investor-context OAuth |
 | GET | `/auth/oauth/google/callback` | Validate provider response and continue the role-bound flow |
 
-For a new Google identity, the user must still establish a local password, select exactly one contact method (email code or WhatsApp-delivered phone code), and verify it before account activation. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
+For a new Google identity, the user must first select Owner or Investor, then complete Google OAuth and select exactly one contact method (email code or WhatsApp-delivered phone code) for separate verification before account activation. No separate local password is required. A Google-asserted email does not waive this verification. The role context is bound to server-side state and cannot be changed by callback input. Existing linked identities sign in only to their existing immutable-role account. Never auto-link based on matching email alone; linking requires fresh proof of control of both identities. Admin accounts cannot be created through public OAuth. Validate state, nonce, issuer, audience, signature, expiry, and exact redirect URI.
 
 ### Admin authentication
 
@@ -464,7 +464,7 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 4. **Registration:** implement Owner/Investor registration with validation and safe pending state.
 5. **Verification:** implement email and phone challenge lifecycle behind provider interfaces.
 6. **Password auth:** implement hashing, role-specific login, session cookie, logout, and recovery.
-7. **Google OAuth:** implement role-bound sign-in/registration; new accounts must still complete the selected email or WhatsApp contact verification.
+7. **Google OAuth:** implement role-bound sign-in/registration; new accounts must select a role before OAuth, need no separate local password, and must still complete selected email or WhatsApp contact verification.
 8. **Authorization:** add backend role/resource policies and negative tests.
 9. **Admin foundation:** provisioning, MFA, permissions, and audit trail.
 10. **Hardening:** rate-limit review, security tests, logging review, accessibility, and deployment configuration.
