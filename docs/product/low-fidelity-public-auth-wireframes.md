@@ -1,36 +1,36 @@
-# Low-Fidelity Wireframes — Public & Authentication
+# Wireframe Low-Fidelity — Situs Publik & Autentikasi
 
-> Status: structural wireframe specification  
-> Related documents:
-> - [Sitemap & UX Blueprint](./sitemap-and-ux-blueprint.md)
-> - [Public & Authentication UI/UX Specification](./public-and-auth-uiux-spec.md)
+> Status: spesifikasi wireframe struktural  
+> Dokumen terkait:
+> - [Peta Situs & Rancangan UI/UX](./sitemap-and-ux-blueprint.md)
+> - [Spesifikasi UI/UX Situs Publik & Autentikasi](./public-and-auth-uiux-spec.md)
 >
-> These wireframes define hierarchy, placement, and interaction—not final colors, imagery, typography, or pixel-perfect dimensions.
+> Wireframe ini menetapkan hierarki, penempatan, dan interaksi—bukan warna, gambar, tipografi, atau ukuran akhir yang presisi hingga tingkat piksel.
 
-## 1. Wireframe conventions
+## 1. Konvensi wireframe
 
-- `[ ... ]` represents a control, card, or content region.
-- `( ... )` represents supporting text or a secondary action.
-- `{ ... }` represents a state or conditional content.
-- Desktop layouts use a centered content container with a wider marketing grid.
-- Mobile layouts use a single column and vertically stacked actions.
-- All primary actions must remain visible without requiring horizontal scrolling.
+- `[ ... ]` mewakili kontrol, kartu, atau area konten.
+- `( ... )` mewakili teks pendukung atau tindakan sekunder.
+- `{ ... }` mewakili status atau konten bersyarat.
+- Tata letak desktop menggunakan container konten terpusat dengan grid pemasaran yang lebih lebar.
+- Tata letak mobile menggunakan satu kolom dengan tindakan yang disusun vertikal.
+- Semua tindakan utama harus tetap terlihat tanpa perlu menggulir secara horizontal.
 
-## 2. Landing page
+## 2. Halaman beranda
 
-### Desktop
+### Tampilan desktop
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ [USahapintar]     Cara Kerja   Fitur   Membership   Tentang   [Masuk] [Daftar]│
+│ [USahapintar]     Cara Kerja   Fitur   Keanggotaan   Tentang   [Masuk] [Daftar]│
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  [PLATFORM INTRO]                           ┌───────────────────────────┐  │
+│  [PENGANTAR PLATFORM]                           ┌───────────────────────────┐  │
 │  Bangun koneksi.                            │                           │  │
-│  Kembangkan peluang usaha.                  │     HERO VISUAL           │  │
-│                                             │  Business collaboration  │  │
-│  Short value proposition                    │  / opportunity discovery │  │
-│  in 2–3 readable lines.                     │                           │  │
+│  Kembangkan peluang usaha.                  │     VISUAL HERO           │  │
+│                                             │  Kolaborasi bisnis  │  │
+│  Deskripsi nilai singkat                    │  / penemuan peluang │  │
+│  dalam 2–3 baris yang mudah dibaca.                     │                           │  │
 │                                             └───────────────────────────┘  │
 │  [Daftar sebagai Pemilik Usaha]                                           │
 │  [Daftar sebagai Investor]                                                │
@@ -40,9 +40,9 @@
 │                       DUA JALUR UTAMA                                      │
 │  ┌────────────────────────────┐      ┌────────────────────────────┐       │
 │  │ PEMILIK USAHA              │      │ INVESTOR                   │       │
-│  │ Promote business           │      │ Discover opportunities     │       │
-│  │ Build business profile     │      │ Review shared information  │       │
-│  │ Find relevant partners     │      │ Connect with owners        │       │
+│  │ Promosikan usaha           │      │ Temukan peluang     │       │
+│  │ Bangun profil usaha     │      │ Tinjau informasi yang dibagikan  │       │
+│  │ Temukan mitra yang relevan     │      │ Terhubung dengan pemilik usaha        │       │
 │  │ [Mulai sebagai Owner]      │      │ [Mulai sebagai Investor]   │       │
 │  └────────────────────────────┘      └────────────────────────────┘       │
 │                                                                            │
@@ -58,16 +58,16 @@
 │  [Ringkasan Free]                    [Ringkasan Premium]                   │
 │  (Lihat detail membership)                                                 │
 ├────────────────────────────────────────────────────────────────────────────┤
-│  TRUST & RESPONSIBILITY                                                    │
-│  Introductions, owner-approved data, no guaranteed funding or returns.    │
+│  KEPERCAYAAN & TANGGUNG JAWAB                                                    │
+│  Perkenalan bisnis, data yang disetujui pemilik, tanpa jaminan pendanaan atau keuntungan.    │
 ├────────────────────────────────────────────────────────────────────────────┤
-│  FINAL CTA: [Daftar sebagai Pemilik Usaha] [Daftar sebagai Investor]      │
+│  CTA AKHIR: [Daftar sebagai Pemilik Usaha] [Daftar sebagai Investor]      │
 ├────────────────────────────────────────────────────────────────────────────┤
 │  Footer: Platform | Bantuan | Legal | Kontak                              │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Mobile
+### Tampilan mobile
 
 ```text
 ┌─────────────────────────────┐
@@ -78,22 +78,22 @@
 │ Bangun koneksi.             │
 │ Kembangkan peluang usaha.   │
 │                             │
-│ Short value proposition     │
+│ Deskripsi nilai singkat     │
 │                             │
 │ [Daftar sebagai Pemilik]    │
 │ [Daftar sebagai Investor]   │
 │ (Pelajari cara kerja)       │
 │                             │
 │ ┌─────────────────────────┐ │
-│ │       HERO VISUAL       │ │
+│ │       VISUAL HERO       │ │
 │ └─────────────────────────┘ │
 ├─────────────────────────────┤
 │ PEMILIK USAHA               │
-│ Benefits in short bullets   │
+│ Manfaat dalam poin singkat   │
 │ [Mulai sebagai Owner]       │
 ├─────────────────────────────┤
 │ INVESTOR                    │
-│ Benefits in short bullets   │
+│ Manfaat dalam poin singkat   │
 │ [Mulai sebagai Investor]    │
 ├─────────────────────────────┤
 │ CARA KERJA                  │
@@ -103,36 +103,36 @@
 │ 4. Mulai terhubung          │
 ├─────────────────────────────┤
 │ FITUR UTAMA                 │
-│ [Feature row]               │
-│ [Feature row]               │
-│ [Feature row]               │
+│ [Baris fitur]               │
+│ [Baris fitur]               │
+│ [Baris fitur]               │
 ├─────────────────────────────┤
 │ MEMBERSHIP                  │
 │ Free to Connect...          │
-│ [Lihat Membership]          │
+│ [Lihat Keanggotaan]          │
 ├─────────────────────────────┤
-│ TRUST & RESPONSIBILITY      │
+│ KEPERCAYAAN & TANGGUNG JAWAB      │
 ├─────────────────────────────┤
 │ FINAL CTA                   │
 │ [Daftar sebagai Pemilik]    │
 │ [Daftar sebagai Investor]   │
 ├─────────────────────────────┤
-│ Footer groups               │
+│ Kelompok footer               │
 └─────────────────────────────┘
 ```
 
-### Landing interactions
+### Interaksi halaman beranda
 
-- Header Daftar opens the role-choice page.
-- Header Masuk opens a compact Owner/Investor choice.
-- Each role CTA routes directly to its matching registration page.
-- Feature and membership links scroll or navigate to their corresponding public sections/pages.
-- Mobile menu traps focus while open, closes with Escape, and restores focus to its trigger.
-- Hero media has a neutral fallback; text and CTAs do not depend on media loading.
+- Header Daftar membuka halaman pemilihan role.
+- Header Masuk membuka pilihan Owner/Investor dalam tampilan ringkas.
+- Setiap CTA role langsung mengarah ke halaman pendaftaran yang sesuai.
+- Tautan fitur dan keanggotaan menggulir halaman atau membuka bagian/halaman publik yang sesuai.
+- Saat menu mobile terbuka, fokus keyboard tetap berada di dalam menu; tombol Escape menutup menu dan fokus kembali ke pemicunya.
+- Media hero memiliki tampilan pengganti yang netral; teks dan CTA tetap berfungsi tanpa menunggu media dimuat.
 
-## 3. Registration role choice — `/daftar`
+## 3. Pemilihan role pendaftaran — `/daftar`
 
-### Desktop
+### Tampilan desktop
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -145,7 +145,7 @@
 │      ┌────────────────────────────────┐  ┌────────────────────────────────┐│
 │      │ PEMILIK USAHA                  │  │ INVESTOR                       ││
 │      │                                │  │                                ││
-│      │ Promote your business, share   │  │ Discover opportunities and     ││
+│      │ Promote your business, share   │  │ Temukan peluang and     ││
 │      │ opportunities, find partners. │  │ connect with business owners. ││
 │      │                                │  │                                ││
 │      │ [Daftar sebagai Pemilik]       │  │ [Daftar sebagai Investor]      ││
@@ -155,24 +155,24 @@
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Mobile
+### Tampilan mobile
 
 ```text
 ┌─────────────────────────────┐
 │ [USahapintar]               │
 ├─────────────────────────────┤
 │ Mulai bersama USahapintar   │
-│ Choose your primary role.   │
+│ Pilih role utama akunmu.   │
 │                             │
 │ ┌─────────────────────────┐ │
 │ │ PEMILIK USAHA           │ │
-│ │ Short role description  │ │
+│ │ Deskripsi singkat role  │ │
 │ │ [Daftar sebagai Pemilik]│ │
 │ └─────────────────────────┘ │
 │                             │
 │ ┌─────────────────────────┐ │
 │ │ INVESTOR                │ │
-│ │ Short role description  │ │
+│ │ Deskripsi singkat role  │ │
 │ │ [Daftar sebagai Investor]││
 │ └─────────────────────────┘ │
 │                             │
@@ -182,13 +182,13 @@
 └─────────────────────────────┘
 ```
 
-Interaction: selecting a role navigates to its dedicated registration path. The role is immutable for the account and cannot be changed through profile settings, support, Admin action, account migration, or OAuth. Anyone who wants the other client role must register a separate account using eligible identities that are not linked to another account.
+Interaksi: pemilihan role mengarahkan pengguna ke jalur pendaftaran khusus role tersebut. Role bersifat tetap untuk akun dan tidak dapat diubah melalui pengaturan profil, bantuan, tindakan Admin, migrasi akun, atau OAuth. Pengguna yang ingin memakai role klien lainnya harus mendaftar akun terpisah dengan identitas yang memenuhi syarat dan belum terhubung ke akun lain.
 
-## 4. Owner and Investor login
+## 4. Login Owner dan Investor
 
-The two login pages share the same layout. Only role-specific heading, helper copy, role indicator, and mismatch destination differ.
+Kedua halaman login menggunakan tata letak yang sama. Perbedaannya hanya pada judul sesuai role, teks bantuan, indikator role, dan tujuan tautan ketika role tidak sesuai.
 
-### Desktop
+### Tampilan desktop
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -196,10 +196,10 @@ The two login pages share the same layout. Only role-specific heading, helper co
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │   ┌───────────────────────────────┐    ┌────────────────────────────────┐  │
-│   │ AUTH CONTEXT                  │    │ MASUK SEBAGAI                  │  │
+│   │ KONTEKS AUTENTIKASI                  │    │ MASUK SEBAGAI                  │  │
 │   │                               │    │ [Pemilik Usaha / Investor]     │  │
-│   │ Role-specific short message   │    │                                │  │
-│   │ and a restrained illustration │    │ [Email atau nomor telepon]     │  │
+│   │ Pesan singkat sesuai role   │    │                                │  │
+│   │ dan ilustrasi sederhana │    │ [Email atau nomor telepon]     │  │
 │   │                               │    │ [Kata sandi             (eye)]  │  │
 │   │                               │    │ (Lupa kata sandi?)             │  │
 │   │                               │    │ [Masuk]                        │  │
@@ -211,7 +211,7 @@ The two login pages share the same layout. Only role-specific heading, helper co
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Mobile
+### Tampilan mobile
 
 ```text
 ┌─────────────────────────────┐
@@ -221,7 +221,7 @@ The two login pages share the same layout. Only role-specific heading, helper co
 │                             │
 │ MASUK SEBAGAI               │
 │ Pemilik Usaha / Investor    │
-│ Short role-specific copy    │
+│ Deskripsi singkat sesuai role    │
 │                             │
 │ [Email atau nomor telepon]  │
 │ [Kata sandi           (eye)]│
@@ -234,40 +234,40 @@ The two login pages share the same layout. Only role-specific heading, helper co
 │                             │
 │ Belum punya akun? [Daftar]  │
 │                             │
-│ [Privacy] [Terms] [Bantuan] │
+│ [Privasi] [Ketentuan] [Bantuan] │
 └─────────────────────────────┘
 ```
 
-### Login states
+### Status login
 
 ```text
 DEFAULT
-  Fields enabled; submit available when input is valid.
+  Field aktif; tombol kirim tersedia saat input valid.
 
-SUBMITTING
-  Submit disabled; progress indicator shown; duplicate request prevented.
+SEDANG DIKIRIM
+  Tombol kirim dinonaktifkan; indikator proses ditampilkan; permintaan ganda dicegah.
 
-INVALID CREDENTIALS
-  Neutral inline notice; do not identify whether the email/phone exists.
+KREDENSIAL TIDAK VALID
+  Tampilkan pemberitahuan netral; jangan ungkap apakah email/nomor telepon terdaftar.
 
-ROLE MISMATCH
-  Explain that this account uses the other role portal; link to the correct portal.
+ROLE TIDAK SESUAI
+  Jelaskan bahwa akun ini menggunakan portal role lain dan berikan tautan ke portal yang benar.
 
-RATE LIMITED
-  Show a safe retry message and remaining wait time only if provided by server.
+DIBATASI SEMENTARA
+  Tampilkan pesan percobaan ulang yang aman dan sisa waktu tunggu hanya jika diberikan server.
 
-NETWORK ERROR
-  Keep non-sensitive fields; offer retry.
+GANGGUAN JARINGAN
+  Pertahankan field yang tidak sensitif dan sediakan opsi coba lagi.
 
-UNVERIFIED CONTACT
-  Provide the relevant verification continuation without exposing account details.
+KONTAK BELUM DIVERIFIKASI
+  Arahkan ke kelanjutan verifikasi yang sesuai tanpa mengungkap detail akun.
 ```
 
-## 5. Owner registration
+## 5. Pendaftaran Owner
 
-Registration is a staged flow. The account is created before the user is asked for extended business information.
+Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta mengisi informasi usaha yang lebih lengkap.
 
-### Step 1 — Account
+### Langkah 1 — Akun
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -276,10 +276,11 @@ Registration is a staged flow. The account is created before the user is asked f
 │ Buat akun Pemilik Usaha                                      │
 │                                                              │
 │ Nama lengkap          [________________________________]     │
-│ Email                 [________________________________]     │
-│ Nomor telepon         [________________________________]     │
-│ Kata sandi            [________________________________]     │
-│ Konfirmasi sandi      [________________________________]     │
+│ Metode kontak awal (pilih satu):                             │
+│ ( ) Email   ( ) Telepon / WhatsApp                           │
+│ Kontak yang dipilih    [______________________________]     │
+│ Kata sandi             [______________________________]     │
+│ Konfirmasi kata sandi  [______________________________]     │
 │                                                              │
 │ [ ] Saya menyetujui Ketentuan dan Kebijakan Privasi           │
 │ [ ] Saya ingin menerima kabar produk (opsional)               │
@@ -289,29 +290,26 @@ Registration is a staged flow. The account is created before the user is asked f
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Step 2 — Verification
+### Langkah 2 — Verifikasi
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ [USahapintar]                               Langkah 2 dari 4 │
 │                                                              │
 │ Verifikasi kontak                                            │
-│ Kode/link dikirim ke email dan nomor yang ditampilkan aman.  │
+│ Kode dikirim melalui satu kanal yang kamu pilih: email atau WhatsApp.                 │
 │                                                              │
-│ Email: m••••@example.com                                     │
-│ [Buka instruksi email] [Kirim ulang] (cooldown)               │
+│ Tujuan: kontak terpilih yang ditampilkan secara tersamarkan            │
+│ [Kode verifikasi _____________________________]              │
+│ [Verifikasi kontak] [Kirim ulang] (jeda kirim ulang)          │
 │                                                              │
-│ Nomor: +62 •••• •••• 1234                                    │
-│ [ _ ] [ _ ] [ _ ] [ _ ] [ _ ] [ _ ]                           │
-│ [Verifikasi nomor]                                            │
-│                                                              │
-│ (Ubah kontak)                                                 │
+│ (Ubah metode atau kontak)                                                 │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The visual OTP control may use grouped boxes, but the underlying input must support paste, keyboard navigation, and assistive technology. The approved baseline is a 10-minute code lifetime, 60-second resend cooldown, at most five sends per destination per hour, and a one-hour verification-session lock after five failed attempts. Resending may issue a new code but must not clear or shorten an active lock. Do not expose the OTP in logs or analytics.
+Kontrol OTP boleh ditampilkan sebagai beberapa kotak, tetapi input dasarnya harus tetap mendukung paste, navigasi keyboard, dan teknologi bantu. Baseline yang disetujui: masa berlaku kode 10 menit, jeda kirim ulang 60 detik, maksimal lima pengiriman per tujuan per jam, dan penguncian sesi verifikasi selama satu jam setelah lima percobaan gagal. Pengiriman ulang boleh menerbitkan kode baru, tetapi tidak boleh menghapus atau memperpendek penguncian yang masih aktif. Jangan tampilkan OTP dalam log atau analytics.
 
-### Step 3 — Business stage
+### Langkah 3 — Tahap usaha
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -328,7 +326,7 @@ The visual OTP control may use grouped boxes, but the underlying input must supp
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Step 4 — Initial business profile
+### Langkah 4 — Profil awal usaha
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -347,15 +345,15 @@ The visual OTP control may use grouped boxes, but the underlying input must supp
 └──────────────────────────────────────────────────────────────┘
 ```
 
-If the stage is idea-only, label the business name as an idea/project name and avoid requiring operating metrics.
+Jika tahap usaha masih berupa ide, beri label nama usaha sebagai nama ide/proyek dan jangan mewajibkan metrik operasional.
 
-## 6. Investor registration
+## 6. Pendaftaran Investor
 
-### Step 1 and 2
+### Langkah 1 dan 2
 
-Reuse the account and contact verification layouts from Owner registration, changing the role copy only.
+Gunakan kembali tata letak akun dan verifikasi kontak dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
 
-### Step 3 — Investor preferences
+### Langkah 3 — Preferensi Investor
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -377,11 +375,11 @@ Reuse the account and contact verification layouts from Owner registration, chan
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Keep financial range and risk preference optional in the initial onboarding unless product/legal review later establishes a justified requirement.
+Rentang keuangan dan preferensi risiko tetap opsional pada onboarding awal, kecuali tinjauan produk/legal kemudian menetapkan alasan yang kuat untuk mewajibkannya.
 
-## 7. Password recovery and reset
+## 7. Pemulihan dan pengaturan ulang kata sandi
 
-### Request reset
+### Permintaan pengaturan ulang
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -393,12 +391,12 @@ Keep financial range and risk preference optional in the initial onboarding unle
 │ [Email atau nomor telepon____________________________]       │
 │ [Kirim instruksi]                                            │
 │                                                              │
-│ {Neutral confirmation message shown regardless of account}  │
+│ {Pesan konfirmasi netral ditampilkan terlepas dari keberadaan akun}  │
 │ (Kembali ke halaman masuk)                                   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Set new password
+### Atur kata sandi baru
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -409,15 +407,15 @@ Keep financial range and risk preference optional in the initial onboarding unle
 │ [Ulangi kata sandi____________________________ (eye)]        │
 │ [Simpan kata sandi]                                          │
 │                                                              │
-│ {Expired token: offer request-new-link action}                │
+│ {Token kedaluwarsa: sediakan tindakan untuk meminta tautan baru}                │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## 8. Admin login
+## 8. Login Admin
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar Admin]                         Internal access  │
+│ [USahapintar Admin]                         Akses internal  │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │ Akses Administrator                                         │
@@ -426,72 +424,72 @@ Keep financial range and risk preference optional in the initial onboarding unle
 │ Kata sandi              [____________________________]       │
 │ [Masuk]                                                     │
 │                                                              │
-│ {MFA challenge after primary authentication}                 │
-│ Authenticator / passkey challenge                            │
+│ {Tantangan MFA setelah autentikasi utama}                 │
+│ Tantangan authenticator/passkey                            │
 │                                                              │
 │ (Hubungi super-admin jika akses bermasalah.)                 │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-No public Admin registration or role selector is present. Admin MFA is required before production use; the exact MFA method/provider remains an implementation decision. Account recovery policy is defined in the approved Identity Core decisions; provider, evidence storage, and operational details remain subject to implementation review.
+Tidak ada pendaftaran Admin publik atau pemilih role Admin. MFA Admin wajib diterapkan sebelum penggunaan produksi; metode/penyedia MFA yang tepat masih menjadi keputusan implementasi. Kebijakan pemulihan akun ditetapkan dalam keputusan Identity Core yang telah disetujui; penyedia layanan, penyimpanan bukti, dan detail operasional tetap harus ditinjau saat implementasi.
 
-## 9. Shared error, loading, and empty states
+## 9. Status error, pemuatan, dan kosong
 
-| State | Visual placement | Behavior |
+| Status | Penempatan tampilan | Perilaku |
 | --- | --- | --- |
-| Field validation | Directly below field | Explain the correction; associate with input |
-| Form-level error | Above submit button | Neutral, non-sensitive explanation |
-| Loading | Submit button | Prevent duplicate submit and preserve layout |
-| Success | Inline confirmation or next page | Explain next action |
-| Network failure | Form-level notice | Retry without losing safe input |
-| Rate limit | Form-level notice | Explain wait period if known |
-| Expired verification | Verification panel | Offer safe resend/restart |
-| OAuth cancelled | Inline notice | Allow retry or use another method |
+| Validasi field | Tepat di bawah field | Jelaskan perbaikannya dan hubungkan dengan input |
+| Error formulir | Di atas tombol kirim | Penjelasan netral tanpa data sensitif |
+| Memuat | Tombol kirim | Cegah pengiriman ganda dan pertahankan tata letak |
+| Berhasil | Konfirmasi inline atau halaman berikutnya | Jelaskan tindakan selanjutnya |
+| Gangguan jaringan | Pemberitahuan di formulir | Coba lagi tanpa menghapus input yang aman |
+| Batas percobaan | Pemberitahuan di formulir | Jelaskan waktu tunggu jika diketahui |
+| Verifikasi kedaluwarsa | Panel verifikasi | Sediakan kirim ulang atau mulai ulang dengan aman |
+| OAuth dibatalkan | Pemberitahuan inline | Izinkan pengguna mencoba lagi atau memakai metode lain |
 
-Do not use color alone to convey state. Keep error messages concise and actionable.
+Jangan gunakan warna sebagai satu-satunya penanda status. Buat pesan error singkat dan menjelaskan tindakan yang dapat dilakukan.
 
-## 10. Component inventory for the first implementation slice
+## 10. Daftar komponen untuk tahap implementasi pertama
 
-| Component | Responsibility | Initial states |
+| Komponen | Tanggung jawab | Status awal |
 | --- | --- | --- |
-| PublicHeader | Public navigation and role entry | Desktop, mobile menu open/closed |
-| PublicFooter | Public/legal/help links | Responsive groups |
-| RoleChoiceCard | Owner/Investor registration entry | Default, focus, selected |
-| AuthLayout | Shared role login composition | Desktop, mobile |
-| TextField | Labeled text input | Default, focus, error, disabled |
-| PasswordField | Password input with visibility toggle | Hidden, visible, error |
-| PhoneField | International phone input | Default, invalid |
-| OtpCodeInput | Contact verification code | Empty, partial, complete, expired |
-| StepIndicator | Multi-step progress | Current, complete, upcoming |
-| FormNotice | Form-level status message | Info, error, success |
-| LoadingButton | Async submit control | Idle, loading, disabled |
+| PublicHeader | Navigasi publik dan pilihan role | Desktop, menu mobile terbuka/tertutup |
+| PublicFooter | Tautan publik, legal, dan bantuan | Kelompok responsif |
+| RoleChoiceCard | Pilihan pendaftaran Owner/Investor | Normal, fokus, dipilih |
+| AuthLayout | Tata letak login bersama per role | Desktop, mobile |
+| TextField | Input teks berlabel | Normal, fokus, error, nonaktif |
+| PasswordField | Input kata sandi dengan kontrol tampil/sembunyi | Tersembunyi, terlihat, error |
+| PhoneField | Input nomor telepon internasional | Normal, tidak valid |
+| OtpCodeInput | Kode verifikasi kontak | Kosong, sebagian, lengkap, kedaluwarsa |
+| StepIndicator | Progres multi-langkah | Saat ini, selesai, berikutnya |
+| FormNotice | Pesan status formulir | Info, error, berhasil |
+| LoadingButton | Tombol kirim asinkron | Diam, memuat, nonaktif |
 
-Keep component styles feature-local or in CSS modules. Do not centralize every page's styling in one large stylesheet.
+Tempatkan style komponen dekat fitur terkait atau dalam CSS Modules. Jangan memusatkan seluruh style halaman ke dalam satu stylesheet besar.
 
-## 11. Review checklist
+## 11. Daftar pemeriksaan
 
-- [ ] Desktop and mobile hierarchy is clear for every screen.
-- [ ] Owner and Investor are distinguished without creating two unrelated design systems.
-- [ ] Admin is clearly separated from public user journeys.
-- [ ] No role selector appears on a signed-in profile as a casual role switch.
-- [ ] All forms have visible labels, inline validation, and server-error states.
-- [ ] OTP supports paste, keyboard, and assistive technology.
-- [ ] Google OAuth preserves role context and handles cancelled/error states.
-- [ ] Mobile layouts avoid horizontal overflow and remain usable with the on-screen keyboard.
-- [ ] Membership copy preserves free approved-connection chat.
-- [ ] No UI implies guaranteed funding, investment returns, or verified metrics without evidence.
-- [ ] Every action has a destination or a documented state transition.
+- [ ] Hierarki desktop dan mobile jelas pada setiap layar.
+- [ ] Owner dan Investor dapat dibedakan tanpa membuat dua design system yang tidak saling terkait.
+- [ ] Admin terpisah dengan jelas dari alur pengguna publik.
+- [ ] Tidak ada pemilih role pada profil pengguna yang sudah login seolah-olah role dapat diganti kapan saja.
+- [ ] Semua formulir memiliki label yang terlihat, validasi inline, dan status error dari server.
+- [ ] OTP mendukung paste, keyboard, dan teknologi bantu.
+- [ ] Google OAuth mempertahankan konteks role serta menangani status dibatalkan/error.
+- [ ] Tata letak mobile tidak overflow secara horizontal dan tetap nyaman digunakan saat keyboard layar terbuka.
+- [ ] Keanggotaan copy preserves free approved-connection chat.
+- [ ] Tidak ada UI yang menyiratkan jaminan pendanaan, hasil investasi, atau metrik terverifikasi tanpa bukti.
+- [ ] Setiap tindakan memiliki tujuan atau transisi status yang terdokumentasi.
 
-## 12. Handoff to implementation
+## 12. Serah terima ke implementasi
 
-Once the wireframes are accepted:
+Setelah wireframe disetujui:
 
-1. Confirm exact copy, required/optional fields, and Owner/Investor role mismatch behavior.
-2. Commit the frontend lockfile and stabilize dependency installation.
-3. Define authentication API contracts and database migrations.
-4. Review the auth threat model (OTP abuse, session fixation, OAuth state/nonce, password reset, account linking, enumeration, CSRF/CORS, rate limiting).
-5. Implement shared form primitives and the public/auth shell.
-6. Add focused component, integration, and browser tests before connecting real authentication providers.
+1. Tetapkan teks final, field wajib/opsional, dan perilaku ketika role Owner/Investor tidak sesuai.
+2. Commit lockfile frontend dan stabilkan instalasi dependency.
+3. Tetapkan kontrak API autentikasi dan migration database.
+4. Tinjau model ancaman autentikasi (penyalahgunaan OTP, session fixation, state/nonce OAuth, reset kata sandi, pengaitan akun, enumerasi akun, CSRF/CORS, dan rate limit).
+5. Implementasikan komponen dasar formulir bersama serta kerangka situs publik/autentikasi.
+6. Tambahkan pengujian komponen, integrasi, dan browser yang terarah sebelum menghubungkan penyedia autentikasi nyata.
 
-No authentication implementation should begin from these wireframes alone; the API contract and security design are required first.
+Implementasi autentikasi tidak boleh dimulai hanya berdasarkan wireframe ini; kontrak API dan rancangan keamanan harus tersedia lebih dahulu.
