@@ -36,6 +36,22 @@ jobs:
   backend:
     name: Backend quality
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: usahapintar_test
+          POSTGRES_PASSWORD: ci_test_only_password
+          POSTGRES_DB: usahapintar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U usahapintar_test -d usahapintar_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://usahapintar_test:ci_test_only_password@localhost:5432/usahapintar_test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -45,4 +61,5 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - run: cargo test --locked -p usahapintar-api --test postgres -- --ignored
       - run: cargo build --workspace --locked
