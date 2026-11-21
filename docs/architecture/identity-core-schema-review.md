@@ -12,7 +12,7 @@ Dokumen ini adalah catatan gerbang desain teknis awal Identity Core. Dokumen ini
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
 - `backend/migrations/` kini memiliki migration akun Identity Core pertama untuk `users` dan `user_identities`.
 - HTTP server saat ini hanya menyediakan `GET /api/v1/health`. Database belum diinisialisasi oleh proses startup.
-- Tes integrasi PostgreSQL kini memeriksa constraint akun, role immutable, initial-contact provenance, reservasi kontak, konkurensi, Google provider identity, dan metode autentikasi.
+- Tes integrasi PostgreSQL kini memeriksa constraint akun, role immutable, initial-contact provenance, deadline registrasi 30 menit, masa tunggu penghapusan 30 hari, reservasi kontak, konkurensi, Google provider identity, dan metode autentikasi.
 - Tidak ada pull request terbuka saat pemeriksaan. Tidak ada perubahan runtime atau deployment yang dilakukan dalam tahap ini.
 
 Pada saat review awal, belum ada skema domain yang digunakan bersama. Migration akun pertama kini dibuat dan diuji pada PostgreSQL sementara di CI. Migration tersebut belum dijalankan pada database produksi dan tidak mengaktifkan registrasi/login.
