@@ -886,6 +886,17 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
         "session failure counter cannot reset before its one-hour lock expires"
     );
 
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid"
+        )
+        .bind(&lock_session_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "a locked session cannot be verified through a direct state update"
+    );
+
     let recovery_session_id: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions (              purpose, channel, destination_ciphertext, destination_nonce,              encryption_key_version, destination_hmac, hmac_key_version, expires_at          )          VALUES (              'account_recovery', 'email', '\\x01', '\\x02', 'enc-v1', '\\x03', 'hmac-v1',              clock_timestamp() + INTERVAL '20 minutes'          )          RETURNING id::text",
     )
@@ -952,6 +963,26 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
         "challenge lifetime cannot exceed ten minutes"
     );
 
+    let locked_challenge_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_challenges (verification_session_id, code_hash, hash_key_version, expires_at) VALUES ($1::uuid, $2, 'otp-hash-v1', clock_timestamp() + INTERVAL '5 minutes') RETURNING id::text"
+    )
+    .bind(&lock_session_id)
+    .bind(vec![8_u8])
+    .fetch_one(pool)
+    .await
+    .expect("challenge may be issued while a session is locked");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_challenges SET status = 'consumed', consumed_at = clock_timestamp() WHERE id = $1::uuid"
+        )
+        .bind(&locked_challenge_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "a challenge cannot be consumed while its parent session is locked"
+    );
+
     assert!(
         sqlx::query(
             "INSERT INTO public.otp_verification_attempt_events (                  verification_session_id, verification_challenge_id, destination_hmac,                  hmac_key_version, channel, purpose, outcome              )              VALUES ($1::uuid, $2::uuid, $3, 'hmac-v1', 'email', 'registration', 'failed')"
@@ -974,6 +1005,14 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     .execute(pool)
     .await
     .expect("valid failed attempt event should be recorded");
+
+    sqlx::query(
+        "UPDATE public.verification_challenges SET status = 'consumed', consumed_at = clock_timestamp() WHERE id = $1::uuid"
+    )
+    .bind(&challenge_id)
+    .execute(pool)
+    .await
+    .expect("challenge may be consumed while its parent session is eligible");
 
     assert!(
         sqlx::query(
