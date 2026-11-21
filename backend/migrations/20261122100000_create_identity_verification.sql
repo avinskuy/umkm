@@ -126,6 +126,23 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
+        IF NEW.status = 'verified' AND OLD.expires_at <= clock_timestamp() THEN
+            RAISE EXCEPTION 'expired verification session cannot be verified'
+                USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.status = 'expired' AND OLD.expires_at > clock_timestamp() THEN
+            RAISE EXCEPTION 'verification session cannot expire before its deadline'
+                USING ERRCODE = '23514';
+        END IF;
+
+        IF OLD.failed_attempt_count = 5
+           AND NEW.failed_attempt_count = 5
+           AND NEW.locked_until < OLD.locked_until THEN
+            RAISE EXCEPTION 'verification lock deadline cannot be shortened'
+                USING ERRCODE = '23514';
+        END IF;
+
         IF OLD.user_id IS NOT NULL AND NEW.user_id IS DISTINCT FROM OLD.user_id THEN
             RAISE EXCEPTION 'verification session account binding is immutable'
                 USING ERRCODE = '23514';
@@ -261,6 +278,16 @@ BEGIN
 
         IF NEW.status NOT IN ('consumed', 'expired', 'superseded', 'cancelled') THEN
             RAISE EXCEPTION 'invalid verification challenge transition'
+                USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.status = 'consumed' AND OLD.expires_at <= clock_timestamp() THEN
+            RAISE EXCEPTION 'expired verification challenge cannot be consumed'
+                USING ERRCODE = '23514';
+        END IF;
+
+        IF NEW.status = 'expired' AND OLD.expires_at > clock_timestamp() THEN
+            RAISE EXCEPTION 'verification challenge cannot expire before its deadline'
                 USING ERRCODE = '23514';
         END IF;
     END IF;
