@@ -85,7 +85,22 @@ Status suspend atau pembatasan fitur oleh Admin **bukan** nilai `account_status`
 
 Status `deletion_pending` dan `deletion_processing` disediakan sebagai vocabulary lifecycle. Transisi penghapusan belum boleh diaktifkan sebelum tabel permintaan penghapusan, retensi, dan proses terkait tersedia pada migration domain tersendiri.
 
-### 2.4 CHECK constraint
+### 2.4 Transisi lifecycle
+
+Database menolak lompatan status yang tidak sah dan menegakkan batas waktu utama:
+
+| Status awal | Transisi yang diizinkan | Syarat |
+| --- | --- | --- |
+| `pending_verification` | `active` atau `pending_expired` | Aktivasi harus sebelum `pending_expires_at` dan mencatat verifikasi kontak awal; expiry hanya setelah deadline 30 menit. |
+| `active` | `deactivated` atau `deletion_pending` | Perubahan status dilakukan melalui operasi backend yang terotorisasi. |
+| `deactivated` | `active` atau `deletion_pending` | Reaktivasi memerlukan autentikasi/verifikasi sesuai kebijakan. |
+| `deletion_pending` | `active`, `deactivated`, atau `deletion_processing` | Pembatalan memerlukan verifikasi; processing hanya setelah 30 hari sejak status masuk `deletion_pending`. |
+| `deletion_processing` | `closed` | Hanya setelah pekerjaan penghapusan dan retensi selesai. |
+| `pending_expired` / `closed` | Tidak ada | Status terminal dan tidak dapat dibuka kembali. |
+
+`pending_expires_at` tidak dapat diubah selama akun tetap pending. Database menggunakan waktu server untuk memeriksa deadline; `status_changed_at` dicatat otomatis saat lifecycle berubah dan menjadi dasar 30 hari masa tunggu penghapusan. Pemeriksaan ini melengkapi, bukan menggantikan, validasi backend, audit, dan tabel permintaan penghapusan yang akan dibuat pada slice berikutnya.
+
+### 2.5 CHECK constraint
 
 Kontrak constraint minimum:
 
@@ -104,7 +119,7 @@ Kontrak constraint minimum:
 
 Constraint lintas tabel yang tidak dapat diekspresikan dengan aman sebagai CHECK harus dijaga oleh operasi backend/transaksi dan tes integrasi. Khusus akun klien: `password_hash` boleh NULL hanya jika identitas Google yang sah dibuat/ditautkan dalam transaksi pembuatan akun yang sama; registrasi email/telepon wajib memiliki password hash. Jangan membuat CHECK yang membaca tabel lain. Aturan kredensial Admin mengikuti jalur provisioning internal dan harus dipastikan sebelum akun Admin diaktifkan.
 
-### 2.5 Keunikan dan reservasi kontak
+### 2.6 Keunikan dan reservasi kontak
 
 Gunakan unique partial index terpisah:
 
@@ -119,7 +134,7 @@ Aturan:
 - Transisi ke `closed` hanya boleh melepas reservasi setelah proses penghapusan benar-benar selesai; berlalunya 30 hari saja tidak cukup.
 - Jangan mengandalkan soft-delete flag atau validasi frontend sebagai pengganti partial unique index.
 
-### 2.6 Password dan verifikasi
+### 2.7 Password dan verifikasi
 
 - `password_hash` menyimpan encoded hash hasil password-hashing library yang dipilih kemudian. Parameter dan library final bukan bagian dari migration.
 - Registrasi email/telepon wajib menyediakan password lokal.
@@ -196,7 +211,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Akun aktif tanpa `initial_contact_verified_at` atau tanpa setidaknya satu kontak utama terverifikasi ditolak.
 - Mengganti kontak utama tanpa verifikasi nilai baru ditolak; provenance `initial_contact_channel` tidak dapat diubah.
 - Timestamp verified tanpa nilai kontak ditolak.
-- Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.
+- Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.\n- Aktivasi sebelum/ sesudah deadline, expiry terlalu awal, lompatan lifecycle, pembatalan setelah deletion processing, dan pembukaan kembali status terminal ditolak.
 - Email dan nomor telepon duplikat ditolak pada seluruh status yang masih memegang reservasi.
 - Email/nomor yang sama dapat digunakan kembali setelah transisi terminal yang sah melepaskan reservasi.
 
