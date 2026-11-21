@@ -1,4 +1,4 @@
-# Incident Response & Security Incident Management
+# Penanganan Insiden & Manajemen Insiden Keamanan
 
 - **Status:** Disetujui sebagai baseline kebijakan dan prosedur.
 - **Acuan utama:** NIST Cybersecurity Framework (CSF) 2.0 dan NIST SP 800-61 Rev. 3.
@@ -36,7 +36,7 @@ Contoh insiden meliputi:
 
 Laporan dapat berasal dari pengguna, Admin, tim teknis, monitoring, penyedia layanan, atau pihak eksternal.
 
-## 3. Severity dan eskalasi
+## 3. Tingkat keparahan dan eskalasi
 
 Gunakan empat tingkat awal. Penetapan akhir mempertimbangkan dampak aktual, paparan, sensitivitas data, jumlah pengguna terdampak, serta urgensi.
 
@@ -78,7 +78,7 @@ Pada tahap tim kecil, satu orang dapat memegang lebih dari satu peran. Pemisahan
 - Catat asumsi serta hal yang belum diketahui.
 - Eskalasi jika dampak atau paparan meningkat.
 
-### 5.3 Containment
+### 5.3 Pembatasan dampak
 
 Pilih tindakan yang proporsional, misalnya:
 
@@ -131,7 +131,7 @@ Setiap insiden minimal memiliki:
 
 Lindungi bukti dari perubahan tanpa izin. Jangan mencatat password, OTP, token, private key, atau isi data sensitif ke log/tiket umum. Terapkan prinsip chain of custody sesuai kebutuhan investigasi.
 
-## 7. Penutupan dan post-incident review
+## 7. Penutupan dan tinjauan pascainsiden
 
 Insiden dapat ditutup setelah dampak terkendali, layanan diverifikasi, tindakan sementara memiliki rencana, dan pemilik tindak lanjut ditetapkan.
 

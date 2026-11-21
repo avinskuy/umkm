@@ -1,4 +1,4 @@
-# Performance, Scalability & Reliability Policy
+# Kebijakan Kinerja, Skalabilitas & Keandalan
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
@@ -34,7 +34,7 @@ Target numerik ditetapkan setelah kebutuhan produk, risiko, dan kapasitas aktual
 - Pantau penggunaan CPU, memory, storage, koneksi database, dan bandwidth.
 - Hindari optimasi prematur dan dependency yang tidak memberi manfaat terukur.
 
-## 4. Scalability
+## 4. Skalabilitas
 
 - Pertahankan modular monolith sebagai baseline sampai ada bukti kebutuhan untuk pemisahan layanan.
 - Evaluasi vertical dan horizontal scaling berdasarkan bottleneck yang terukur.
@@ -75,7 +75,7 @@ Ketika sebagian layanan terganggu:
 - Buat alert untuk gejala yang dapat ditindaklanjuti serta tetapkan pemilik respons.
 - Tinjau insiden dan temuan performa untuk menentukan perbaikan.
 
-## 8. Capacity dan cost management
+## 8. Kapasitas dan pengelolaan biaya
 
 Perkirakan kebutuhan CPU, RAM, database, storage, bandwidth, dan dependency berdasarkan workload yang terukur. Catat asumsi, batas, dan biaya. Rencana kapasitas harus diperbarui saat pola penggunaan atau arsitektur berubah.
 

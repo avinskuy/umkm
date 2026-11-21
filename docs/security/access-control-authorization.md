@@ -1,4 +1,4 @@
-# Access Control & Authorization Policy
+# Kebijakan Kontrol Akses & Otorisasi
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026

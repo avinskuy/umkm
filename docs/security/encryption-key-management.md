@@ -1,4 +1,4 @@
-# Encryption & Key Management Policy
+# Kebijakan Enkripsi & Manajemen Kunci
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026

@@ -1,4 +1,4 @@
-# Strategi Pengujian & Quality Assurance
+# Strategi Pengujian & Jaminan Kualitas
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
@@ -99,7 +99,7 @@ Perubahan yang gagal pada pemeriksaan wajib tidak boleh dianggap siap dirilis. W
 - Perubahan satu modul harus memeriksa dampak terhadap modul yang bergantung padanya.
 - Fitur yang sudah bekerja harus tetap diuji pada perubahan terkait.
 
-## 8. Performance, accessibility, dan usability
+## 8. Kinerja, aksesibilitas, dan kemudahan penggunaan
 
 - Uji endpoint dan query penting menggunakan workload yang representatif.
 - Lakukan load/stress/soak test di environment aman ketika kapasitas atau perubahan membenarkannya.
