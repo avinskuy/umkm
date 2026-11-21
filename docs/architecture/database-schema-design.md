@@ -50,9 +50,9 @@ The product's shorter labels “Owner” and “Investor” are display language
 | `users` | Account identity, immutable primary role, account status, normalized contact values, optional password hash | Unique non-null normalized email and phone; role check; status check; role immutable after insert |
 | `user_identities` | External provider identities such as Google | Unique (`provider`, `provider_subject`); FK to user; never auto-link by matching email |
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
-| `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; status jeda pengiriman tersimpan secara persisten |
+| `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
-| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi |
+| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi; satu kontak boleh terhubung ke beberapa akun |
 | `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | Tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
@@ -148,7 +148,7 @@ Moderation status is not publication status. An opportunity can be published and
 erDiagram
     USERS ||--o{ USER_IDENTITIES : links
     USERS ||--o{ SESSIONS : owns
-    USERS ||--o{ VERIFICATION_SESSIONS : starts
+    USERS o|--o{ VERIFICATION_SESSIONS : starts
     VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
     USERS ||--o{ RECOVERY_CONTACTS : owns
     USERS ||--o{ ACCOUNT_RECOVERY_CASES : requests
@@ -188,7 +188,7 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `user_identities(provider, provider_subject)`: unique.
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
-- `recovery_contacts(user_id, status, created_at)` dan indeks unik parsial pada nilai kontak yang sudah dinormalisasi sesuai kebijakan keunikan yang disetujui.
+- `recovery_contacts(user_id, status, created_at)` serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk menemukan relasi kontak bersama; jangan membuat unique constraint global pada nilai kontak pemulihan.
 - `account_recovery_cases(user_id, status, created_at)` serta indeks untuk antrean pemeriksaan petugas berdasarkan status dan waktu penugasan.
 - `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
@@ -233,6 +233,8 @@ Do not implement all domains in one large initial migration. Introduce reviewed,
 Each migration must be immutable after application to a shared database. Include forward migration tests against a disposable PostgreSQL instance. Add rollback guidance where safe; do not promise down migrations for destructive or data-transforming changes without a recovery plan.
 
 ## 8. Keputusan Identity Core dan keputusan skema yang masih tersisa
+
+> Tinjauan khusus mengenai sesi pemulihan tanpa akun tujuan, kontak pemulihan bersama, pemilihan akun, rate limit lintas sesi, dan reservasi kontak utama tersedia di [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md). Dokumen tersebut melengkapi bagian ini dan harus dibaca sebelum migrasi.
 
 ### Batas awal kebijakan Identity Core yang telah disetujui
 
