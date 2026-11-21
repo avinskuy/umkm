@@ -181,7 +181,7 @@ Acuan pola UX dan kemampuan platform:
 - Google for Developers, [Automatic SMS Verification with the SMS Retriever API](https://developers.google.com/identity/sms-retriever/overview).
 - Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
 
-Keputusan operasional yang masih perlu dibahas terpisah: apakah penerbitan/resend challenge diperbolehkan selama sesi sedang terkunci satu jam. Apa pun pilihannya, challenge baru tidak boleh membuat sesi dapat diverifikasi sebelum penguncian berakhir.
+Kebijakan penerbitan OTP selama sesi terkunci telah ditetapkan pada bagian **Keputusan: penerbitan OTP selama penguncian sesi** di bawah. Tidak ada keputusan kebijakan OTP tambahan yang perlu dibuka pada tahap dokumentasi ini. Untuk pengalaman pengguna, USahapintar mengadopsi pola verifikasi yang telah digunakan luas dan mengikuti dokumentasi resmi platform serta penyedia yang kelak dipilih; detail integrasi dan konfigurasi dibahas saat implementasi.
 
 
 ### Keputusan: penerbitan OTP selama penguncian sesi
