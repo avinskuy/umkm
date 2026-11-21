@@ -4,7 +4,7 @@
 > Scope: relational model, integrity constraints, privacy boundaries, and migration sequencing  
 > Runtime baseline: PostgreSQL 16 + SQLx 0.8
 
-This document translates the approved USahapintar product and authentication policies into a proposed relational model. It is a design artifact, not a claim that these tables or features are implemented. No production migration should be created until the domain decisions and schema review are complete.
+This document translates the approved USahapintar product and authentication policies into a proposed relational model. Identity Core policy values and the remaining schema-level decisions are consolidated in [Identity Core Final Technical Review](identity-core-final-technical-review.md). It is a design artifact, not a claim that these tables or features are implemented. No production migration should be created until the domain decisions and schema review are complete.
 
 ## 1. Design principles
 
@@ -44,6 +44,8 @@ The product's shorter labels “Owner” and “Investor” are display language
 ## 3. Proposed domain model
 
 ### A. Identity and authentication
+
+Use canonical persisted roles `business_owner`, `investor`, and `admin`. The approved initial session, OTP, pending-registration, account-lifecycle, and recovery policies are defined in [Identity Core Final Technical Review](identity-core-final-technical-review.md) and must be reflected in the first migration. Do not implement the older generic placeholders below as production defaults.
 
 | Table | Responsibility | Important constraints |
 | --- | --- | --- |
@@ -222,9 +224,9 @@ Each migration must be immutable after application to a shared database. Include
 
 The following need explicit design/product review; do not infer them in SQL:
 
-- Whether email and phone are both mandatory at registration, and when each becomes unique/verified.
+- Resolved: exactly one initial registration contact is selected (email or phone/WhatsApp); the other contact may be added and independently verified after activation.
 - Resolved: Google-only accounts may exist without a local password; `password_hash` is nullable. Email/phone registrations still require a password. A future local-password setup flow for Google-only accounts is not yet specified.
-- Final account-status lifecycle and account-closure/identity-retention policy.
+- Resolved baseline: 30-minute pending registration; temporary deactivation is distinct from permanent deletion; permanent deletion has a 30-day waiting period with a verified cancellation path. Exact legal/security retention and identity-reuse rules remain subject to policy review.
 - Owner and Investor profile fields and onboarding stage enumerations.
 - Business ownership cardinality and business verification lifecycle.
 - Exact consent scopes, expiry, revocation, and treatment of previously exported data.
