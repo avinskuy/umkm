@@ -2,9 +2,9 @@
 
 > Status: baseline teknis yang direkomendasikan untuk implementasi bertahap
 > Tanggal: 21 November 2026
-> Cakupan: lima penghalang teknis sebelum migration domain pertama
+> Cakupan: keputusan teknis lintas migration Identity Core
 
-Dokumen ini menetapkan cara teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk, tidak menambahkan migration, dan tidak mengaktifkan koneksi database pada HTTP startup. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
+Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau mengaktifkan koneksi database pada HTTP startup. Migration akun 0001 telah dibuat dan diuji; kontrak migration verifikasi 0002 disusun terpisah. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
 
 ## 1. Perlindungan tujuan pengiriman OTP
 
@@ -174,18 +174,31 @@ Keputusan berikut mengikat rancangan migration yang relevan:
 9. Semua perubahan lifecycle, kontak, sesi, recovery, dan provisioning Admin yang penting menghasilkan audit event.
 10. Migration yang sudah diterapkan tidak diedit; perubahan berikutnya menggunakan migration baru.
 
-## 7. Gerbang sebelum migration pertama
+## 7. Gerbang migration dan status implementasi
 
-Sebelum membuat migration `0001`:
+### Migration 0001 — identitas akun
 
-- Tinjau nama kolom final, tipe PostgreSQL, CHECK constraint, partial unique index, foreign key, dan transisi status.
-- Pisahkan migration owner, runtime application principal, dan provisioning principal sejak desain privilege.
-- Siapkan database PostgreSQL sementara yang dapat dibuang.
-- Uji role immutable, penolakan role Admin pada jalur publik, unique reservasi kontak, cleanup pending, dan race registrasi paralel.
-- Pastikan migration tidak memuat key, ciphertext contoh, data pribadi, atau kredensial.
-- Jangan menjalankan migration pada database produksi dan jangan mengaktifkan database pada HTTP startup dalam tahap desain.
+Gerbang migration akun pertama telah dipenuhi dan hasilnya sudah di-merge ke `main`:
 
-Migration pertama dibatasi pada identitas akun dan role. Verifikasi, sesi, recovery, audit, dan notifikasi tetap menjadi slice berikutnya; jangan menarik semua domain ke migration pertama hanya demi kelengkapan.
+- [x] Kontrak kolom, tipe PostgreSQL, CHECK constraint, partial unique index, foreign key, dan lifecycle ditinjau.
+- [x] Principal migration dipisahkan secara konseptual dari runtime application dan provisioning Admin; GRANT lingkungan tetap belum dibuka.
+- [x] Tes PostgreSQL nyata untuk role immutable, penolakan pembuatan Admin melalui jalur klien, reservasi kontak, cleanup pending, provider identity, dan konkurensi berhasil di CI.
+- [x] Migration tidak memuat key, data pribadi, atau kredensial.
+- [x] Tidak mengaktifkan database pada HTTP startup dan tidak dijalankan pada database produksi.
+
+### Migration 0002 — verifikasi kontak dan OTP
+
+Kontrak skema migration 0002 sedang ditinjau pada [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md). Sebelum SQL dibuat, review harus memastikan:
+
+- Konsistensi purpose/channel dan aturan nullable `user_id` khusus recovery pra-pemilihan akun.
+- Representasi ciphertext, nonce, HMAC, dan key version tidak menyimpan key material atau tujuan plaintext.
+- Rotasi HMAC dan transaction-scoped advisory lock tidak membuka bypass rate limit.
+- Constraint lifecycle sesi/challenge, partial unique index, foreign key, dan timestamp terminal lengkap.
+- Transaksi resend, konsumsi OTP, kegagalan kelima, reset lock, dan cleanup idempotent.
+- Tes PostgreSQL dengan beberapa koneksi membuktikan batas lima pengiriman, cooldown 60 detik, lock satu jam, dan one-time use.
+- Migration tidak mengaktifkan endpoint, provider, login session, recovery case, atau database startup.
+
+Jangan menjalankan migration pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
 
 ## 8. Keputusan yang tetap ditunda
 

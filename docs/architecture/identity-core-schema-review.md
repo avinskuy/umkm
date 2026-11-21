@@ -1,10 +1,10 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: tinjauan awal selesai; migration akun pertama telah diimplementasikan dan diuji
+> Status: migration akun pertama terimplementasi; kontrak migration verifikasi 0002 sedang ditinjau
 > Tanggal: 21 November 2026
-> Basis pemeriksaan: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`
+> Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
-Dokumen ini adalah catatan gerbang desain teknis awal Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun pertama kini tersedia; dokumen ini sendiri tetap merupakan catatan review dan tidak mengaktifkan database pada HTTP startup.
+Dokumen ini adalah catatan gerbang desain teknis awal Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration akun pertama telah tersedia dan diuji. Kontrak migration verifikasi 0002 sedang disusun sebagai gerbang terpisah; dokumen ini tidak mengaktifkan database pada HTTP startup.
 
 ## 1. Hasil pemeriksaan repository
 
@@ -37,7 +37,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 | Urutan | Cakupan | Isi utama |
 | --- | --- | --- |
 | 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, identitas provider, dan perlindungan role immutable |
-| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, batas pengiriman persisten, dan indeks untuk pencarian/rate limit |
+| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman persisten, serta indeks pencarian/rate limit; kontrak skema sedang ditinjau di [dokumen migration 0002](identity-core-migration-0002-verification-contract.md) |
 | 0003 | Sesi autentikasi | `sessions`, token hash, idle/absolute expiry, dan pencabutan |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
 | 0005 | Audit Identity Core | audit event yang dibutuhkan untuk perubahan identitas, sesi, verifikasi, dan pemulihan |
@@ -224,13 +224,14 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Pekerjaan berikutnya adalah **migration 0002 untuk verifikasi kontak**. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
+Pekerjaan berikutnya adalah meninjau kontrak [migration 0002 untuk verifikasi kontak](identity-core-migration-0002-verification-contract.md), khususnya konsistensi enkripsi/HMAC, rotasi fingerprint, serialisasi advisory lock, dan transaksi resend/verifikasi. Migration SQL belum dibuat sampai kontrak ini lolos review. Sebelum endpoint registrasi diaktifkan, tetap diperlukan bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
 Migration tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
 ## 9. Referensi internal
 
 - [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md)
+- [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md)
 - [Rancangan Skema Database](database-schema-design.md)
 - [Keputusan Registrasi Identity Core](identity-core-registration-decisions.md)
 - [Tinjauan Skema Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md)
