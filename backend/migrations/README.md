@@ -2,7 +2,7 @@
 
 Direktori ini berisi migration SQLx berversi. Migration pertama untuk Identity Core adalah:
 
-- `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
+- `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
 
 Migration pertama tidak membuat sesi login, OTP, recovery, audit Identity Core, profil, atau domain produk lain. Tidak ada grant runtime atau provisioning Admin yang dibuka secara otomatis oleh migration ini; hak akses tiap principal harus disiapkan terpisah sesuai kebijakan least privilege.
 
