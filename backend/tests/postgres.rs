@@ -263,6 +263,22 @@ async fn assert_user_constraints(pool: &PgPool) {
         .await
         .expect("expired pending account should be created for cleanup test");
 
+    assert!(
+        sqlx::query(
+            "UPDATE public.users \
+             SET account_status = 'active', \
+                 email_verified_at = now(), \
+                 initial_contact_verified_at = now(), \
+                 pending_expires_at = NULL \
+             WHERE id = $1::uuid"
+        )
+        .bind(&expired_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "an expired pending registration cannot be activated"
+    );
+
     sqlx::query(
         "UPDATE public.users \
          SET account_status = 'pending_expired', \
