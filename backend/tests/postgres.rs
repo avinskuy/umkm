@@ -1603,6 +1603,32 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         "consumed reset token cannot be reused"
     );
 
+    let second_token_id: String = sqlx::query_scalar(
+        "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+         VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes') RETURNING id::text",
+    )
+    .bind(&recovery_case_id)
+    .bind(&first_user_id)
+    .bind(vec![44_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("a new token may be issued after the previous token is consumed");
+
+    sqlx::query("UPDATE public.users SET account_status = 'deactivated' WHERE id = $1::uuid")
+        .bind(&first_user_id)
+        .execute(pool)
+        .await
+        .expect("account deactivation should revoke outstanding password reset tokens");
+
+    let revoked_token_reason: Option<String> = sqlx::query_scalar(
+        "SELECT revocation_reason FROM public.password_reset_tokens WHERE id = $1::uuid",
+    )
+    .bind(&second_token_id)
+    .fetch_one(pool)
+    .await
+    .expect("revoked token reason should be queryable");
+    assert_eq!(revoked_token_reason.as_deref(), Some("account_status_changed"));
+
     sqlx::query(
         "UPDATE public.account_recovery_cases SET status = 'completed' WHERE id = $1::uuid",
     )
