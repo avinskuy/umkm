@@ -1,10 +1,10 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration 0001–0004 telah di-merge; migration 0005 Identity Audit Events sedang ditinjau pada branch implementasi
+> Status: migration 0001–0005 telah di-merge; provisioning principal/privilege sedang diuji pada branch implementasi
 > Tanggal: 22 November 2026
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
-Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration 0001–0004 telah di-merge; migration 0005 Identity Audit Events sedang ditinjau pada branch PR. Seluruh migration belum dijalankan pada database produksi; HTTP startup tetap tidak menginisialisasi database.
+Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration 0001–0005 telah di-merge. Bootstrap role PostgreSQL sedang ditinjau melalui PR terpisah. Seluruh migration belum dijalankan pada database produksi; HTTP startup tetap tidak menginisialisasi database.
 
 ## 1. Hasil pemeriksaan repository
 
@@ -13,8 +13,8 @@ Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Doku
 - `backend/migrations/` memiliki migration akun 0001, verifikasi 0002, sesi autentikasi 0003, account recovery 0004, dan Identity Audit Events 0005.
 - HTTP server saat ini hanya menyediakan `GET /api/v1/health`. Database belum diinisialisasi oleh proses startup.
 - Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, provider identity, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
-- Migration 0001–0004 diuji pada PostgreSQL sementara melalui CI; tes audit events 0005 ditambahkan pada branch implementasi dan menunggu CI. Migration belum dijalankan pada database produksi.
-- Belum ada endpoint login/logout, provider OTP, cookie/session middleware, operasi enkripsi/HMAC runtime, atau aktivasi fitur autentikasi.
+- Migration 0001–0005 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
+- Belum ada endpoint login/logout, provider OTP, cookie/session middleware, operasi enkripsi/HMAC runtime, atau aktivasi fitur autentikasi. Grant database minimal tidak berarti alur autentikasi telah aktif.
 
 ## 2. Prinsip desain yang harus dipertahankan
 
@@ -242,3 +242,10 @@ Migration 0001–0005 belum boleh dijalankan pada database produksi. Migration 0
 - [Desain Arsitektur Autentikasi dan Keamanan Identitas](authentication-and-identity-security-design.md)
 - [Kebijakan Keamanan Database dan Integritas Data](../security/database-security-data-integrity.md)
 - [Strategi Pengujian dan Quality Assurance](../engineering/testing-strategy-quality-assurance.md)
+
+
+## 10. Status provisioning principal PostgreSQL
+
+Bootstrap principal dipisahkan dari schema migration karena role PostgreSQL berlaku pada tingkat cluster/database. Skrip `backend/database/bootstrap/001_create_principals.sql` membuat login aplikasi, migrator, backup, dan monitoring beserta role group; PUBLIC kehilangan CONNECT/TEMPORARY dan akses schema `public`. Skrip `002_identity_core_grants.sql` hanya memberikan hak pembuatan akun melalui fungsi `SECURITY DEFINER` yang ownership, privilege pemilik, dan `search_path`-nya telah diverifikasi; aplikasi mendapat INSERT audit tanpa hak SELECT/UPDATE/DELETE/TRUNCATE.
+
+CI menjalankan SQLx migrations sebagai `usahapintar_migrator` non-superuser, lalu menguji fungsi/grant melalui `usahapintar_app_login`. Backup dan monitoring diuji sebagai principal terpisah. Skrip tidak dijalankan pada production; kredensial production dan provisioning DBA tetap di luar repository.
