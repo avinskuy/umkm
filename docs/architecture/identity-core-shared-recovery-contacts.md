@@ -191,3 +191,18 @@ Acuan:
 - Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
 
 **Catatan terbuka:** kebijakan apakah penerbitan atau resend challenge diperbolehkan selama sesi terkunci satu jam belum diputuskan. Jika penerbitan diizinkan, challenge tersebut tetap tidak dapat diverifikasi sampai sesi dibuka kembali. Penerbitan challenge tidak boleh mempercepat atau mengatur ulang penguncian.
+
+
+## 12. Penerbitan challenge selama sesi terkunci
+
+Pengguna boleh meminta dan menerima OTP baru selama sesi verifikasi terkunci, selama jeda resend 60 detik, batas lima pengiriman per kontak per jam, serta rate limit lain terpenuhi.
+
+Aturan keamanan:
+- Penerbitan challenge baru tidak menghapus, memperpendek, atau mengatur ulang `locked_until` maupun penghitung kegagalan sesi.
+- Semua percobaan verifikasi tetap ditolak sampai waktu penguncian berakhir, termasuk percobaan dengan challenge baru yang diterbitkan selama penguncian.
+- Challenge baru menggantikan challenge sebelumnya sesuai transisi `pending` → `superseded`. Challenge yang sudah terminal tidak dapat digunakan kembali.
+- Jika challenge baru kedaluwarsa sebelum sesi terbuka, pengguna dapat meminta challenge berikutnya setelah batas resend/pengiriman mengizinkan.
+- Setelah penguncian berakhir, sesi `pending` yang sama dapat digunakan kembali sesuai aturan reset penghitung kegagalan.
+- Penerbitan tetap tunduk pada rate limit lintas sesi dan instance; membuat sesi baru tidak boleh menghindari batas tersebut.
+
+Dengan demikian, pengguna tetap dapat memperoleh kode terbaru saat menunggu, tetapi tidak dapat menggunakannya untuk melewati penguncian verifikasi.
