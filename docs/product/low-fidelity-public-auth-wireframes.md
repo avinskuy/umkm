@@ -121,7 +121,7 @@
 └─────────────────────────────┘
 ```
 
-### Landing interactions
+### Interaksi halaman beranda
 
 - Header Daftar membuka halaman pemilihan role.
 - Header Masuk membuka pilihan Owner/Investor dalam tampilan ringkas.
@@ -245,7 +245,7 @@ DEFAULT
   Field aktif; tombol kirim tersedia saat input valid.
 
 SEDANG DIKIRIM
-  Tombol kirim dinonaktifkan; indikator proses ditampilkan; request ganda dicegah.
+  Tombol kirim dinonaktifkan; indikator proses ditampilkan; permintaan ganda dicegah.
 
 KREDENSIAL TIDAK VALID
   Tampilkan pemberitahuan netral; jangan ungkap apakah email/nomor telepon terdaftar.
@@ -434,7 +434,7 @@ Rentang keuangan dan preferensi risiko tetap opsional pada onboarding awal, kecu
 
 Tidak ada pendaftaran Admin publik atau pemilih role Admin. MFA Admin wajib diterapkan sebelum penggunaan produksi; metode/penyedia MFA yang tepat masih menjadi keputusan implementasi. Kebijakan pemulihan akun ditetapkan dalam keputusan Identity Core yang telah disetujui; penyedia layanan, penyimpanan bukti, dan detail operasional tetap harus ditinjau saat implementasi.
 
-## 9. Status error, loading, dan kosong
+## 9. Status error, pemuatan, dan kosong
 
 | Status | Penempatan tampilan | Perilaku |
 | --- | --- | --- |
@@ -488,7 +488,7 @@ Setelah wireframe disetujui:
 1. Tetapkan teks final, field wajib/opsional, dan perilaku ketika role Owner/Investor tidak sesuai.
 2. Commit lockfile frontend dan stabilkan instalasi dependency.
 3. Tetapkan kontrak API autentikasi dan migration database.
-4. Tinjau threat model autentikasi (penyalahgunaan OTP, session fixation, state/nonce OAuth, reset kata sandi, pengaitan akun, enumerasi akun, CSRF/CORS, dan rate limit).
+4. Tinjau model ancaman autentikasi (penyalahgunaan OTP, session fixation, state/nonce OAuth, reset kata sandi, pengaitan akun, enumerasi akun, CSRF/CORS, dan rate limit).
 5. Implementasikan komponen dasar formulir bersama serta kerangka situs publik/autentikasi.
 6. Tambahkan pengujian komponen, integrasi, dan browser yang terarah sebelum menghubungkan penyedia autentikasi nyata.
 
