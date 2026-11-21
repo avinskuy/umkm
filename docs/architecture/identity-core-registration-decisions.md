@@ -103,3 +103,15 @@ Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia
 ## Gerbang implementasi
 
 Migrasi Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan yang disetujui diterjemahkan menjadi batasan skema yang telah ditinjau, batas tanggung jawab penyedia layanan ditentukan, rancangan konkurensi/kedaluwarsa/pembersihan/privasi diperiksa, dan rencana pengujian disetujui. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
+
+
+## Tambahan keputusan: kontak pemulihan bersama dan UX pemilihan akun
+
+- Satu alamat email atau nomor HP pemulihan yang sudah diverifikasi boleh digunakan oleh beberapa akun. Jangan menerapkan keunikan global pada kontak pemulihan. Aturan ini tidak mengubah keunikan dan reservasi kontak utama pendaftaran.
+- Jika satu kontak pemulihan terhubung ke beberapa akun, gunakan pendekatan hybrid: verifikasi kontak terlebih dahulu, lalu tampilkan pilihan akun dengan petunjuk pembeda yang aman. Jangan mengungkap jumlah atau daftar akun sebelum verifikasi, dan jangan menampilkan data sensitif atau kontak lengkap.
+- Keberhasilan verifikasi kontak hanya membuktikan kendali atas kontak tersebut; bukan bukti tunggal kepemilikan semua akun yang terhubung. Akun yang dipilih tetap menjalani pemeriksaan kepemilikan dan risiko.
+- Kolom verification_sessions.user_id boleh NULL sementara hanya pada alur pemulihan sebelum akun tujuan dipilih. Untuk pendaftaran dan verifikasi akun tertentu, user_id wajib. Setelah akun dipilih dan pemeriksaan yang sesuai selesai, sesi/kasus dikaitkan ke akun tersebut secara atomik dan satu kali.
+- Batas percobaan dan pengiriman harus berlaku lintas sesi dan instance, sehingga membuat sesi baru tidak mengatur ulang batas. Penghitung dan penguncian ditegakkan di server serta tahan terhadap request bersamaan.
+- Kontak utama tetap direservasi selama masa tunggu penghapusan permanen 30 hari. Kontak tersebut baru dapat dilepas setelah proses penghapusan selesai dan sesuai kebijakan retensi/pelepasan identitas. Aturan ini tidak berlaku pada kontak pemulihan bersama.
+
+Rincian teknis dan checklist migrasi terdapat pada [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md).
