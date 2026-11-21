@@ -207,7 +207,8 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Tidak ada endpoint publik untuk provisioning Admin.
 
 ### Provider identity
-- Provider subject yang sama tidak dapat terhubung ke dua akun.\n- Akun klien tanpa password hash ditolak kecuali identitas Google yang sah dibuat/ditautkan dalam transaksi yang sama.
+- Provider subject yang sama tidak dapat terhubung ke dua akun.
+- Akun klien tanpa password hash ditolak kecuali identitas Google yang sah dibuat/ditautkan dalam transaksi yang sama.
 - Provider yang tidak diizinkan ditolak.
 - FK menolak user yang tidak ada.
 - Identitas provider tidak dapat dipindahkan otomatis hanya karena email cocok.
