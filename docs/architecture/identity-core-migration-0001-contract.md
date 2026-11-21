@@ -40,7 +40,7 @@ Migration ini tidak mengaktifkan koneksi database pada HTTP startup, tidak menja
 | `phone_e164` | `text` | Ya | Nomor telepon dalam format E.164 |
 | `initial_contact_channel` | `text` | Tidak | `email` atau `phone`; ditetapkan saat pendaftaran |
 | `email_verified_at` | `timestamptz` | Ya | Diisi hanya setelah email tersebut berhasil diverifikasi |
-| `phone_verified_at` | `timestamptz` | Ya | Diisi hanya setelah nomor tersebut berhasil diverifikasi |
+| `phone_verified_at` | `timestamptz` | Ya | Diisi hanya setelah nomor tersebut berhasil diverifikasi |\n| `initial_contact_verified_at` | `timestamptz` | Ya | Waktu kontak awal pendaftaran berhasil diverifikasi; provenance yang tidak berubah saat kontak utama kelak diganti |
 | `password_hash` | `text` | Ya | Hash password lokal; bukan plaintext |
 | `pending_expires_at` | `timestamptz` | Ya | Wajib selama `pending_verification`; target 30 menit dari pembuatan |
 | `created_at` | `timestamptz` | Tidak | `now()` |
@@ -58,7 +58,7 @@ Nilai yang diterima:
 
 Ketentuan:
 - Satu akun hanya memiliki satu role utama.
-- Role ditetapkan pada pembuatan akun dan tidak dapat diubah sesudah INSERT.
+- Role ditetapkan pada pembuatan akun dan tidak dapat diubah sesudah INSERT.\n- `initial_contact_channel` juga immutable karena mencatat metode kontak yang dipilih pada saat registrasi, bukan selalu kanal kontak utama yang masih digunakan saat ini.
 - Public registration hanya dapat membuat `business_owner` atau `investor`.
 - `admin` hanya dibuat melalui jalur provisioning internal dengan principal/workflow terpisah.
 - Tidak ada endpoint, dukungan operasional biasa, OAuth linking, atau proses recovery yang dapat memindahkan role.
@@ -123,7 +123,7 @@ Aturan:
 - Registrasi email/telepon wajib menyediakan password lokal.
 - Registrasi Google OAuth tidak mewajibkan password lokal, tetapi tetap wajib memverifikasi kontak awal yang dipilih secara terpisah sebelum aktivasi.
 - OTP pendaftaran bukan password, bukan login credential, dan bukan token reset password.
-- `email_verified_at` dan `phone_verified_at` adalah fakta verifikasi yang terpisah; jangan menganggap satu kontak terverifikasi berarti kontak lain ikut terverifikasi.
+- `email_verified_at` dan `phone_verified_at` adalah fakta verifikasi untuk nilai kontak saat ini; ketika kontak diganti, timestamp lama tidak boleh dipakai untuk menyatakan nilai baru telah terverifikasi.\n- `initial_contact_channel` dan `initial_contact_verified_at` menyimpan provenance metode registrasi awal. Keduanya tidak berubah saat pengguna mengganti atau menghapus salah satu kontak utama setelah akun aktif.\n- Perubahan kontak harus memverifikasi nilai baru sebelum mengganti nilai aktif; jangan menaruh kontak baru yang belum terverifikasi langsung pada kolom identitas utama.
 - Verifikasi OTP, masa berlaku 10 menit, batas percobaan, lock, resend, dan rate limit disediakan pada migration verifikasi berikutnya. Migration pertama tidak membuat kolom OTP.
 
 ## 3. Tabel `user_identities`
@@ -187,7 +187,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Lifecycle tidak dikenal ditolak.
 - Initial contact channel tidak dikenal ditolak.
 - Akun pending tanpa kontak awal atau tanpa expiry ditolak.
-- Akun pending yang kontak awalnya sudah ditandai verified ditolak.
+- Akun pending yang kontak awalnya sudah ditandai verified atau memiliki `initial_contact_verified_at` ditolak.\n- Akun aktif tanpa `initial_contact_verified_at` atau tanpa setidaknya satu kontak utama terverifikasi ditolak.\n- Mengganti kontak utama tanpa verifikasi nilai baru ditolak; provenance `initial_contact_channel` tidak dapat diubah.
 - Akun aktif tanpa verifikasi kontak awal ditolak.
 - Timestamp verified tanpa nilai kontak ditolak.
 - Pending expired/closed dengan kontak, verification timestamp, atau password hash masih terisi ditolak.
