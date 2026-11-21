@@ -1,6 +1,6 @@
 # PostgreSQL Database Schema Design
 
- > Status: Partially implemented — Identity Core account slice exists; remaining domain schemas are proposals  
+> Status: Partially implemented — Identity Core account slice exists; remaining domain schemas are proposals  
 > Scope: relational model, integrity constraints, privacy boundaries, and migration sequencing  
 > Runtime baseline: PostgreSQL 16 + SQLx 0.8
 
@@ -65,7 +65,8 @@ The product's shorter labels “Owner” and “Investor” are display language
 - A user who wants the other client role must create a separate account using identities not linked elsewhere.
 - Unique indexes should be partial for nullable email/phone columns, and normalization must happen before insert.
 - Provider identity is keyed by the provider's stable subject, not email text.
-- `account_status` lifecycle values are `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, and `closed`. Suspend/feature limits are moderation/enforcement records, not lifecycle status.\n- Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
+- `account_status` lifecycle values are `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, and `closed`. Suspend/feature limits are moderation/enforcement records, not lifecycle status.
+- Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
 - Verification challenges must support rate limiting, attempt caps, short expiry, resend cooldown, and invalidation of superseded challenges. OTP hashing must use a keyed construction suitable for short numeric codes.
 - Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
 - Pendaftaran tertunda kedaluwarsa setelah 30 menit. Proses pembersihan harus idempotent, aman terhadap proses bersamaan, dan tidak boleh menghapus akun yang sudah aktif.
