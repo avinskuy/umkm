@@ -157,15 +157,15 @@ Content:
 1. Brand and a short return link to the public site.
 2. Heading: **Masuk sebagai Pemilik Usaha**
 3. Supporting text: **Kelola profil usaha, bagikan peluang, dan kembangkan koneksi.**
-4. Authentication form.
-5. Alternative sign-in separator.
-6. Google sign-in action.
-7. Registration link for new Owners.
-8. Privacy/terms links and support link.
+4. Authentication form using the login identifier/method approved by the separate login-policy decision.
+5. Registration link for new Owners.
+6. Privacy/terms links and support link.
+
+Do not show Google sign-in until its account-creation/linking policy is approved.
 
 ### Form fields and behavior
 
-- The registrant chooses exactly one initial contact method: email, or phone number verified through WhatsApp. These are alternatives; both are not required during initial registration.
+- Login identifier behavior (email/password versus phone OTP) remains subject to the separate login-policy decision. Do not reuse registration verification copy as login-field requirements.
 - Password field with show/hide toggle.
 - Forgot password link.
 - Remember-device/session option only if the backend session policy supports it safely; do not imply permanent sessions.
@@ -216,9 +216,10 @@ Keep the visual layout consistent so the two pages feel like one product. Distin
 
 **Step 1 — Account**
 - Full name.
-- Email.
-- Phone number.
-- Password and confirmation.
+- Choose one contact method: email address OR phone number.
+- If email is chosen, send the verification code to that email address.
+- If phone is chosen, send the verification code through WhatsApp.
+- Password and confirmation only if required by the approved login model.
 - Required acceptance of Terms and Privacy Policy.
 - Optional product updates consent, unchecked by default.
 
@@ -257,9 +258,10 @@ Ask for only the fields relevant to the selected stage:
 
 **Step 1 — Account**
 - Full name.
-- Email.
-- Phone number.
-- Password and confirmation.
+- Choose one contact method: email address OR phone number.
+- If email is chosen, send the verification code to that email address.
+- If phone is chosen, send the verification code through WhatsApp.
+- Password and confirmation only if required by the approved login model.
 - Required Terms and Privacy Policy acceptance.
 - Optional product updates consent, unchecked by default.
 
@@ -279,15 +281,9 @@ Ask for only the fields relevant to the selected stage:
 - CTA to Investor dashboard and opportunity discovery.
 - Preferences can be edited later.
 
-## 9. Google OAuth behavior
+## 9. Google OAuth behavior — decision pending
 
-- Google is an alternative authentication method, not a shortcut around role assignment.
-- Start OAuth from the role-specific login or registration context.
-- On callback, the backend validates state, nonce where applicable, issuer, audience, signature, expiry, and redirect URI.
-- If the identity is new, continue the correct role-specific registration flow.
-- If the Google identity is already linked to an account with a different primary role, stop and offer the correct login path; do not silently change account role.
-- Account linking requires proof of control of both identities. Never auto-link accounts solely because two providers return a matching email without an explicit safe linking policy.
-- Handle denied consent, cancelled flow, expired state, provider outage, and duplicate-link attempts.
+Existing references to Google OAuth are not implementation approval. Whether Google can create accounts, only link after verified registration, or is excluded from the MVP remains unresolved. Do not show Google actions or implement OAuth callbacks/account linking until the decision is approved. If later approved, validate state, nonce, issuer, audience, signature, expiry, and redirect URI; never auto-link accounts on matching email alone.
 
 ## 10. Password recovery
 
