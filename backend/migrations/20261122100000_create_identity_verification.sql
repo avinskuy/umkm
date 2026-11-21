@@ -77,6 +77,14 @@ DECLARE
     v_initial_channel TEXT;
     v_pending_expires_at TIMESTAMPTZ;
 BEGIN
+    IF TG_OP = 'INSERT' THEN
+        NEW.created_at := clock_timestamp();
+        IF NEW.expires_at <= NEW.created_at THEN
+            RAISE EXCEPTION 'verification session deadline must be in the future'
+                USING ERRCODE = '23514';
+        END IF;
+    END IF;
+
     IF TG_OP = 'UPDATE' THEN
         IF NEW.id IS DISTINCT FROM OLD.id
            OR NEW.purpose IS DISTINCT FROM OLD.purpose
@@ -249,6 +257,12 @@ DECLARE
     v_session_expires_at TIMESTAMPTZ;
 BEGIN
     IF TG_OP = 'INSERT' THEN
+        NEW.created_at := clock_timestamp();
+        IF NEW.expires_at <= NEW.created_at THEN
+            RAISE EXCEPTION 'verification challenge deadline must be in the future'
+                USING ERRCODE = '23514';
+        END IF;
+
         SELECT status, expires_at
         INTO v_session_status, v_session_expires_at
         FROM public.verification_sessions
@@ -346,6 +360,7 @@ DECLARE
     v_session_status TEXT;
     v_session_expires_at TIMESTAMPTZ;
     v_session_locked_until TIMESTAMPTZ;
+    v_session_failed_attempt_count SMALLINT;
     v_challenge_status TEXT;
     v_challenge_expires_at TIMESTAMPTZ;
 BEGIN
@@ -354,9 +369,11 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    SELECT destination_hmac, hmac_key_version, channel, purpose, status, expires_at, locked_until
+    SELECT destination_hmac, hmac_key_version, channel, purpose, status, expires_at, locked_until,
+           failed_attempt_count
     INTO v_destination_hmac, v_hmac_key_version, v_channel, v_purpose,
-         v_session_status, v_session_expires_at, v_session_locked_until
+         v_session_status, v_session_expires_at, v_session_locked_until,
+         v_session_failed_attempt_count
     FROM public.verification_sessions
     WHERE id = NEW.verification_session_id;
 
@@ -371,6 +388,7 @@ BEGIN
 
     IF v_session_status <> 'pending'
        OR v_session_expires_at <= clock_timestamp()
+       OR v_session_failed_attempt_count = 5
        OR (v_session_locked_until IS NOT NULL AND v_session_locked_until > clock_timestamp()) THEN
         RAISE EXCEPTION 'OTP attempt event requires an eligible verification session'
             USING ERRCODE = '23514';
@@ -388,9 +406,10 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    NEW.attempted_at := clock_timestamp();
     RETURN NEW;
 END;
-$$;
+$;
 
 CREATE TRIGGER otp_verification_attempt_events_10_guard
     BEFORE INSERT OR UPDATE ON public.otp_verification_attempt_events
@@ -427,6 +446,12 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog
 AS $$
 BEGIN
+    IF TG_OP = 'INSERT' THEN
+        NEW.created_at := clock_timestamp();
+        NEW.updated_at := NEW.created_at;
+        RETURN NEW;
+    END IF;
+
     IF NEW.id IS DISTINCT FROM OLD.id
        OR NEW.destination_hmac IS DISTINCT FROM OLD.destination_hmac
        OR NEW.hmac_key_version IS DISTINCT FROM OLD.hmac_key_version
@@ -449,7 +474,7 @@ END;
 $$;
 
 CREATE TRIGGER otp_delivery_events_10_guard
-    BEFORE UPDATE ON public.otp_delivery_events
+    BEFORE INSERT OR UPDATE ON public.otp_delivery_events
     FOR EACH ROW EXECUTE FUNCTION public.guard_otp_delivery_event();
 
 REVOKE ALL ON TABLE
