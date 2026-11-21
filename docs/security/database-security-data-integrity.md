@@ -1,4 +1,4 @@
-# Database Security & Data Integrity Policy
+# Kebijakan Keamanan Database & Integritas Data
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
@@ -13,7 +13,7 @@
 - [PostgreSQL 16 — Predefined Roles](https://www.postgresql.org/docs/16/predefined-roles.html).
 - [PostgreSQL 16 — Privileges](https://www.postgresql.org/docs/16/ddl-priv.html).
 
-## 2. Database access control
+## 2. Kontrol akses database
 
 - Terapkan least privilege dan deny-by-default.
 - Pisahkan identitas/role untuk aplikasi, migration, backup, monitoring, dan administrasi database.
@@ -22,7 +22,7 @@
 - Pisahkan kredensial setiap environment dan simpan sebagai secret.
 - Tinjau privilege dan cabut akses yang tidak lagi dibutuhkan.
 
-## 3. Provisioning principal dan privilege
+## 3. Provisioning principal dan hak akses
 
 Implementasi baseline tersedia di `backend/database/bootstrap/001_create_principals.sql` dan `002_identity_core_grants.sql`. Role aplikasi, migrasi, backup, monitoring, audit reader, dan DBA dipisahkan. Principal aplikasi tidak memiliki SUPERUSER, CREATEDB, CREATEROLE, atau BYPASSRLS. Password tidak disimpan dalam repository.
 
@@ -37,7 +37,7 @@ Semua migration produksi harus dijalankan oleh `usahapintar_migrator` non-superu
 - Lindungi file konfigurasi, data, WAL, dan backup.
 - Jangan membuka database langsung ke internet publik tanpa kebutuhan dan tinjauan risiko yang jelas.
 
-## 5. Data integrity dan transaksi
+## 5. Integritas data dan transaksi
 
 - Gunakan primary key, foreign key, unique constraint, check constraint, dan NOT NULL sesuai aturan domain.
 - Terapkan transaksi untuk operasi yang harus berhasil atau gagal sebagai satu kesatuan.
@@ -46,7 +46,7 @@ Semua migration produksi harus dijalankan oleh `usahapintar_migrator` non-superu
 - Validasi di backend dan tegakkan invariant penting di database; validasi frontend bukan kontrol integritas.
 - Perubahan data harus mempertahankan relasi, kepemilikan, dan aturan lifecycle.
 
-## 6. SQL safety
+## 6. Keamanan SQL
 
 - Gunakan parameterized query melalui SQLx.
 - Jangan menggabungkan input pengguna langsung ke string SQL.
@@ -54,7 +54,7 @@ Semua migration produksi harus dijalankan oleh `usahapintar_migrator` non-superu
 - Hindari hak database yang lebih luas daripada kebutuhan query aplikasi.
 - Jangan menampilkan query internal atau detail database dalam respons error publik.
 
-## 7. Schema dan migration
+## 7. Skema dan migration
 
 - Semua perubahan schema dikelola melalui migration berversi.
 - Migration yang sudah diterapkan pada database bersama tidak boleh diedit; buat migration baru.
@@ -67,7 +67,7 @@ Semua migration produksi harus dijalankan oleh `usahapintar_migrator` non-superu
 
 Perlindungan database mengikuti klasifikasi L1–L4. L3 dan L4 memerlukan kontrol akses dan perlindungan lebih ketat. Jangan menyimpan secret, OTP plaintext, atau token yang dapat digunakan kembali. Lihat [Data Classification & Data Sensitivity Policy](data-classification.md).
 
-## 9. Backup & restore
+## 9. Backup dan pemulihan
 
 - Enkripsi backup dan batasi aksesnya.
 - Simpan salinan terpisah dari lingkungan production.
@@ -76,7 +76,7 @@ Perlindungan database mengikuti klasifikasi L1–L4. L3 dan L4 memerlukan kontro
 - Pastikan proses restore tidak mengaktifkan kembali data yang sudah dihapus atau akun yang sudah ditutup.
 - Sinkronkan proses backup/restore dengan kebijakan BCDR dan data retention.
 
-## 10. Audit dan monitoring database
+## 10. Audit dan pemantauan database
 
 Pantau akses dan aktivitas penting, perubahan privilege, perubahan schema, kegagalan autentikasi, serta pola akses tidak biasa. Lindungi audit trail. Jangan mencatat data L3/L4 yang tidak diperlukan, password, OTP, token, atau secret.
 
