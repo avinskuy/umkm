@@ -5,14 +5,14 @@
 > Wireframe reference: `docs/product/low-fidelity-public-auth-wireframes.md`  
 > Backend direction: Rust + Axum; PostgreSQL + SQLx is the proposed persistence baseline.
 
-This document defines the first authentication architecture for USahapintar. It is a design contract, not an implemented or security-audited system. Provider choices, operational secrets, retention periods, and final policies must be approved before production use.
+This document defines the first authentication architecture for USahapintar. Approved product-policy baselines are consolidated in [Identity Core Final Technical Review](identity-core-final-technical-review.md). It is a design contract, not an implemented or security-audited system. Provider choices, operational secrets, retention periods, and final policies must be approved before production use.
 
 ## 1. Scope and invariants
 
 ### In scope
 
 - Public registration for Business Owner and Investor only.
-- Exactly one immutable primary client role (`owner` or `investor`) per account.
+- Exactly one immutable primary client role (`business_owner` or `investor`) per client account; `admin` is internally provisioned.
 - Separate Owner and Investor login entry points.
 - Email/phone registrations require password-based login. Google OAuth registrations do not require a separate local password and authenticate through the linked Google identity. Email/WhatsApp verification codes are only for account activation/contact verification and never replace a password or Google authentication at login.
 - Email or phone/WhatsApp as mutually exclusive initial registration verification choices.
@@ -56,7 +56,7 @@ Membership is a separate entitlement dimension and never changes the immutable p
 
 Use a single primary role for the MVP:
 
-- `owner`
+- `business_owner`
 - `investor`
 - `admin`
 
@@ -91,7 +91,7 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `phone_e164` | Normalized E.164 phone number; required and WhatsApp-verified when phone is selected, otherwise optional until added later |
 | `password_hash` | Nullable Argon2id password hash: required for email/phone registrations; may be null for Google-only registrations |
 | `primary_role` | Owner, Investor, or Admin |
-| `account_status` | Pending verification, active, suspended, or closed |
+| `account_status` | Pending verification, active, temporarily deactivated, suspended, deletion pending, deletion processing, or closed/deleted according to the finalized lifecycle state machine |
 | `registration_contact_method` | Initial registration method: email or phone; immutable audit attribute |
 | `email_verified_at` | Verification timestamp, independently nullable |
 | `phone_verified_at` | Verification timestamp, independently nullable |
@@ -133,8 +133,9 @@ Opaque, server-managed sessions.
 | `id` | UUID primary key |
 | `user_id` | Session owner |
 | `token_hash` | Hash of a high-entropy opaque session token |
-| `created_at`, `last_seen_at` | Activity timestamps |
-| `expires_at` | Absolute expiry |
+| `created_at`, `last_seen_at` | Activity timestamps; idle expiry is refreshed server-side on qualifying activity |
+| `idle_expires_at` | Rolling idle expiry, capped by absolute expiry |
+| `absolute_expires_at` | Non-extendable maximum lifetime (30 days from creation) |
 | `revoked_at` | Revocation timestamp |
 | `user_agent_summary` | Optional minimized device hint |
 | `ip_prefix_hash` | Optional privacy-preserving abuse signal, subject to retention policy |
@@ -156,8 +157,12 @@ Supports email and WhatsApp-delivered phone verification for account activation/
 | `channel` | email or whatsapp; phone is the normalized destination, WhatsApp is the delivery channel |
 | `destination_hash` | Hash or protected reference to destination |
 | `code_hash` | Hash of a high-entropy one-time code |
-| `purpose` | Registration verification or contact change |
-| `attempt_count` | Failed attempts |
+| `purpose` | Registration verification, contact change, recovery contact verification, or another explicitly enumerated purpose |
+| `attempt_count` | Failed attempts within the verification session |
+| `verification_session_id` | Stable parent scope for attempt lock and resend state |
+| `locked_until` | Server-enforced one-hour lock after five failed attempts |
+| `last_sent_at` | Server-enforced 60-second resend cooldown |
+| `send_count_window` / `send_window_started_at` | Per-destination send throttling, or equivalent dedicated limiter storage |
 | `expires_at` | Short expiry |
 | `consumed_at` | One-time use marker |
 | `created_at` | Creation timestamp |
@@ -169,11 +174,23 @@ Controls:
 - Invalidate older active challenges when a new challenge is issued for the same purpose/destination.
 - Provider delivery failures must not mark a destination as verified.
 
+### Recovery contacts and account recovery
+
+Recovery email and recovery phone are optional after activation, independently verified, and recommended during onboarding. Store them separately from the primary login contact with verification timestamps and change history. A recovery contact must not be treated as verified merely because it matches a primary contact or Google-asserted email.
+
+Support:
+- Forgot password through a verified recovery email or recovery phone.
+- Forgot email through a verified recovery contact. Only after successful proof of control may the complete primary email be displayed to the requester.
+- Uniform unauthenticated responses and throttling to prevent account enumeration.
+- Notifications for successful recovery and sensitive recovery-contact changes.
+- Risk-based evaluation using trusted devices, prior sessions, verified recovery factors, and suspicious activity.
+- If both primary and recovery contacts are lost, allow a recovery request assessed through trusted devices and other ownership signals. If evidence is insufficient, escalate to specially authorized manual support review. Delay or reject recovery when risk remains too high. Manual review must be permission-scoped, audited, and must never change the immutable primary role.
+
 ### `password_reset_tokens`
 
 - Store a hash of a cryptographically random, single-use token.
 - Include user ID, expiry, created timestamp, and consumed timestamp.
-- Revoke existing sessions after a successful reset according to the security policy.
+- Revoke suspicious/old sessions after successful reset; risk-based exceptions must be explicitly reviewed.
 - Do not reveal account existence in request responses.
 
 ### `admin_audit_logs`
@@ -280,7 +297,7 @@ Avoid storing long-lived bearer tokens in localStorage. If a cross-site architec
 - Role mismatch never creates a session.
 - Sensitive admin actions may require recent re-authentication/MFA.
 
-Exact idle/absolute timeouts must be chosen before production and documented in operations settings.
+Initial baseline: 7-day idle timeout and 30-day absolute timeout. Remember this device may preserve a persistent browser cookie across browser restarts, but cannot bypass either timeout or server-side revocation. Multiple concurrent devices are allowed; Security Settings must list active sessions and support individual revocation and logout-all. Suspicious sessions may be revoked based on risk signals. Sensitive actions require fresh authentication where appropriate.
 
 ## 6. Password policy
 
@@ -297,6 +314,8 @@ Exact Argon2id parameters and password policy values belong in configuration/sec
 
 ## 7. OTP and verification abuse controls
 
+Approved initial baseline: 10-minute OTP validity; maximum 5 failed attempts per verification session; a 1-hour lock after the fifth failure; 60-second resend cooldown; maximum 5 sends per hour per contact. A new OTP invalidates the old code but never resets the verification-session lock. Pending registration expires after 30 minutes. All enforcement is server-side and must be safe under concurrent requests.
+
 Apply layered limits:
 - Per destination (email/phone).
 - Per account.
@@ -305,10 +324,12 @@ Apply layered limits:
 - Global provider spend/throughput guard.
 
 Also require:
-- Short code expiry.
+- OTP validity of 10 minutes.
 - One-time use.
-- Bounded attempts.
-- Resend cooldown.
+- Maximum 5 failed attempts per verification session; the fifth failure locks that verification session for 1 hour.
+- Resend cooldown of 60 seconds.
+- Maximum 5 sends per hour per destination, plus IP/network and suspicious-pattern limits.
+- A newly issued code invalidates the previous code and must not clear an existing verification-session lock.
 - Challenge invalidation on successful verification or superseding request.
 - Uniform responses that do not confirm account existence.
 - Monitoring for repeated delivery failures, enumeration patterns, and unusual OTP request volume.
@@ -471,14 +492,15 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 
 Implement each step as a small pull request. Do not merge until CI, focused integration tests, and the relevant security checks pass.
 
-## 14. Open decisions before implementation
+## 14. Remaining operational decisions before implementation
 
 - PostgreSQL hosting and backup/restore approach.
 - Email delivery provider and sender/domain verification.
 - WhatsApp Business/API provider for phone verification, cost limits, and Indonesia delivery reliability.
 - Google OAuth client setup and production callback origins.
-- Exact password and session timeout policy.
-- Password recovery contact and verification workflow details.
+- Exact Argon2id parameters and final abuse/risk thresholds.
+- Email and WhatsApp provider selection, sender/template requirements, and delivery operations.
+- Manual recovery support authorization matrix, evidence checklist, escalation and appeal workflow.
 - Admin MFA method and recovery procedure.
 - Consent versioning and retention periods.
 - Account closure, data export, and deletion workflow.
