@@ -1,6 +1,6 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration akun 0001, verifikasi 0002, dan sesi autentikasi 0003 telah digabung ke main; CI pasca-merge seluruhnya lulus
+> Status: migration akun 0001 dan verifikasi 0002 telah di-merge; migration sesi 0003 sedang ditinjau pada branch implementasi
 > Tanggal: 21 November 2026
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
@@ -227,12 +227,13 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 
 Migration 0002 tersedia pada branch implementasi dan telah lulus quality checks serta tes integrasi PostgreSQL CI pada head yang diperiksa. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
 
-Migration 0001 maupun 0002 tetap belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
+Migration 0001–0003 belum boleh dijalankan pada database produksi. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 
 ## 9. Referensi internal
 
 - [Kontrak Skema Migration 0001 — Identitas Akun](identity-core-migration-0001-contract.md)
 - [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md)
+- [Kontrak Skema Migration 0003 — Sesi Autentikasi](identity-core-migration-0003-session-contract.md)
 - [Rancangan Skema Database](database-schema-design.md)
 - [Keputusan Registrasi Identity Core](identity-core-registration-decisions.md)
 - [Tinjauan Skema Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md)
