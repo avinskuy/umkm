@@ -114,4 +114,6 @@ Migrasi Identity Core dan endpoint runtime baru boleh dimulai setelah kebijakan 
 - Batas percobaan dan pengiriman harus berlaku lintas sesi dan instance, sehingga membuat sesi baru tidak mengatur ulang batas. Penghitung dan penguncian ditegakkan di server serta tahan terhadap request bersamaan.
 - Kontak utama tetap direservasi selama masa tunggu penghapusan permanen 30 hari. Kontak tersebut baru dapat dilepas setelah proses penghapusan selesai dan sesuai kebijakan retensi/pelepasan identitas. Aturan ini tidak berlaku pada kontak pemulihan bersama.
 
+- `account_recovery_cases` boleh dibuat sebelum akun tujuan diketahui. `target_user_id` sementara NULL dan kasus tetap terhubung ke sesi verifikasi; setelah pemilihan akun serta pemeriksaan keamanan selesai, target dikaitkan secara atomik dan satu kali. Kasus tanpa target tetap tercatat dan dapat masuk antrean pemeriksaan tanpa membuka identitas akun.
+
 Rincian teknis dan checklist migrasi terdapat pada [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md).
