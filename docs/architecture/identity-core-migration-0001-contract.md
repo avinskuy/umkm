@@ -63,7 +63,7 @@ Ketentuan:
 - Public registration hanya dapat membuat `business_owner` atau `investor`.
 - `admin` hanya dibuat melalui jalur provisioning internal dengan principal/workflow terpisah.
 - Tidak ada endpoint, dukungan operasional biasa, OAuth linking, atau proses recovery yang dapat memindahkan role.
-- Tambahkan trigger database yang menolak perubahan `primary_role` pada UPDATE sebagai defense in depth.
+- Tambahkan trigger database yang menolak perubahan `primary_role` dan `initial_contact_channel` pada UPDATE sebagai defense in depth.
 - Hak akses database harus mencegah runtime principal membuat role Admin dengan mengirim nilai role arbitrer. Gunakan jalur pembuatan akun klien yang hanya menerima dua role klien dan jalur provisioning Admin yang terpisah. Jangan memberi runtime principal hak INSERT generik pada tabel yang memungkinkan pemilihan role bebas.
 - Fungsi database `SECURITY DEFINER` (jika dipakai) harus dimiliki role non-login, memakai `search_path` tetap, tidak memakai SQL dinamis, dan hak EXECUTE publik dicabut. Nama role database serta GRANT aktual ditangani pada bootstrap lingkungan, bukan ditebak dalam migration.
 
@@ -200,7 +200,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Email/nomor yang sama dapat digunakan kembali setelah transisi terminal yang sah melepaskan reservasi.
 
 ### Role dan provisioning
-- Primary role tidak dapat diubah setelah INSERT, termasuk melalui update yang mencoba mempertahankan nilai lain.
+- Primary role dan `initial_contact_channel` tidak dapat diubah setelah INSERT, termasuk melalui update yang mencoba mempertahankan nilai lain.
 - Jalur registrasi klien hanya dapat membuat Business Owner atau Investor.
 - Runtime application principal tidak dapat membuat Admin melalui insert langsung atau parameter role yang dimanipulasi.
 - Provisioning Admin hanya dapat dilakukan melalui principal/workflow internal yang terpisah dan tercatat.
