@@ -7,7 +7,7 @@
 
 Dokumen ini menetapkan kontrak skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
 
-Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`; nama file aktual akan ditentukan saat migration dibuat.
+Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`. File implementasinya adalah `20261121170000_create_identity_accounts.sql`.
 
 ## 1. Batas migration pertama
 
@@ -25,7 +25,7 @@ Migration pertama **tidak** membangun:
 - audit Identity Core;
 - profil Owner/Investor, bisnis, post, koneksi, chat, membership, notifikasi, deletion request, atau data retention.
 
-Migration ini tidak mengaktifkan koneksi database pada HTTP startup, tidak menjalankan migration terhadap database produksi, dan tidak membuat endpoint registrasi/login.
+Migration ini hanya membentuk skema; migration ini tidak menjalankan dirinya sendiri pada database produksi dan tidak membuat endpoint registrasi/login. Secara terpisah, HTTP server menginisialisasi pool PostgreSQL saat startup, tetapi tidak menjalankan migration secara otomatis.
 
 ## 2. Tabel `users`
 
