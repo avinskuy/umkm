@@ -1,58 +1,58 @@
-# Architecture Overview
+# Gambaran Arsitektur
 
-## Direction
+## Arah pengembangan
 
-USahapintar starts as a **modular monolith**. The frontend and backend are separate deployable applications, while the backend keeps domain modules inside one service. This minimizes operational complexity while preserving clear boundaries.
+USahapintar dimulai dengan pendekatan **modular monolith**. Frontend dan backend merupakan aplikasi terpisah yang dapat di-deploy secara mandiri, sedangkan modul-modul domain backend tetap berada dalam satu layanan. Pendekatan ini menjaga batas tanggung jawab tetap jelas tanpa menambah kerumitan operasional yang belum diperlukan.
 
-## Applications
+## Aplikasi
 
 ### Frontend
 
-- React and TypeScript.
-- Feature-oriented organization.
-- Shared UI primitives live separately from domain-specific components.
-- Component styles are colocated and scoped (CSS Modules where appropriate).
-- Global styles are limited to reset, tokens, and truly global rules.
+- React dan TypeScript.
+- Struktur kode berorientasi fitur.
+- Komponen UI umum ditempatkan terpisah dari komponen khusus domain.
+- Style komponen diletakkan berdekatan dengan komponennya dan dibatasi cakupannya (gunakan CSS Modules jika sesuai).
+- Style global dibatasi pada reset, design tokens, dan aturan yang benar-benar berlaku secara global.
 
 ### Backend
 
-- Rust and Axum.
-- Domain-oriented modules with explicit API, application, domain, and infrastructure responsibilities as complexity requires.
-- PostgreSQL is the planned primary relational database.
-- SQLx is the planned database access layer.
-- Authorization is enforced server-side.
+- Rust dan Axum.
+- Modul berorientasi domain dengan pemisahan tanggung jawab API, application, domain, dan infrastructure secara eksplisit sesuai kebutuhan kompleksitas.
+- PostgreSQL direncanakan sebagai database relasional utama.
+- SQLx direncanakan sebagai lapisan akses database.
+- Otorisasi ditegakkan di sisi server.
 
-## Initial domain boundaries
+## Batas domain awal
 
-- Identity and authentication
-- Owner profiles and businesses
-- Investor profiles
-- Opportunities and partnership requests
-- Connections and messaging
-- Memberships
-- Business data and verification
-- AI advisory and intelligence
-- Moderation and administration
+- Identitas dan autentikasi
+- Profil pemilik usaha dan bisnis
+- Profil investor
+- Peluang dan permintaan kemitraan
+- Koneksi dan pesan
+- Keanggotaan
+- Data dan verifikasi bisnis
+- Asisten dan intelijen berbasis AI
+- Moderasi dan administrasi
 
-These are logical boundaries, not a requirement to create empty modules in advance. Add a module when it has real behavior and a clear contract.
+Daftar ini menunjukkan batas tanggung jawab secara logis, bukan kewajiban untuk membuat modul kosong sejak awal. Buat modul ketika sudah ada perilaku nyata dan kontrak yang jelas.
 
-## Identity Core decisions
+## Keputusan Identity Core
 
-The approved and unresolved registration, contact-verification, and account-lifecycle decisions are tracked in [Identity Core — Registration Decisions](identity-core-registration-decisions.md). No Identity Core migration should be created until its implementation gate is satisfied.
+Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Migrasi Identity Core belum boleh dibuat sebelum seluruh persyaratan gerbang implementasinya terpenuhi.
 
-## Database schema
+## Skema database
 
-The proposed relational model, integrity constraints, privacy boundaries, and migration sequence are documented in [PostgreSQL Database Schema Design](database-schema-design.md). It remains a proposal until the first migration review gate is completed.
+Model relasional yang diusulkan, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Dokumen tersebut masih berupa usulan sampai tahap peninjauan migrasi pertama selesai.
 
-## Data access and privacy
+## Akses data dan privasi
 
-Business owners control which business information is shared. Investor-facing data must be explicitly permitted and must not include customer-level transaction details. Data should carry provenance, reporting period, update time, and verification status.
+Pemilik bisnis menentukan informasi bisnis mana yang boleh dibagikan. Data yang ditampilkan kepada investor harus mendapat izin secara eksplisit dan tidak boleh mencakup detail transaksi pada tingkat pelanggan. Data perlu menyertakan asal-usul, periode pelaporan, waktu pembaruan, dan status verifikasi.
 
-## Architecture constraints
+## Batasan arsitektur
 
-- No microservices for the initial product.
-- No generic `utils` or `common` dumping grounds.
-- Avoid circular dependencies between features.
-- Shared code must have multiple real consumers or a clear platform-level responsibility.
-- Keep transport concerns out of domain rules.
-- Do not trust frontend role or ownership claims.
+- Tidak menggunakan microservices untuk produk tahap awal.
+- Hindari folder penampung umum seperti `utils` atau `common` tanpa tanggung jawab yang jelas.
+- Hindari ketergantungan melingkar antarf fitur.
+- Kode bersama harus memiliki lebih dari satu pengguna nyata atau tanggung jawab tingkat platform yang jelas.
+- Pisahkan kebutuhan transport/API dari aturan domain.
+- Jangan mempercayai klaim role atau kepemilikan yang berasal dari frontend.
