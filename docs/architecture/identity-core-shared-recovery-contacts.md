@@ -36,6 +36,7 @@ Satu email atau nomor HP pemulihan yang sudah diverifikasi boleh dihubungkan ke 
 Implikasi:
 
 - Jangan membuat unique constraint global pada nilai email maupun nomor HP pemulihan; setiap kontak dapat memiliki beberapa baris relasi pemilik.
+- Gunakan unique constraint komposit `(user_id, channel, contact_hash)` agar satu akun tidak memiliki relasi duplikat untuk kontak/kanal yang sama. Constraint ini tetap mengizinkan kontak yang sama dipakai oleh akun berbeda.
 - Gunakan indeks non-unik berdasarkan kanal dan keyed hash kontak untuk menemukan akun-akun yang terhubung tanpa membuka nilai kontak.
 - Simpan relasi pemilik kontak melalui foreign key ke akun; relasi satu email atau nomor HP ke beberapa akun direpresentasikan melalui beberapa baris.
 - Simpan nilai kontak secara aman. Untuk pencarian dan deduplikasi, gunakan representasi normalisasi serta keyed hash yang stabil dan dikelola server. Jika nilai asli perlu dikirim ulang atau ditampilkan kepada pemiliknya, lindungi dengan enkripsi yang sesuai; jangan gunakan hash sebagai pengganti data yang harus dipulihkan.
@@ -90,6 +91,7 @@ Rancangan constraint dan indeks harus membedakan kontak utama pada users dari re
 - [ ] account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; target dikaitkan atomik setelah pemeriksaan.
 - [ ] Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
 - [ ] Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
+- [ ] Relasi kontak yang sama tidak dapat didaftarkan dua kali pada akun yang sama, tetapi tetap boleh dipakai akun berbeda.
 - [ ] Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
 - [ ] Nilai kontak yang perlu dipakai kembali dilindungi dengan enkripsi yang sesuai.
 - [ ] OTP terikat pada purpose, kanal, dan kontak; tidak dapat dipakai lintas akun atau tujuan.
