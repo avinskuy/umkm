@@ -104,6 +104,22 @@ CREATE INDEX identity_audit_events_request_idx
     ON public.identity_audit_events (request_id)
     WHERE request_id IS NOT NULL;
 
+CREATE FUNCTION public.stamp_identity_audit_event()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = pg_catalog
+AS $
+BEGIN
+    NEW.id := gen_random_uuid();
+    NEW.occurred_at := clock_timestamp();
+    RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER identity_audit_events_05_stamp
+    BEFORE INSERT ON public.identity_audit_events
+    FOR EACH ROW EXECUTE FUNCTION public.stamp_identity_audit_event();
+
 CREATE FUNCTION public.guard_identity_audit_event()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -124,7 +140,7 @@ CREATE TRIGGER identity_audit_events_20_no_truncate
     FOR EACH STATEMENT EXECUTE FUNCTION public.guard_identity_audit_event();
 
 REVOKE ALL ON TABLE public.identity_audit_events FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_safe_identity_audit_metadata(JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.stamp_identity_audit_event() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.guard_identity_audit_event() FROM PUBLIC;
 
 COMMENT ON TABLE public.identity_audit_events IS
