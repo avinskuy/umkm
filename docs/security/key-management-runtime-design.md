@@ -223,7 +223,7 @@ Jangan memilih vendor hanya berdasarkan popularitas atau contoh dokumentasi. Jan
 
 ## 10. Pengujian dan kriteria penerimaan
 
-### Unit/contract tests
+### Pengujian unit/kontrak
 - Purpose dan environment tidak dapat tertukar.
 - Versi aktif dipakai untuk operasi baru; versi lama hanya untuk read/decrypt yang diizinkan.
 - Unknown, revoked, atau destroyed version ditolak.
@@ -235,7 +235,7 @@ Jangan memilih vendor hanya berdasarkan popularitas atau contoh dokumentasi. Jan
 - Cache menghormati expiry dan revocation.
 - Kuota global mencegah pemakaian melewati batas yang ditetapkan.
 
-### Integration tests
+### Pengujian integrasi
 - KMS/secret manager sandbox dengan workload identity terbatas.
 - Timeout, throttling, permission denied, key disabled, key deleted, dan provider unavailable.
 - Retry dan idempotency tidak menggandakan operasi yang tidak aman.

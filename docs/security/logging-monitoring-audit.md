@@ -1,4 +1,4 @@
-# Logging, Monitoring & Audit Trail Policy
+# Kebijakan Logging, Pemantauan & Audit Trail
 
 - **Status:** Disetujui sebagai baseline
 - **Tanggal:** 21 November 2026
