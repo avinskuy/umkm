@@ -4,7 +4,7 @@
 > Tanggal: 21 November 2026
 > Cakupan: keputusan teknis lintas migration Identity Core
 
-Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau mengaktifkan koneksi database pada HTTP startup. Migration akun 0001 telah dibuat dan diuji; kontrak migration verifikasi 0002 disusun terpisah. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
+Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau mengaktifkan koneksi database pada HTTP startup. Migration 0001–0003 telah dibuat, diuji, dan di-merge; kontrak migration verifikasi, sesi, dan pemulihan disusun terpisah. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
 
 ## 1. Perlindungan tujuan pengiriman OTP
 
@@ -206,9 +206,13 @@ Migration 0002 telah di-merge ke `main` dan lulus CI PostgreSQL. Skema menyediak
 
 ### Migration 0003 — sesi autentikasi
 
-Migration 0003 tersedia pada branch implementasi dan sedang melalui review/CI. Skema menyediakan hash token sesi, batas absolut 30 hari, idle timeout 7 hari, rotasi token, pencabutan satu arah, dan pencabutan otomatis ketika status lifecycle akun berubah menjadi nonaktif. Endpoint, cookie, middleware, validasi sesi per request, audit event, serta pencabutan karena reset password/restriksi Admin tetap merupakan pekerjaan runtime.
+Migration 0003 telah di-merge dan lulus CI PostgreSQL. Skema menyediakan hash token sesi, batas absolut 30 hari, idle timeout 7 hari, rotasi token, pencabutan satu arah, dan pencabutan otomatis ketika status lifecycle akun berubah menjadi nonaktif. Endpoint, cookie, middleware, validasi sesi per request, audit event, serta pencabutan karena reset password/restriksi Admin tetap merupakan pekerjaan runtime.
 
-Jangan menjalankan migration 0001–0003 pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
+### Migration 0004 — pemulihan akun
+
+Migration 0004 menambahkan relasi kontak pemulihan yang boleh digunakan lintas akun, kasus recovery yang baru mengikat akun setelah kontak diverifikasi, dan token reset kata sandi berbentuk hash unik. Database mengikat kontak ke sesi `recovery_contact_add` yang terverifikasi, membatasi duplikasi aktif per akun, menyediakan indeks pencarian fingerprint lintas akun, mengunci target kasus setelah dipilih, serta mensyaratkan kasus `password_reset` yang disetujui dan akun aktif sebelum token dibuat. Runtime tetap wajib mencocokkan fingerprint dengan kontak milik akun target, menjalankan pemeriksaan risiko dan limit, mengelola key/provider, mengonsumsi token dan mengganti password secara atomik, mencabut sesi, serta menulis audit.
+
+Jangan menjalankan migration 0001–0004 pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
 
 ## 8. Keputusan yang tetap ditunda
 
