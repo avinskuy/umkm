@@ -102,7 +102,7 @@ Kontrak constraint minimum:
 11. Pada `pending_expired` dan `closed`, kolom kontak utama, timestamp verifikasi kontak, `initial_contact_verified_at`, dan `password_hash` harus NULL. Identitas provider yang tidak lagi diperlukan harus dilepas melalui proses terminal yang sesuai.
 12. `password_hash`, bila terisi, tidak boleh berupa string kosong.
 
-Constraint lintas tabel yang tidak dapat diekspresikan dengan aman sebagai CHECK (misalnya memastikan akun tanpa password hash memiliki identitas Google yang sah) harus dijaga oleh operasi backend/transaksi dan tes integrasi. Jangan membuat CHECK yang membaca tabel lain.
+Constraint lintas tabel yang tidak dapat diekspresikan dengan aman sebagai CHECK harus dijaga oleh operasi backend/transaksi dan tes integrasi. Khusus akun klien: `password_hash` boleh NULL hanya jika identitas Google yang sah dibuat/ditautkan dalam transaksi pembuatan akun yang sama; registrasi email/telepon wajib memiliki password hash. Jangan membuat CHECK yang membaca tabel lain. Aturan kredensial Admin mengikuti jalur provisioning internal dan harus dipastikan sebelum akun Admin diaktifkan.
 
 ### 2.5 Keunikan dan reservasi kontak
 
@@ -207,7 +207,7 @@ Keunikan satu provider subject global tidak berarti satu email provider dapat me
 - Tidak ada endpoint publik untuk provisioning Admin.
 
 ### Provider identity
-- Provider subject yang sama tidak dapat terhubung ke dua akun.
+- Provider subject yang sama tidak dapat terhubung ke dua akun.\n- Akun klien tanpa password hash ditolak kecuali identitas Google yang sah dibuat/ditautkan dalam transaksi yang sama.
 - Provider yang tidak diizinkan ditolak.
 - FK menolak user yang tidak ada.
 - Identitas provider tidak dapat dipindahkan otomatis hanya karena email cocok.
