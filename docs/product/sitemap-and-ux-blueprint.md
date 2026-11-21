@@ -1,294 +1,294 @@
-# USahapintar — Sitemap & UI/UX Blueprint
+# USahapintar — Peta Situs & Rancangan UI/UX
 
-> Status: product design baseline  
-> Scope: responsive web application and PWA  
-> Design direction: Minimalist Editorial × Modern Marketplace × SaaS  
-> Primary palette: soft white, sage green, forest green, warm neutral accents
+> Status: baseline rancangan produk  
+> Cakupan: aplikasi web responsif dan PWA  
+> Arah desain: Editorial Minimalis × Marketplace Modern × SaaS  
+> Palet utama: putih lembut, hijau sage, hijau hutan, dan aksen warna netral hangat
 
-This document defines the information architecture and page-level experience before feature implementation. It is a product blueprint, not a claim that the routes or features are already implemented.
+Dokumen ini menetapkan struktur informasi dan pengalaman pengguna sebelum fitur dikembangkan. Dokumen ini merupakan rancangan produk, bukan pernyataan bahwa seluruh rute atau fitur sudah tersedia.
 
-## 1. Product model
+## 1. Model produk
 
-USahapintar is a membership-based business promotion, intelligence, and networking platform. It helps business owners present opportunities and helps investors discover businesses and partnership opportunities.
+USahapintar adalah platform promosi bisnis, intelijen, dan jejaring berbasis keanggotaan. Platform ini membantu pemilik usaha menampilkan peluang bisnis dan membantu investor menemukan bisnis serta peluang kemitraan.
 
-It is **not** a goods marketplace or an investment transaction platform. The MVP facilitates discovery, introductions, approved connections, and communication. It does not hold funds, execute investments, or guarantee funding or returns.
+USahapintar **bukan** marketplace barang atau platform transaksi investasi. MVP berfokus pada penemuan peluang, perkenalan, koneksi yang disetujui, dan komunikasi. Platform tidak menampung dana, menjalankan transaksi investasi, atau menjamin pendanaan maupun keuntungan.
 
-### Client roles
+### Peran pengguna
 
-- **Business Owner** — creates and manages business profiles, publishes business promotion/opportunity posts, uses Growth Advisor, and builds connections.
-- **Investor** — discovers business opportunities, creates and manages partnership-seeking posts using the Investor post format, uses Investment Intelligence, and builds connections.
-- **Admin** — internal operational role for verification, moderation, membership, reports, and platform governance. Admin accounts are provisioned internally and are not offered in public registration.
+- **Business Owner** — membuat dan mengelola profil usaha, menerbitkan posting promosi/peluang bisnis, menggunakan Growth Advisor, dan membangun koneksi.
+- **Investor** — menemukan peluang bisnis, membuat dan mengelola posting pencarian kemitraan dengan format khusus Investor, menggunakan Investment Intelligence, dan membangun koneksi.
+- **Admin** — peran operasional internal untuk verifikasi, moderasi, keanggotaan, laporan, dan tata kelola platform. Akun Admin disediakan melalui proses internal dan tidak tersedia pada pendaftaran publik.
 
-Each client account has exactly one immutable primary client role: `business_owner` or `investor`. The role is selected during registration and cannot be changed later through profile settings, support requests, account migration, OAuth, or any other self-service or administrative workflow. Anyone who wants to use the other client role must register a separate new account with eligible, unlinked login identities. Owner and Investor experiences use separate login entry points and role-aware authorization. The backend is authoritative for role and resource access. Admin is a separately provisioned internal role and is not a client registration choice.
+Setiap akun klien hanya memiliki satu role utama yang tetap: `business_owner` atau `investor`. Role dipilih saat pendaftaran dan tidak dapat diubah melalui pengaturan profil, permintaan bantuan, migrasi akun, OAuth, atau proses administratif lainnya. Pengguna yang ingin memakai role klien lain harus membuat akun baru dengan identitas login yang belum terhubung ke akun lain. Owner dan Investor memiliki jalur login terpisah serta otorisasi sesuai role. Backend menjadi sumber kebenaran untuk role dan akses sumber daya. Admin merupakan role internal yang disediakan secara terpisah, bukan pilihan pendaftaran klien.
 
-### Membership model
+### Model keanggotaan
 
-USahapintar has Free and Premium membership tiers that apply independently of the account's immutable client role. Both tiers retain core discovery, connection requests, connection approval, and messaging after an accepted connection. Premium adds higher posting and connection-request quotas, priority visibility/featured promotion, richer analytics, advanced discovery filters, and enhanced profile features. Membership never grants another role's permissions or access to private information that has not been explicitly shared.
+USahapintar memiliki paket keanggotaan Free dan Premium yang berlaku terpisah dari role utama akun. Kedua paket tetap dapat menggunakan fitur inti berupa penemuan peluang, permintaan koneksi, persetujuan koneksi, dan pesan setelah koneksi diterima. Premium menambahkan kuota posting dan permintaan koneksi yang lebih tinggi, prioritas visibilitas/promosi unggulan, analitik yang lebih lengkap, filter penemuan lanjutan, dan fitur profil tambahan. Keanggotaan tidak memberikan izin milik role lain atau akses ke informasi privat yang belum dibagikan secara eksplisit.
 
-The detailed role-access baseline, entitlement keys, quota enforcement rules, downgrade behavior, and required tests are maintained in [Membership & Entitlements Policy](membership-and-entitlements.md). Exact numeric quotas and commercial terms remain open decisions and must not be invented in UI or implementation.
+Baseline akses role, entitlement, aturan kuota, perilaku downgrade, dan pengujian wajib dijelaskan dalam [Kebijakan Keanggotaan & Hak Fitur](membership-and-entitlements.md). Angka kuota dan ketentuan komersial tetap menjadi keputusan produk; jangan mengarang nilainya di UI atau implementasi.
 
-## 2. Global information architecture
+## 2. Struktur informasi global
 
-### Public website (no login required)
+### Situs publik (tanpa login)
 
-| Route | Page | Purpose |
+| Rute | Halaman | Tujuan |
 | --- | --- | --- |
-| `/` | Landing | Explain the platform and direct visitors to register or sign in |
-| `/cara-kerja` | How it works | Explain discovery, connection approval, and networking |
-| `/fitur` | Features | Present Owner, Investor, and shared platform capabilities |
-| `/membership` | Membership | Compare Free and Premium benefits and quotas |
-| `/tentang` | About | Explain mission, scope, and platform principles |
-| `/pusat-bantuan` | Help center | FAQs and basic guidance |
-| `/kontak` | Contact | Official support and inquiry channels |
-| `/kebijakan/privasi` | Privacy policy | Explain data collection, use, consent, and retention |
-| `/ketentuan` | Terms | Explain platform rules, limitations, and user responsibilities |
+| `/` | Beranda | Menjelaskan platform dan mengarahkan pengunjung untuk mendaftar atau masuk |
+| `/cara-kerja` | Cara kerja | Menjelaskan penemuan peluang, persetujuan koneksi, dan jejaring |
+| `/fitur` | Fitur | Menampilkan kemampuan Owner, Investor, dan fitur bersama |
+| `/membership` | Keanggotaan | Membandingkan manfaat dan kuota Free serta Premium |
+| `/tentang` | Tentang | Menjelaskan misi, cakupan, dan prinsip platform |
+| `/pusat-bantuan` | Pusat bantuan | FAQ dan panduan dasar |
+| `/kontak` | Kontak | Kanal dukungan dan pertanyaan resmi |
+| `/kebijakan/privasi` | Kebijakan privasi | Menjelaskan pengumpulan, penggunaan, consent, dan retensi data |
+| `/ketentuan` | Ketentuan | Menjelaskan aturan platform, batasan, dan tanggung jawab pengguna |
 
-Public visitors can understand the service and membership model. The internal discovery feed, private profiles, connections, chat, and AI workspaces require authentication.
+Pengunjung publik dapat memahami layanan dan model keanggotaan. Feed penemuan internal, profil privat, koneksi, pesan, dan ruang kerja AI memerlukan autentikasi.
 
-### Authentication
+### Autentikasi
 
-| Route | Page | Purpose |
+| Rute | Halaman | Tujuan |
 | --- | --- | --- |
-| `/masuk/pemilik` | Owner login | Dedicated Owner sign-in entry |
-| `/masuk/investor` | Investor login | Dedicated Investor sign-in entry |
-| `/daftar` | Registration role choice | Choose Owner or Investor; no public Admin option |
-| `/daftar/pemilik` | Owner registration | Create an Owner account and begin business onboarding |
-| `/daftar/investor` | Investor registration | Create an Investor account and begin investor onboarding |
-| `/verifikasi/email` | Email verification | Verify email address |
-| `/verifikasi/telepon` | Phone OTP verification | Verify phone number |
-| `/lupa-kata-sandi` | Password recovery | Request a password reset |
-| `/atur-kata-sandi` | Set new password | Complete password recovery |
+| `/masuk/pemilik` | Login Owner | Jalur masuk khusus Owner |
+| `/masuk/investor` | Login Investor | Jalur masuk khusus Investor |
+| `/daftar` | Pilihan role pendaftaran | Memilih Owner atau Investor; tanpa pilihan Admin publik |
+| `/daftar/pemilik` | Pendaftaran Owner | Membuat akun Owner dan memulai onboarding usaha |
+| `/daftar/investor` | Pendaftaran Investor | Membuat akun Investor dan memulai onboarding investor |
+| `/verifikasi/email` | Verifikasi email | Memverifikasi alamat email |
+| `/verifikasi/telepon` | Verifikasi OTP telepon | Memverifikasi nomor telepon |
+| `/lupa-kata-sandi` | Pemulihan kata sandi | Meminta pengaturan ulang kata sandi |
+| `/atur-kata-sandi` | Atur kata sandi baru | Menyelesaikan pemulihan kata sandi |
 
-Initial registration requires choosing exactly one contact method: email verified by a one-time code delivered to email, or phone number verified by a one-time code delivered through WhatsApp. Both contact methods are not required at signup; the other may be added and verified later. Google OAuth is retained for sign-in and registration. A new Google registrant must choose Owner or Investor before OAuth, does not need a separate local password, and must still complete email OR WhatsApp contact-code verification. Existing role-specific login entry points remain separate, and the backend rejects a role mismatch with a clear, non-revealing message. Include password visibility, loading/error states, resend cooldown, terms/privacy links, and accessible validation.
+Pendaftaran awal mewajibkan pengguna memilih tepat satu metode kontak: email yang diverifikasi melalui kode sekali pakai yang dikirim ke email, atau nomor telepon yang diverifikasi melalui kode sekali pakai yang dikirim lewat WhatsApp. Kedua kontak tidak wajib diberikan saat pendaftaran; kontak lainnya dapat ditambahkan dan diverifikasi kemudian. Google OAuth tetap tersedia untuk login dan pendaftaran. Pendaftar baru melalui Google harus memilih Owner atau Investor sebelum OAuth, tidak perlu membuat kata sandi lokal terpisah, dan tetap harus menyelesaikan verifikasi kontak melalui email ATAU WhatsApp. Jalur login berdasarkan role tetap terpisah dan backend harus menolak ketidaksesuaian role dengan pesan yang jelas tanpa membocorkan informasi akun. Sediakan kontrol tampil/sembunyi kata sandi, status loading/error, jeda kirim ulang kode, tautan ketentuan/privasi, dan validasi yang aksesibel.
 
-Admin uses a separate internal entry at `/admin/login`, with stronger session controls and MFA. It is not linked as a public registration role.
+Admin menggunakan jalur internal terpisah di `/admin/login`, dengan kontrol sesi yang lebih ketat dan MFA. Jalur ini tidak ditampilkan sebagai pilihan pendaftaran publik.
 
-## 3. Authenticated application shell
+## 3. Kerangka aplikasi setelah login
 
-After login, users enter the application shell for their primary role. The shell should share visual primitives while keeping navigation, dashboard content, and permissions role-specific.
+Setelah login, pengguna masuk ke kerangka aplikasi sesuai role utamanya. Kerangka aplikasi dapat memakai elemen visual bersama, tetapi navigasi, isi dashboard, dan izin tetap mengikuti role masing-masing.
 
-### Shared authenticated routes
+### Rute bersama setelah login
 
-| Route | Page | Access |
+| Rute | Halaman | Akses |
 | --- | --- | --- |
-| `/app/notifikasi` | Notifications | Owner, Investor; security notifications cannot be disabled through marketing preferences |
-| `/app/koneksi` | Connections | Owner, Investor |
-| `/app/pesan` | Messages | Owner, Investor; approved connections only |
-| `/app/pesan/:conversationId` | Conversation | Conversation participants only |
-| `/app/profil` | My profile | Owner, Investor |
-| `/app/profil/:userId` | Public-facing member profile | Authenticated users, field-level visibility |
-| `/app/pengaturan` | Account settings | Owner, Investor |
-| `/app/keanggotaan` | Membership and usage | Owner, Investor |
-| `/app/riwayat-aktivitas` | Account activity history | Own account only; moderation actions and appeal status/outcomes |
-| `/app/riwayat-aktivitas/:actionId/banding` | Submit moderation appeal | Affected account only; at most one appeal per moderation action |
+| `/app/notifikasi` | Notifikasi | Owner dan Investor; notifikasi keamanan tidak dapat dimatikan melalui preferensi pemasaran |
+| `/app/koneksi` | Koneksi | Owner dan Investor |
+| `/app/pesan` | Pesan | Owner dan Investor; hanya untuk koneksi yang disetujui |
+| `/app/pesan/:conversationId` | Percakapan | Hanya peserta percakapan |
+| `/app/profil` | Profil saya | Owner dan Investor |
+| `/app/profil/:userId` | Profil anggota yang dapat dilihat publik | Pengguna terautentikasi, mengikuti visibilitas tiap field |
+| `/app/pengaturan` | Pengaturan akun | Owner dan Investor |
+| `/app/keanggotaan` | Keanggotaan dan penggunaan | Owner dan Investor |
+| `/app/riwayat-aktivitas` | Riwayat aktivitas akun | Hanya akun sendiri; mencakup tindakan moderasi serta status/hasil banding |
+| `/app/riwayat-aktivitas/:actionId/banding` | Ajukan banding moderasi | Hanya akun terdampak; maksimal satu banding untuk setiap tindakan moderasi |
 
-A connection request must be approved before a conversation can be started. Direct messaging is not a Premium-only feature. Free and Premium users can connect and chat after approval, subject to fair-use and safety limits.
+Permintaan koneksi harus disetujui sebelum percakapan dapat dimulai. Pesan langsung bukan fitur khusus Premium. Pengguna Free maupun Premium dapat terhubung dan mengirim pesan setelah persetujuan, dengan tetap mengikuti batas penggunaan wajar dan keselamatan.
 
-## 4. Business Owner workspace
+## 4. Ruang kerja Business Owner
 
-Suggested route prefix: `/owner`.
+Awalan rute yang disarankan: `/owner`.
 
-| Route | Page | Main content and actions |
+| Rute | Halaman | Isi dan tindakan utama |
 | --- | --- | --- |
-| `/owner/dashboard` | Owner dashboard | Business summary, profile completeness, post performance, connection activity, membership usage, next actions |
-| `/owner/bisnis` | My businesses | List and manage business profiles |
-| `/owner/bisnis/baru` | Create business profile | Business identity, sector, location, stage, description, supporting information |
-| `/owner/bisnis/:businessId` | Business overview | Business information, verification status, approved metrics, published posts |
-| `/owner/postingan` | My posts | Promotion/opportunity posts, status, performance, edit/archive actions |
-| `/owner/postingan/baru` | Create promotion post | Publish a business promotion or opportunity with clear evidence and visibility settings |
-| `/owner/postingan/:postId` | Post detail and performance | Post content, moderation status, engagement and analytics |
-| `/owner/jelajah` | Discover investors and opportunities | Search and filter eligible profiles and partnership posts |
-| `/owner/koneksi` | Connection management | Incoming/outgoing requests and accepted connections |
-| `/owner/pesan` | Messages | Chat with approved connections |
-| `/owner/growth-advisor` | Growth Advisor home | Guided business analysis and saved reports |
-| `/owner/growth-advisor/validasi-ide` | Idea validation | Evaluate an early-stage business idea |
-| `/owner/growth-advisor/perencanaan` | Business planning | Build a structured business plan |
-| `/owner/growth-advisor/keuangan` | Financial planning | HPP, pricing, break-even, and capital-planning worksheets |
-| `/owner/growth-advisor/pasar` | Market research | Market, customer, competitor, and regional research |
-| `/owner/growth-advisor/pertumbuhan` | Growth strategy | Practical growth priorities and scenarios |
-| `/owner/growth-advisor/kesehatan-bisnis` | Business health check | Review business indicators and data completeness |
-| `/owner/analitik` | Business analytics | Trends and post/profile performance based on available data |
-| `/owner/keanggotaan` | Membership | Plan, usage quotas, and upgrade information |
-| `/owner/pengaturan` | Settings | Account, security, privacy, and notification preferences |
+| `/owner/dashboard` | Dashboard Owner | Ringkasan usaha, kelengkapan profil, performa posting, aktivitas koneksi, penggunaan keanggotaan, dan tindakan berikutnya |
+| `/owner/bisnis` | Bisnis saya | Melihat dan mengelola profil usaha |
+| `/owner/bisnis/baru` | Buat profil usaha | Identitas usaha, sektor, lokasi, tahap usaha, deskripsi, dan informasi pendukung |
+| `/owner/bisnis/:businessId` | Ringkasan usaha | Informasi usaha, status verifikasi, metrik yang disetujui, dan posting terbit |
+| `/owner/postingan` | Posting saya | Posting promosi/peluang, status, performa, serta tindakan edit/arsip |
+| `/owner/postingan/baru` | Buat posting promosi | Menerbitkan promosi atau peluang usaha dengan bukti dan pengaturan visibilitas yang jelas |
+| `/owner/postingan/:postId` | Detail dan performa posting | Konten posting, status moderasi, interaksi, dan analitik |
+| `/owner/jelajah` | Temukan investor dan peluang | Mencari dan memfilter profil serta posting kemitraan yang relevan |
+| `/owner/koneksi` | Pengelolaan koneksi | Permintaan masuk/keluar dan koneksi yang diterima |
+| `/owner/pesan` | Pesan | Percakapan dengan koneksi yang disetujui |
+| `/owner/growth-advisor` | Beranda Growth Advisor | Analisis usaha terpandu dan laporan tersimpan |
+| `/owner/growth-advisor/validasi-ide` | Validasi ide | Mengevaluasi ide usaha tahap awal |
+| `/owner/growth-advisor/perencanaan` | Perencanaan bisnis | Menyusun rencana bisnis terstruktur |
+| `/owner/growth-advisor/keuangan` | Perencanaan keuangan | Lembar kerja HPP, harga, break-even, dan perencanaan modal |
+| `/owner/growth-advisor/pasar` | Riset pasar | Riset pasar, pelanggan, pesaing, dan wilayah |
+| `/owner/growth-advisor/pertumbuhan` | Strategi pertumbuhan | Prioritas dan skenario pertumbuhan yang praktis |
+| `/owner/growth-advisor/kesehatan-bisnis` | Pemeriksaan kesehatan bisnis | Meninjau indikator usaha dan kelengkapan data |
+| `/owner/analitik` | Analitik bisnis | Tren serta performa posting/profil berdasarkan data yang tersedia |
+| `/owner/keanggotaan` | Keanggotaan | Paket, kuota penggunaan, dan informasi peningkatan paket |
+| `/owner/pengaturan` | Pengaturan | Preferensi akun, keamanan, privasi, dan notifikasi |
 
-Owner onboarding adapts to the business stage: idea only, preparing to start, currently operating, or growing. The UI should ask only for information relevant to the selected stage and allow users to complete their profile progressively.
+Onboarding Owner menyesuaikan tahap usaha: baru berupa ide, sedang bersiap memulai, sudah beroperasi, atau sedang berkembang. UI hanya meminta informasi yang relevan dengan tahap yang dipilih dan memungkinkan pengguna melengkapi profil secara bertahap.
 
-## 5. Investor workspace
+## 5. Ruang kerja Investor
 
-Suggested route prefix: `/investor`.
+Awalan rute yang disarankan: `/investor`.
 
-| Route | Page | Main content and actions |
+| Rute | Halaman | Isi dan tindakan utama |
 | --- | --- | --- |
-| `/investor/dashboard` | Investor dashboard | Saved opportunities, discovery highlights, connection activity, preference summary |
-| `/investor/jelajah` | Opportunity discovery | Search and filter business opportunities |
-| `/investor/jelajah/:postId` | Opportunity detail | Owner-approved business information, evidence labels, and connection request |
-| `/investor/tersimpan` | Saved opportunities | Bookmarked opportunities and status changes |
-| `/investor/postingan` | My partnership posts | Create and manage partnership-seeking posts using the Investor-specific format, subject to membership quotas and moderation |
-| `/investor/postingan/baru` | Create partnership post | Create an Investor-format post describing partnership intent, preferred sector, region, and collaboration scope |
-| `/investor/koneksi` | Connection management | Requests, accepted connections, and introductions |
-| `/investor/pesan` | Messages | Chat with approved connections |
-| `/investor/investment-intelligence` | Investment Intelligence home | Guided analysis and saved reports |
-| `/investor/investment-intelligence/analisis` | Opportunity analysis | Financial health, profitability, growth, market, and risk review |
-| `/investor/investment-intelligence/perbandingan` | Benchmarking | Compare opportunities using available, comparable data |
-| `/investor/investment-intelligence/simulasi` | Scenario simulation | Explore assumptions and possible scenarios without promising outcomes |
-| `/investor/analitik` | Discovery analytics | Saved-search and discovery activity insights |
-| `/investor/keanggotaan` | Membership | Plan, usage quotas, and upgrade information |
-| `/investor/pengaturan` | Settings | Account, security, privacy, and notification preferences |
+| `/investor/dashboard` | Dashboard Investor | Peluang tersimpan, sorotan penemuan, aktivitas koneksi, dan ringkasan preferensi |
+| `/investor/jelajah` | Penemuan peluang | Mencari dan memfilter peluang usaha |
+| `/investor/jelajah/:postId` | Detail peluang | Informasi usaha yang disetujui Owner, label bukti, dan permintaan koneksi |
+| `/investor/tersimpan` | Peluang tersimpan | Peluang yang ditandai dan perubahan statusnya |
+| `/investor/postingan` | Posting kemitraan saya | Membuat dan mengelola posting pencarian kemitraan dengan format khusus Investor, mengikuti kuota keanggotaan dan moderasi |
+| `/investor/postingan/baru` | Buat posting kemitraan | Membuat posting format Investor yang menjelaskan tujuan kemitraan, sektor pilihan, wilayah, dan cakupan kolaborasi |
+| `/investor/koneksi` | Pengelolaan koneksi | Permintaan, koneksi yang diterima, dan perkenalan |
+| `/investor/pesan` | Pesan | Percakapan dengan koneksi yang disetujui |
+| `/investor/investment-intelligence` | Beranda Investment Intelligence | Analisis terpandu dan laporan tersimpan |
+| `/investor/investment-intelligence/analisis` | Analisis peluang | Meninjau kesehatan keuangan, profitabilitas, pertumbuhan, pasar, dan risiko |
+| `/investor/investment-intelligence/perbandingan` | Perbandingan | Membandingkan peluang menggunakan data yang tersedia dan sebanding |
+| `/investor/investment-intelligence/simulasi` | Simulasi skenario | Mengeksplorasi asumsi dan kemungkinan skenario tanpa menjanjikan hasil |
+| `/investor/analitik` | Analitik penemuan | Wawasan dari pencarian tersimpan dan aktivitas penemuan |
+| `/investor/keanggotaan` | Keanggotaan | Paket, kuota penggunaan, dan informasi peningkatan paket |
+| `/investor/pengaturan` | Pengaturan | Preferensi akun, keamanan, privasi, dan notifikasi |
 
-Investor onboarding captures profile information and discovery preferences such as sector, target region, indicative range, horizon, and risk preference. These preferences support discovery and analysis; they must not be presented as a promise of investment suitability or returns.
+Onboarding Investor mengumpulkan informasi profil dan preferensi penemuan seperti sektor, wilayah target, kisaran indikatif, horizon, dan preferensi risiko. Preferensi ini mendukung penemuan dan analisis; jangan menyajikannya sebagai jaminan kesesuaian investasi atau hasil investasi.
 
-Investor-facing AI may only use business data the Owner has explicitly approved for sharing. Customer-level transaction details are not exposed.
+AI untuk Investor hanya boleh menggunakan data usaha yang secara eksplisit disetujui Owner untuk dibagikan. Detail transaksi pada tingkat pelanggan tidak boleh ditampilkan.
 
-## 6. Admin workspace
+## 6. Ruang kerja Admin
 
-Suggested route prefix: `/admin`. Access is internal and enforced server-side.
+Awalan rute yang disarankan: `/admin`. Akses bersifat internal dan wajib ditegakkan di server.
 
-| Route | Page | Main content and actions |
+| Rute | Halaman | Isi dan tindakan utama |
 | --- | --- | --- |
-| `/admin/login` | Admin login | Internal sign-in, MFA, and security notices |
-| `/admin/dashboard` | Operations overview | Platform health, pending reviews, reports, and operational metrics |
-| `/admin/users` | User management | Search, status, role, verification, and account actions |
-| `/admin/users/:userId` | User detail | Profile review, verification history, reports, and moderation actions |
-| `/admin/businesses` | Business verification | Review business profiles and submitted evidence |
-| `/admin/posts` | Post moderation | Review, approve, reject, hide, or request edits |
-| `/admin/reports` | Reports and complaints | Triage reports, investigate, and record outcomes |
-| `/admin/banding` | Moderation appeals | Review submitted appeals and record accepted, modified, or rejected outcomes |
-| `/admin/memberships` | Membership management | Plans, entitlements, quotas, and subscription status |
-| `/admin/connections` | Connection oversight | Investigate abuse reports and relevant safety events; no routine private-chat browsing |
-| `/admin/ai-governance` | AI and data governance | Review data-source status, consent, output incidents, and audit metadata |
-| `/admin/admins` | Admin accounts | Super-admin provisioning and permission assignment |
-| `/admin/audit-logs` | Audit logs | Search security-sensitive administrative actions |
-| `/admin/settings` | Platform settings | Controlled configuration and operational settings |
+| `/admin/login` | Login Admin | Login internal, MFA, dan pemberitahuan keamanan |
+| `/admin/dashboard` | Ringkasan operasional | Kesehatan platform, antrean tinjauan, laporan, dan metrik operasional |
+| `/admin/users` | Pengelolaan pengguna | Pencarian, status, role, verifikasi, dan tindakan akun |
+| `/admin/users/:userId` | Detail pengguna | Tinjauan profil, riwayat verifikasi, laporan, dan tindakan moderasi |
+| `/admin/businesses` | Verifikasi usaha | Meninjau profil usaha dan bukti yang dikirimkan |
+| `/admin/posts` | Moderasi posting | Meninjau, menyetujui, menolak, menyembunyikan, atau meminta perbaikan posting |
+| `/admin/reports` | Laporan dan keluhan | Mengelompokkan laporan, menyelidiki, dan mencatat hasil |
+| `/admin/banding` | Banding moderasi | Meninjau banding dan mencatat hasil diterima, diubah, atau ditolak |
+| `/admin/memberships` | Pengelolaan keanggotaan | Paket, entitlement, kuota, dan status langganan |
+| `/admin/connections` | Pengawasan koneksi | Menyelidiki laporan penyalahgunaan dan peristiwa keselamatan terkait; bukan untuk membaca percakapan privat secara rutin |
+| `/admin/ai-governance` | Tata kelola AI dan data | Meninjau status sumber data, consent, insiden keluaran, dan metadata audit |
+| `/admin/admins` | Akun Admin | Provisioning super-admin dan penetapan izin |
+| `/admin/audit-logs` | Log audit | Mencari tindakan administratif yang sensitif terhadap keamanan |
+| `/admin/settings` | Pengaturan platform | Konfigurasi dan pengaturan operasional yang terkontrol |
 
-Use least-privilege permissions, MFA, strict session expiry, rate limits, and append-only audit records for sensitive actions. Admin access to private user content must be purpose-limited, permission-checked, and auditable.
+Gunakan izin least privilege, MFA, masa sesi yang ketat, rate limit, dan catatan audit append-only untuk tindakan sensitif. Akses Admin ke konten privat pengguna harus dibatasi berdasarkan tujuan, diperiksa izinnya, dan dapat diaudit.
 
-## 7. Primary user journeys
+## 7. Alur utama pengguna
 
-### Owner journey
+### Alur Owner
 
-1. Public landing → choose Owner registration.
-2. Select Business Owner as the permanent primary role, choose either email or phone/WhatsApp as the registration contact, and verify the selected contact.
-3. Complete stage-aware business onboarding.
-4. Enter Owner dashboard and complete the business profile.
-5. Publish a promotion/opportunity post within membership limits.
-6. Discover relevant investors and receive connection requests.
-7. Approve a connection → start chat.
-8. Use Growth Advisor and analytics with clearly labeled data sources.
+1. Beranda publik → pilih pendaftaran Owner.
+2. Pilih Business Owner sebagai role utama permanen, tentukan email atau telepon/WhatsApp sebagai kontak pendaftaran, lalu verifikasi kontak yang dipilih.
+3. Selesaikan onboarding usaha sesuai tahap bisnis.
+4. Masuk ke dashboard Owner dan lengkapi profil usaha.
+5. Terbitkan posting promosi/peluang sesuai batas keanggotaan.
+6. Temukan investor yang relevan dan terima permintaan koneksi.
+7. Setujui koneksi → mulai percakapan.
+8. Gunakan Growth Advisor dan analitik dengan label sumber data yang jelas.
 
-### Investor journey
+### Alur Investor
 
-1. Public landing → choose Investor registration.
-2. Select Investor as the permanent primary role, choose either email or phone/WhatsApp as the registration contact, and verify the selected contact.
-3. Complete investor profile and discovery preferences.
-4. Enter Investor dashboard and explore opportunities.
-5. Review an opportunity and its data-source/verification labels.
-6. Send a connection request → wait for approval.
-7. Chat after approval and use Investment Intelligence with Owner-approved data.
+1. Beranda publik → pilih pendaftaran Investor.
+2. Pilih Investor sebagai role utama permanen, tentukan email atau telepon/WhatsApp sebagai kontak pendaftaran, lalu verifikasi kontak yang dipilih.
+3. Lengkapi profil Investor dan preferensi penemuan.
+4. Masuk ke dashboard Investor dan jelajahi peluang.
+5. Tinjau peluang beserta label sumber data/verifikasinya.
+6. Kirim permintaan koneksi → tunggu persetujuan.
+7. Mulai percakapan setelah disetujui dan gunakan Investment Intelligence dengan data yang disetujui Owner.
 
-### Admin journey
+### Alur Admin
 
-1. Admin is provisioned internally.
-2. Sign in through the separate admin portal and complete MFA.
-3. Review pending user/business/post verification queues.
-4. Moderate reports and manage membership entitlements.
-5. Record sensitive actions in the audit log.
+1. Akun Admin disediakan melalui proses internal.
+2. Masuk melalui portal Admin terpisah dan selesaikan MFA.
+3. Tinjau antrean verifikasi pengguna/usaha/posting.
+4. Moderasi laporan dan kelola entitlement keanggotaan.
+5. Catat tindakan sensitif di log audit.
 
-## 8. Navigation model
+## 8. Model navigasi
 
 ### Desktop
 
-- Public header: brand, How it works, Features, Membership, Help, Sign in, primary Register CTA.
-- Owner sidebar: Overview, My Business, Posts, Discover, Connections, Messages, Growth Advisor, Analytics, Membership, Settings.
-- Investor sidebar: Overview, Discover, Saved, Partnership Posts, Connections, Messages, Investment Intelligence, Analytics, Membership, Settings.
-- Admin sidebar: Overview, Users, Business Review, Post Moderation, Reports, Memberships, AI & Data Governance, Admin Accounts, Audit Logs, Settings.
+- Header publik: brand, Cara Kerja, Fitur, Keanggotaan, Bantuan, Masuk, dan CTA utama Daftar.
+- Sidebar Owner: Ringkasan, Bisnis Saya, Posting, Jelajah, Koneksi, Pesan, Growth Advisor, Analitik, Keanggotaan, Pengaturan.
+- Sidebar Investor: Ringkasan, Jelajah, Tersimpan, Posting Kemitraan, Koneksi, Pesan, Investment Intelligence, Analitik, Keanggotaan, Pengaturan.
+- Sidebar Admin: Ringkasan, Pengguna, Tinjauan Usaha, Moderasi Posting, Laporan, Keanggotaan, Tata Kelola AI & Data, Akun Admin, Log Audit, Pengaturan.
 
 ### Mobile
 
-Use a compact top bar and a role-aware bottom navigation for the most frequent destinations. Place secondary destinations in a clearly grouped drawer. Do not simply shrink the desktop sidebar. Keep labels visible for primary navigation, show active state clearly, and ensure touch targets are comfortable.
+Gunakan top bar ringkas dan navigasi bawah yang menyesuaikan role untuk tujuan yang paling sering dipakai. Tempatkan tujuan sekunder di drawer yang dikelompokkan dengan jelas. Jangan sekadar mengecilkan sidebar desktop. Label navigasi utama harus tetap terlihat, status aktif harus jelas, dan area sentuh harus nyaman.
 
-## 9. Page layout patterns
+## 9. Pola tata letak halaman
 
-Use a small set of consistent patterns instead of inventing a new layout for every route:
+Gunakan beberapa pola yang konsisten, bukan membuat tata letak baru untuk setiap rute:
 
-1. **Public marketing page** — header, hero, proof/benefit sections, explanatory content, CTA, footer.
-2. **Authenticated dashboard** — page heading, contextual action, summary cards, primary work area, recent activity.
-3. **Discovery/list page** — heading, search/filter controls, result count, responsive cards/list, empty/loading/error states.
-4. **Detail page** — identity/summary, verification and data-source labels, main content, contextual actions, related information.
-5. **Form/onboarding page** — short step indicator, grouped fields, inline guidance, validation, save/continue action.
-6. **AI workspace** — task selection, structured input, progress state, result sections, assumptions/evidence/limitations, save/export where supported.
-7. **Admin review page** — queue filters, review context, evidence panel, decision controls, reason capture, audit metadata.
+1. **Halaman publik** — header, hero, bagian bukti/manfaat, konten penjelas, CTA, dan footer.
+2. **Dashboard terautentikasi** — judul halaman, tindakan kontekstual, kartu ringkasan, area kerja utama, dan aktivitas terbaru.
+3. **Halaman daftar/penemuan** — judul, kontrol pencarian/filter, jumlah hasil, kartu/daftar responsif, serta status kosong/loading/error.
+4. **Halaman detail** — identitas/ringkasan, label verifikasi dan sumber data, konten utama, tindakan kontekstual, dan informasi terkait.
+5. **Formulir/onboarding** — indikator langkah singkat, field yang dikelompokkan, panduan langsung, validasi, dan tindakan simpan/lanjut.
+6. **Ruang kerja AI** — pilihan tugas, input terstruktur, status proses, bagian hasil, asumsi/bukti/batasan, serta simpan/ekspor jika didukung.
+7. **Halaman tinjauan Admin** — filter antrean, konteks tinjauan, panel bukti, kontrol keputusan, pencatatan alasan, dan metadata audit.
 
-## 10. Visual and interaction system
+## 10. Sistem visual dan interaksi
 
-### Visual direction
+### Arah visual
 
-- Soft white is the dominant surface; sage green is the primary accent; forest green is reserved for strong actions and emphasis.
-- Use warm beige and pale sage for restrained secondary surfaces.
-- Typography should feel editorial and readable, with clear hierarchy and generous line-height.
-- Prefer whitespace, clear alignment, and consistent spacing over dense dashboards.
-- Use real product imagery or neutral illustrations only where they explain a business category or page purpose. Avoid decorative clutter and excessive gradients.
+- Putih lembut menjadi permukaan utama; hijau sage menjadi aksen utama; hijau hutan digunakan untuk tindakan dan penekanan penting.
+- Gunakan beige hangat dan sage pucat sebagai permukaan sekunder secara terbatas.
+- Tipografi terasa editorial dan mudah dibaca, dengan hierarki jelas serta line-height yang nyaman.
+- Utamakan ruang kosong, perataan yang rapi, dan jarak yang konsisten daripada dashboard yang padat.
+- Gunakan gambar produk asli atau ilustrasi netral hanya jika membantu menjelaskan kategori usaha atau tujuan halaman. Hindari dekorasi berlebihan dan gradien yang terlalu ramai.
 
-### Core design tokens (initial)
+### Token desain inti (awal)
 
-| Token | Value | Use |
+| Token | Nilai | Penggunaan |
 | --- | --- | --- |
-| Soft white | `#F8FAF7` | Main background |
-| Pale sage | `#E8EDE5` | Soft surfaces |
-| Sage green | `#A3B18A` | Accent |
-| Forest green | `#344E41` | Primary emphasis |
-| Deep charcoal | `#29332D` | Main text |
-| Warm beige | `#D8CDBB` | Neutral accent |
-| Muted green | `#6B9277` | Secondary accent |
+| Putih lembut | `#F8FAF7` | Latar utama |
+| Sage pucat | `#E8EDE5` | Permukaan lembut |
+| Hijau sage | `#A3B18A` | Aksen |
+| Hijau hutan | `#344E41` | Penekanan utama |
+| Charcoal gelap | `#29332D` | Teks utama |
+| Beige hangat | `#D8CDBB` | Aksen netral |
+| Hijau redup | `#6B9277` | Aksen sekunder |
 
-These are starting tokens and can be refined after the first visual page review.
+Nilai ini merupakan token awal dan dapat disempurnakan setelah peninjauan visual halaman pertama.
 
-### Required states and accessibility
+### Status wajib dan aksesibilitas
 
-Every data-driven page must define loading, empty, error, and success states. Forms need visible labels, keyboard support, useful inline errors, and clear focus indicators. Status must never rely on color alone. Charts need text summaries or accessible data alternatives. Respect reduced-motion preferences.
+Setiap halaman berbasis data harus memiliki status loading, kosong, error, dan berhasil. Formulir memerlukan label yang terlihat, dukungan keyboard, pesan error yang berguna, dan indikator fokus yang jelas. Status tidak boleh hanya dibedakan melalui warna. Grafik harus memiliki ringkasan teks atau alternatif data yang aksesibel. Hormati preferensi reduced motion.
 
-### Trust and data transparency
+### Kepercayaan dan transparansi data
 
-Display the data status wherever business metrics or AI analysis appear:
+Tampilkan status data pada setiap bagian yang menyajikan metrik bisnis atau analisis AI:
 
-- **Verified** — reviewed through an explicit verification process.
-- **System-integrated** — received from a connected system.
-- **Owner-reported** — entered or declared by the business owner.
-- **AI estimate** — inferred or modeled; assumptions must be visible.
+- **Terverifikasi** — sudah ditinjau melalui proses verifikasi yang jelas.
+- **Terintegrasi sistem** — diterima dari sistem yang terhubung.
+- **Dilaporkan Owner** — dimasukkan atau dinyatakan oleh pemilik usaha.
+- **Estimasi AI** — disimpulkan atau dimodelkan; asumsi harus terlihat.
 
-Show source, reporting period, last update, consent/visibility, and completeness where applicable. Never let an AI estimate appear indistinguishable from verified financial data.
+Tampilkan sumber, periode pelaporan, waktu pembaruan terakhir, consent/visibilitas, dan kelengkapan jika relevan. Estimasi AI tidak boleh terlihat seolah-olah setara dengan data keuangan terverifikasi.
 
-## 11. Membership experience
+## 11. Pengalaman keanggotaan
 
-Use a shared membership page with role-aware benefit details. The guiding principle is **Free to Connect, Premium to Grow**.
+Gunakan halaman keanggotaan bersama dengan detail manfaat yang menyesuaikan role. Prinsip utamanya adalah **Free to Connect, Premium to Grow**.
 
-- Both Free and Premium users can discover eligible opportunities, request/accept connections, and chat after approval.
-- Premium may offer higher posting and connection-request quotas, priority visibility, featured promotion, richer profiles, advanced discovery filters, and deeper analytics/AI history.
-- Exact prices, quota amounts, and plan durations remain product decisions and are intentionally not fixed in this blueprint.
-- Clearly show quota usage, reset period, and what happens when a quota is reached. Never block an already-approved conversation solely because a user is Free.
+- Pengguna Free dan Premium dapat menemukan peluang yang sesuai, mengirim/menerima permintaan koneksi, dan mengirim pesan setelah koneksi disetujui.
+- Premium dapat menawarkan kuota posting dan permintaan koneksi yang lebih tinggi, prioritas visibilitas, promosi unggulan, profil lebih lengkap, filter penemuan lanjutan, serta riwayat analitik/AI yang lebih mendalam.
+- Harga, jumlah kuota, dan durasi paket tetap menjadi keputusan produk dan sengaja belum ditetapkan dalam rancangan ini.
+- Tampilkan penggunaan kuota, periode reset, dan tindakan saat kuota tercapai dengan jelas. Jangan pernah memblokir percakapan yang sudah disetujui hanya karena pengguna memakai paket Free.
 
-## 12. MVP implementation order after design review
+## 12. Urutan implementasi MVP setelah tinjauan desain
 
-1. Finalize sitemap, role access matrix, and primary user journeys.
-2. Finalize shared visual foundations and responsive application shells.
-3. Implement authentication and onboarding (Owner, Investor, separate Admin portal).
-4. Implement profiles and business profiles with ownership/visibility controls.
-5. Implement posts and discovery.
-6. Implement connection requests and approved-connection messaging.
-7. Implement membership entitlements and quota enforcement.
-8. Implement Growth Advisor and Investment Intelligence on top of governed business data.
-9. Implement Admin verification, moderation, membership operations, and audit tools.
-10. Add end-to-end coverage, security review, accessibility review, and deployment readiness.
+1. Finalisasi peta situs, matriks akses role, dan alur utama pengguna.
+2. Finalisasi fondasi visual bersama dan kerangka aplikasi responsif.
+3. Implementasikan autentikasi dan onboarding (Owner, Investor, serta portal Admin terpisah).
+4. Implementasikan profil pengguna dan profil usaha dengan kontrol kepemilikan/visibilitas.
+5. Implementasikan posting dan penemuan peluang.
+6. Implementasikan permintaan koneksi dan pesan setelah koneksi disetujui.
+7. Implementasikan entitlement keanggotaan dan penegakan kuota.
+8. Implementasikan Growth Advisor dan Investment Intelligence di atas data usaha yang tata kelolanya jelas.
+9. Implementasikan verifikasi Admin, moderasi, operasional keanggotaan, dan alat audit.
+10. Tambahkan cakupan end-to-end, tinjauan keamanan, tinjauan aksesibilitas, dan kesiapan deployment.
 
-## 13. Explicitly out of scope for the MVP
+## 13. Hal yang tidak termasuk dalam MVP
 
-- Goods checkout, cart, shipping, or inventory-first e-commerce workflows.
-- Holding or transferring investment funds.
-- Executing investment contracts or guaranteeing returns.
-- Public Admin registration.
-- Premium-only direct messaging.
-- Investor access to private Owner data without explicit permission.
-- AI-generated financial claims without evidence, assumptions, and limitations.
+- Checkout barang, keranjang, pengiriman, atau alur e-commerce yang berfokus pada inventaris.
+- Menampung atau memindahkan dana investasi.
+- Menjalankan kontrak investasi atau menjamin keuntungan.
+- Pendaftaran Admin publik.
+- Pesan langsung yang hanya tersedia untuk Premium.
+- Akses Investor ke data privat Owner tanpa izin eksplisit.
+- Klaim keuangan yang dibuat AI tanpa bukti, asumsi, dan batasan.
 
 ---
 
-**Design review checkpoint:** validate the page hierarchy, navigation labels, and page-level content before moving into high-fidelity visual design or feature implementation.
+**Titik tinjauan desain:** validasi hierarki halaman, label navigasi, dan konten tiap halaman sebelum beralih ke desain visual tingkat tinggi atau implementasi fitur.
