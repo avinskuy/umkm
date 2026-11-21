@@ -1320,7 +1320,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     let second_user_id = insert_active_email(pool, "recovery-contact-second@example.test").await;
 
     let first_contact_session: String = sqlx::query_scalar(
-        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \
          VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
     )
     .bind(&first_user_id)
@@ -1333,7 +1333,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
 
     assert!(
         sqlx::query(
-            "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+            "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \
              VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid)"
         )
         .bind(&first_user_id)
@@ -1356,7 +1356,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("recovery contact verification session should be verified");
 
     let first_contact_id: String = sqlx::query_scalar(
-        "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+        "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \
          VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid) RETURNING id::text",
     )
     .bind(&first_user_id)
@@ -1390,7 +1390,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     );
 
     let second_contact_session: String = sqlx::query_scalar(
-        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \
          VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
     )
     .bind(&second_user_id)
@@ -1410,7 +1410,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("second account recovery contact session should be verified");
 
     sqlx::query(
-        "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+        "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \
          VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid)",
     )
     .bind(&second_user_id)
@@ -1423,7 +1423,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("same optional recovery contact may belong to another account");
 
     let duplicate_contact_session: String = sqlx::query_scalar(
-        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+        "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \
          VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
     )
     .bind(&first_user_id)
@@ -1444,7 +1444,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
 
     assert!(
         sqlx::query(
-            "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \\
+            "INSERT INTO public.recovery_contacts (user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, contact_hmac, hmac_key_version, verification_session_id) \
              VALUES ($1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', $5::uuid)"
         )
         .bind(&first_user_id)
@@ -1459,7 +1459,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     );
 
     let recovery_session_id: String = sqlx::query_scalar(
-        "INSERT INTO public.verification_sessions (purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \\
+        "INSERT INTO public.verification_sessions (purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \
          VALUES ('account_recovery', 'email', $1, $2, 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
     )
     .bind(vec![11_u8])
@@ -1470,7 +1470,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("preselection account recovery session should be created");
 
     let recovery_case_id: String = sqlx::query_scalar(
-        "INSERT INTO public.account_recovery_cases (verification_session_id, requested_action) \\
+        "INSERT INTO public.account_recovery_cases (verification_session_id, requested_action) \
          VALUES ($1::uuid, 'password_reset') RETURNING id::text",
     )
     .bind(&recovery_session_id)
@@ -1543,7 +1543,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         .expect("reviewed recovery case may be approved");
 
     let token_id: String = sqlx::query_scalar(
-        "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+        "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \
          VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes') RETURNING id::text",
     )
     .bind(&recovery_case_id)
@@ -1555,7 +1555,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
 
     assert!(
         sqlx::query(
-            "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+            "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \
              VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes')"
         )
         .bind(&recovery_case_id)
@@ -1569,7 +1569,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
 
     assert!(
         sqlx::query(
-            "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+            "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \
              VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes')"
         )
         .bind(&recovery_case_id)
@@ -1601,7 +1601,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     );
 
     let second_token_id: String = sqlx::query_scalar(
-        "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \\
+        "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at) \
          VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes') RETURNING id::text",
     )
     .bind(&recovery_case_id)
