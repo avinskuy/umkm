@@ -209,34 +209,34 @@ Jika kontak utama dan seluruh kontak pemulihan tidak dapat diakses, alur pemulih
 
 Avoid creating unused tables before a concrete feature requires them.
 
-## Approved Identity Core policy baseline
+## Kebijakan awal Identity Core yang telah disetujui
 
-The following product-policy values are approved initial baselines and must be enforced by the backend. They remain revisable after security review and are not provider guarantees.
+Nilai kebijakan produk berikut merupakan batas awal yang telah disepakati dan harus ditegakkan oleh backend. Nilai ini dapat ditinjau ulang melalui evaluasi keamanan dan bukan jaminan dari penyedia layanan.
 
-### OTP and pending registration
+### OTP dan pendaftaran tertunda
 
-- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan, berlaku 10 menit, disimpan sebagai keyed hash, hanya dapat digunakan satu kali secara atomik, terikat pada tujuan dan alamat penerima, serta tidak boleh dicatat dalam log sebagai teks asli.
-- Maksimal lima percobaan gagal untuk setiap sesi verifikasi. Kegagalan kelima mengunci sesi tersebut selama satu jam. Pengiriman kode baru tidak boleh menghapus atau melewati penguncian.
-- Jeda sebelum mengirim ulang adalah 60 detik. Maksimal lima pengiriman per jam untuk setiap alamat kontak. Tambahkan pembatasan adaptif berdasarkan IP/jaringan, akun, tujuan, dan pola aktivitas mencurigakan.
+- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode berlaku selama 10 menit, disimpan sebagai keyed hash, terikat pada tujuan dan alamat penerima, hanya dapat digunakan satu kali secara atomik, serta tidak boleh dicatat dalam log sebagai teks asli.
+- Maksimal lima percobaan gagal untuk setiap sesi verifikasi. Kegagalan kelima mengunci sesi tersebut selama satu jam. Pengiriman kode pengganti tidak boleh menghapus atau melewati penguncian.
+- Jeda sebelum pengiriman ulang adalah 60 detik. Maksimal lima pengiriman per jam untuk setiap alamat kontak. Terapkan pembatasan tambahan yang menyesuaikan IP/jaringan, akun, tujuan, dan pola aktivitas mencurigakan.
 - Kode baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama. Kegagalan pengiriman tidak boleh dianggap sebagai keberhasilan verifikasi.
-- Pendaftaran yang belum selesai kedaluwarsa setelah 30 menit, terpisah dari masa berlaku OTP. Proses pembersihan harus aman dijalankan berulang kali dan saat ada proses bersamaan, serta tidak boleh menghapus akun yang sudah aktif.
+- Pendaftaran yang belum selesai kedaluwarsa setelah 30 menit, terpisah dari masa berlaku OTP. Pembersihan harus aman dijalankan berulang kali dan saat terjadi proses bersamaan, serta tidak boleh menghapus akun yang sudah aktif.
 
-### Sessions
+### Sesi
 
 - Pengguna boleh memiliki beberapa sesi aktif sekaligus. Pengguna dapat melihat daftar sesi, mencabut satu sesi, atau mengakhiri semua sesi.
-- Batas awal: sesi berakhir setelah 7 hari tidak aktif dan memiliki batas usia maksimal 30 hari sejak dibuat.
+- Batas awal sesi adalah 7 hari tanpa aktivitas dan maksimal 30 hari sejak sesi dibuat.
 - Fitur “Ingat perangkat ini” hanya membuat sesi browser bertahan. Fitur ini tidak boleh melewati kedua batas waktu atau pencabutan sesi dari server. Menutup browser tidak otomatis mengakhiri sesi yang memang dibuat persisten.
 - Pencabutan sesi dari server berlaku segera. Gunakan cookie `Secure` dan `HttpOnly`, pengaturan `SameSite`, serta perlindungan CSRF dan pemeriksaan origin. Tindakan sensitif dapat meminta verifikasi ulang.
 
-### Account lifecycle
+### Siklus hidup akun
 
-Penonaktifan sementara berbeda dari penghapusan permanen. Saat dinonaktifkan, profil publik disembunyikan dan akses normal dibatasi, tetapi data serta role tetap disimpan. Untuk mengaktifkan kembali akun, pengguna harus login dan melewati pemeriksaan keamanan. Penghapusan permanen memerlukan konfirmasi dan autentikasi ulang, lalu masa tunggu 30 hari. Selama masa tunggu, akun disembunyikan/dibatasi dan permintaan penghapusan dapat dibatalkan melalui pemeriksaan keamanan. Setelah itu, proses penghapusan mengikuti aturan retensi data dan penanganan cadangan yang sudah didokumentasikan. Kontak tidak boleh otomatis digunakan kembali.
+Penonaktifan sementara berbeda dari penghapusan permanen. Saat dinonaktifkan, profil publik disembunyikan dan akses normal dibatasi, tetapi data serta role tetap disimpan. Untuk mengaktifkan kembali akun, pengguna harus login dan melewati pemeriksaan keamanan. Penghapusan permanen memerlukan konfirmasi dan autentikasi ulang, lalu masa tunggu 30 hari. Selama masa tunggu, akun disembunyikan atau dibatasi dan permintaan penghapusan dapat dibatalkan melalui pemeriksaan keamanan. Setelah itu, proses penghapusan mengikuti aturan retensi data dan penanganan cadangan yang telah didokumentasikan. Kontak tidak boleh otomatis digunakan kembali.
 
-### Recovery
+### Pemulihan akun
 
 Kontak pemulihan tidak wajib saat pendaftaran. Kontak ini dapat ditambahkan setelah akun aktif dan harus diverifikasi secara terpisah. Alur lupa kata sandi dan lupa email menggunakan email atau nomor HP pemulihan yang sudah terverifikasi. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan berhasil diverifikasi dan terbukti terhubung ke akun.
 
-Jika kontak utama dan kontak pemulihan sama-sama hilang, gunakan proses pemulihan alternatif berlapis. Periksa perangkat tepercaya, sesi sebelumnya, dan sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, teruskan ke petugas support dengan kewenangan khusus. Permintaan berisiko tinggi dapat ditunda atau ditolak. Terapkan hak akses minimum, kriteria pemeriksaan yang terdokumentasi, audit log, dan notifikasi yang sesuai. Pemulihan tidak boleh mengubah role utama. Pencabutan sesi dan perlindungan tambahan setelah pemulihan ditentukan berdasarkan tingkat risiko.
+Jika kontak utama dan seluruh kontak pemulihan sama-sama tidak dapat diakses, gunakan proses pemulihan alternatif berlapis. Periksa perangkat tepercaya, sesi sebelumnya, dan sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, teruskan kasus kepada petugas support dengan kewenangan khusus. Permintaan berisiko tinggi dapat ditunda atau ditolak. Terapkan hak akses minimum, kriteria pemeriksaan yang terdokumentasi, audit log, dan notifikasi yang sesuai. Pemulihan tidak boleh mengubah role utama. Pencabutan sesi dan perlindungan tambahan setelah pemulihan ditentukan berdasarkan tingkat risiko.
 
 ## 4. API contract (proposed)
 
