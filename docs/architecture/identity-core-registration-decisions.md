@@ -4,18 +4,18 @@
 
 ## Kebijakan pendaftaran yang disetujui
 
-1. Public registration is available only for Business Owner and Investor.
-2. The registrant chooses one permanent primary role, then exactly one initial contact method:
-   - Email: a one-time code is delivered to the supplied email address.
-   - Phone: a one-time code is delivered through WhatsApp.
-3. Email and phone are alternatives. Both are not required during initial registration.
-4. Email- or phone-based registration requires a password. Registration through Google OAuth does not require the user to create or enter a separate local password.
-5. The account remains pending verification until the selected channel's code is successfully verified. Verification is an account-activation and anti-bot control, not a passwordless login method.
-6. The selected contact is normalized and uniquely reserved. A contact already associated with another account cannot be reused to create or merge an account.
-7. The non-selected contact may be added later, but must be verified independently before being treated as verified or used for security-sensitive recovery.
-8. Phone numbers use E.164 normalization. WhatsApp delivery is a server-side provider integration; credentials must never enter source control or frontend configuration.
-9. OTPs are never stored or logged in plaintext. Use keyed hashes, expiry, one-time use, bounded attempts, resend cooldown, and destination/account/network rate limits. Delivery failure never marks a contact verified.
-10. Registration and recovery responses must not reveal whether a contact is already associated with an account.
+1. Pendaftaran publik hanya tersedia bagi Business Owner dan Investor.
+2. Pendaftar memilih satu role utama yang bersifat tetap, lalu tepat satu metode kontak awal:
+   - Email: kode sekali pakai dikirim ke alamat email yang diberikan.
+   - Telepon: kode sekali pakai dikirim melalui WhatsApp.
+3. Email dan telepon merupakan pilihan alternatif. Keduanya tidak wajib diberikan saat pendaftaran awal.
+4. Pendaftaran melalui email atau telepon wajib menggunakan kata sandi. Pendaftaran melalui Google OAuth tidak mewajibkan pengguna membuat atau memasukkan kata sandi lokal terpisah.
+5. Akun tetap berstatus menunggu verifikasi sampai kode dari kanal yang dipilih berhasil diverifikasi. Verifikasi merupakan kontrol aktivasi akun dan anti-bot, bukan metode login tanpa kata sandi.
+6. Kontak yang dipilih dinormalisasi dan direservasi secara unik. Kontak yang sudah terhubung ke akun lain tidak dapat digunakan kembali untuk membuat atau menggabungkan akun.
+7. Kontak yang tidak dipilih dapat ditambahkan kemudian, tetapi harus diverifikasi secara terpisah sebelum dianggap terverifikasi atau digunakan untuk pemulihan yang sensitif terhadap keamanan.
+8. Nomor telepon dinormalisasi ke format E.164. Pengiriman WhatsApp merupakan integrasi penyedia di sisi server; kredensial tidak boleh masuk ke source control atau konfigurasi frontend.
+9. OTP tidak pernah disimpan atau dicatat dalam log sebagai teks asli. Gunakan keyed hash, masa berlaku, penggunaan satu kali, batas percobaan, jeda kirim ulang, dan rate limit berdasarkan tujuan/akun/jaringan. Kegagalan pengiriman tidak pernah menandai kontak sebagai terverifikasi.
+10. Respons pendaftaran dan pemulihan tidak boleh mengungkap apakah kontak sudah terhubung ke suatu akun.
 
 ## Invariant role dan identitas
 
