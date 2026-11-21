@@ -1,11 +1,11 @@
 # Authentication & Identity — Architecture and Security Design
 
-> Status: partially implemented; account schema exists, runtime authentication flows remain unimplemented  
+> Status: skema akun, verifikasi, dan sesi tersedia; runtime autentikasi masih belum diimplementasikan  
 > Product reference: `docs/product/public-and-auth-uiux-spec.md`  
 > Wireframe reference: `docs/product/low-fidelity-public-auth-wireframes.md`  
 > Backend direction: Rust + Axum; PostgreSQL 16 + SQLx 0.8 foundation is available. The first account/Google-identity migration is implemented; verification, sessions, recovery, and runtime flows remain unimplemented.
 
-This document defines the authentication architecture for USahapintar. The first database slice for account identity and Google provider identity is implemented, but authentication endpoints and runtime database integration are not. This is not a claim of a production-ready or security-audited system. Provider choices, operational secrets, retention periods, and final controls must be reviewed before production use.
+This document defines the authentication architecture for USahapintar. The account, contact-verification, and authentication-session database slices are implemented, but authentication endpoints, cookie handling, middleware, and runtime database integration are not. This is not a claim of a production-ready or security-audited system. Provider choices, operational secrets, retention periods, and final controls must be reviewed before production use.
 
 ## 1. Scope and invariants
 
@@ -139,20 +139,24 @@ Opaque, server-managed sessions.
 | --- | --- |
 | `id` | UUID primary key |
 | `user_id` | Session owner |
-| `token_hash` | Hash of a high-entropy opaque session token |
-| `created_at` | Waktu pembuatan sesi |
-| `last_seen_at` | Waktu aktivitas terakhir yang diperbarui server untuk menegakkan batas 7 hari tanpa aktivitas |
-| `expires_at` | Waktu kedaluwarsa absolut (30 hari sejak sesi dibuat pada batas awal) |
-| `remember_device` | Penanda apakah sesi browser menggunakan cookie persisten; tidak boleh melewati batas idle maupun absolut |
-| `revoked_at` | Revocation timestamp |
-| `user_agent_summary` | Optional minimized device hint |
-| `ip_prefix_hash` | Optional privacy-preserving abuse signal, subject to retention policy |
+| `token_hash` | SHA-256 hash 32-byte dari token sesi opaque berentropi tinggi; unique global |
+| `created_at` | Waktu pembuatan sesi yang ditetapkan database |
+| `last_seen_at` | Aktivitas terakhir yang diperbarui server untuk menegakkan batas idle 7 hari |
+| `expires_at` | Batas absolut yang ditetapkan database, 30 hari sejak sesi dibuat |
+| `token_rotated_at` | Waktu rotasi token terakhir yang ditetapkan database |
+| `remember_device` | Penanda persistensi cookie browser; tidak mengubah batas idle maupun absolut |
+| `revoked_at`, `revocation_reason` | Waktu dan alasan pencabutan server-side |
+| `user_agent_summary` | Ringkasan perangkat opsional, diminimalkan dan dibatasi panjangnya |
+| `ip_prefix_hash` | HMAC/hash prefix jaringan opsional; bukan alamat IP mentah |
 
 Constraints:
-- Store only a cryptographic hash of the session token.
-- Rotate the token after authentication and privilege changes.
-- Revoke sessions on password reset, account suspension, and relevant security events.
-- Avoid collecting full IP/device fingerprints unless there is a documented security need and retention policy.
+- Simpan hanya hash kriptografis token sesi berentropi tinggi, bukan token asli. Skema mensyaratkan digest 32 byte dan keunikan global.
+- Waktu pembuatan, aktivitas awal, rotasi token, dan batas absolut ditetapkan database. Batas absolut selalu 30 hari.
+- Backend wajib menolak sesi yang tidak aktif lebih dari 7 hari, telah melewati `expires_at`, dicabut, atau dimiliki akun yang tidak aktif. Perangkat yang diingat tidak boleh melewati batas ini.
+- Rotasi token dilakukan setelah autentikasi dan perubahan privilege; hash lama diganti secara atomik dan timestamp rotasi diperbarui database.
+- Pencabutan sesi harus segera berlaku dari server. Logout, pencabutan satu perangkat, logout semua perangkat, reset password, perubahan status akun, tindakan Admin, dan peristiwa keamanan memiliki reason code yang eksplisit.
+- Perubahan lifecycle akun dari `active` ke status lain otomatis mencabut seluruh sesi yang belum dicabut. Restriksi/suspensi moderasi dan peristiwa keamanan lain tetap harus memicu pencabutan melalui runtime.
+- Jangan mengumpulkan alamat IP penuh atau fingerprint perangkat lengkap tanpa kebutuhan keamanan dan kebijakan retensi yang terdokumentasi.
 
 ### `verification_challenges`
 
