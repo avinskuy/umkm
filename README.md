@@ -38,5 +38,6 @@ Lihat [CONTRIBUTING.md](CONTRIBUTING.md) untuk alur kontribusi dan [Standar Engi
 - [Dokumentasi arsitektur](docs/architecture/)
 - [Kebijakan keamanan dan privasi](docs/security/README.md)
 - [Kesiapan operasional](docs/operations/README.md)
+- [Audit repository 21 November 2026](docs/engineering/repository-audit-2026-11-21.md)
 
 Petunjuk setup frontend dan backend tersedia pada README masing-masing direktori.
