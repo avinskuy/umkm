@@ -29,19 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(%address, "USahapintar API listening");
     tracing::info!("PostgreSQL application pool initialized");
 
-    axum::serve(listener, app(pool.clone()))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-
-    pool.close().await;
+    axum::serve(listener, app(pool)).await?;
 
     Ok(())
-}
-
-async fn shutdown_signal() {
-    if let Err(error) = tokio::signal::ctrl_c().await {
-        tracing::error!(%error, "failed to listen for shutdown signal");
-    }
-
-    tracing::info!("shutdown signal received");
 }
