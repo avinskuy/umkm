@@ -243,7 +243,7 @@ CREATE FUNCTION public.guard_verification_challenge()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = pg_catalog
-AS $
+AS $$
 DECLARE
     v_session_status TEXT;
     v_session_expires_at TIMESTAMPTZ;
