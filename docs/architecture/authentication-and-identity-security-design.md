@@ -160,7 +160,7 @@ Constraints:
 
 ### `verification_challenges`
 
-Supports email and WhatsApp-delivered phone verification for account activation/contact verification without storing usable codes. These codes are not login credentials.
+Mendukung verifikasi email dan nomor telepon melalui WhatsApp untuk aktivasi akun/verifikasi kontak tanpa menyimpan kode yang masih dapat digunakan. Kode tersebut bukan kredensial login.
 
 | Column | Purpose |
 | --- | --- |
@@ -180,11 +180,11 @@ Supports email and WhatsApp-delivered phone verification for account activation/
 Controls:
 - Catatan sesi verifikasi terpisah harus menyimpan akumulasi batas lima kegagalan dan penguncian satu jam. Pembuatan challenge baru tidak boleh mengatur ulang batas tersebut.
 - Simpan atau tegakkan secara persisten jeda pengiriman ulang 60 detik dan batas lima pengiriman per jam untuk setiap alamat tujuan di seluruh instance aplikasi.
-- Short expiry, one-time consumption, attempt caps, resend cooldown, and destination/account/IP rate limits.
+- Masa berlaku singkat, konsumsi satu kali, batas percobaan, jeda kirim ulang, serta rate limit berdasarkan tujuan/akun/IP.
 - Use a keyed hash/HMAC for short numeric OTPs so database disclosure alone does not make offline guessing trivial.
-- Never log code values or include them in analytics.
-- Invalidate older active challenges when a new challenge is issued for the same purpose/destination.
-- Provider delivery failures must not mark a destination as verified.
+- Jangan mencatat nilai kode dalam log atau mengirimkannya ke analytics.
+- Batalkan challenge aktif yang lebih lama ketika challenge baru diterbitkan untuk tujuan/purpose yang sama.
+- Kegagalan pengiriman oleh penyedia tidak boleh menandai tujuan sebagai terverifikasi.
 
 ### Kontak pemulihan dan kasus pemulihan akun
 
@@ -197,25 +197,25 @@ Jika kontak utama dan seluruh kontak pemulihan tidak dapat diakses, alur pemulih
 ### `password_reset_tokens`
 
 - Store a hash of a cryptographically random, single-use token.
-- Include user ID, expiry, created timestamp, and consumed timestamp.
-- Revoke existing sessions after a successful reset according to the security policy.
-- Do not reveal account existence in request responses.
+- Sertakan user ID, masa berlaku, timestamp pembuatan, dan timestamp konsumsi.
+- Cabut sesi yang sudah ada setelah reset berhasil sesuai kebijakan keamanan.
+- Jangan mengungkap keberadaan akun dalam respons permintaan.
 
 ### `admin_audit_logs`
 
-- Append-only records for sensitive administrative actions.
-- Include actor ID, action, target type/ID, timestamp, outcome, and minimal reason/context.
-- Do not store passwords, OTPs, raw session tokens, reset tokens, or unnecessary private content.
-- Protect audit log read access separately from ordinary Admin permissions.
+- Record append-only untuk tindakan administratif yang sensitif.
+- Sertakan actor ID, tindakan, jenis/ID target, timestamp, hasil, serta alasan/konteks minimum.
+- Jangan menyimpan kata sandi, OTP, token sesi mentah, token reset, atau konten privat yang tidak diperlukan.
+- Lindungi izin baca audit log secara terpisah dari izin Admin biasa.
 
 ### Tabel tambahan hanya jika diperlukan
 
-- `admin_mfa_credentials` for TOTP/passkey credential metadata and recovery state.
-- `account_link_requests` if explicit provider linking is included in the first release.
-- `login_attempt_buckets` or a Redis-backed limiter if operational traffic requires distributed rate limiting.
+- `admin_mfa_credentials` untuk metadata kredensial TOTP/passkey dan status pemulihan.
+- `account_link_requests` jika pengaitan penyedia secara eksplisit masuk ke rilis pertama.
+- `login_attempt_buckets` atau limiter berbasis Redis jika trafik operasional memerlukan rate limit terdistribusi.
 - `user_consents` for versioned Terms/Privacy consent records.
 
-Avoid creating unused tables before a concrete feature requires them.
+Hindari membuat tabel yang belum digunakan sebelum ada fitur konkret yang membutuhkannya.
 
 ## Kebijakan awal Identity Core yang telah disetujui
 
