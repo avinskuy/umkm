@@ -49,11 +49,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 | --- | --- | --- |
 | `users` | Account identity, immutable primary role, account status, normalized contact values, optional password hash | Unique non-null normalized email and phone; role check; status check; role immutable after insert |
 | `user_identities` | External provider identities such as Google | Unique (`provider`, `provider_subject`); FK to user; never auto-link by matching email |
-| `sessions` | Opaque revocable server sessions | Unique token hash; 7-day idle and 30-day absolute expiry baseline; persistent-cookie preference; revocation timestamp; FK to user |
-| `verification_sessions` | Aggregate verification flow state across OTP resends | Five-failure budget and one-hour lockout survive replacement codes; purpose/destination binding; durable cooldown state |
-| `verification_challenges` | Individual email/WhatsApp OTP codes | Keyed hash, 10-minute expiry, supersession/consumption timestamps; one-time use; linked verification session |
-| `recovery_contacts` | Optional independently verified recovery email/phone | Normalized destination, channel, verified status/time, ownership FK, lifecycle and notification audit |
-| `account_recovery_cases` | Forgot-password, forgot-email, and alternative recovery workflow | Purpose/status, expiry, risk outcome, reviewer assignment and audit references; no raw secrets/evidence in general logs |
+| `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
+| `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; status jeda pengiriman tersimpan secara persisten |
+| `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
+| `recovery_contacts` | Email/nomor HP pemulihan opsional yang diverifikasi secara terpisah | Alamat tujuan ternormalisasi, kanal, status/waktu verifikasi, FK pemilik, siklus hidup, dan catatan notifikasi |
+| `account_recovery_cases` | Alur lupa kata sandi, lupa email, dan pemulihan alternatif | Tujuan/status, kedaluwarsa, hasil penilaian risiko, penugasan pemeriksa, dan referensi audit; tanpa rahasia/bukti mentah di log umum |
 | `password_reset_tokens` | Password recovery | Unique token hash; expiry and consumed timestamp; never store raw token |
 | `admin_audit_logs` | Append-only record of privileged administrative actions | Actor, action, target, outcome, timestamp; no secrets or unnecessary private content |
 
@@ -65,11 +65,11 @@ The product's shorter labels “Owner” and “Investor” are display language
 - Provider identity is keyed by the provider's stable subject, not email text.
 - Account closure, identity release, and identity transfer require separate retention and verification policy; do not implement automatic identity reuse.
 - Verification challenges must support rate limiting, attempt caps, short expiry, resend cooldown, and invalidation of superseded challenges. OTP hashing must use a keyed construction suitable for short numeric codes.
-- Verification-session failure state must be separate from individual OTP challenge rows so resend cannot reset the five-attempt budget or one-hour lockout. Enforce 60-second resend cooldown and five sends per destination per hour durably across instances.
+- Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
 - Pending registrations expire after 30 minutes; cleanup must be idempotent, concurrency-safe, and unable to delete activated accounts.
-- Session records must support a seven-day idle timeout and 30-day absolute timeout, Remember this device without bypassing either limit, individual revocation, and logout-all.
-- Recovery contacts are optional after activation and independently verified. Full primary email disclosure is permitted only after successful verification of a linked recovery contact. Alternative recovery cases need trusted-device/session signals and specially authorized manual review when automated evidence is insufficient.
-- Account status design must distinguish temporary deactivation from permanent deletion. Permanent deletion has a 30-day waiting/cancellation period before processing; retention and backup handling must be specified by data category.
+- Data sesi harus mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut, fitur “Ingat perangkat ini” tanpa melewati kedua batas, pencabutan sesi individual, dan logout dari semua perangkat.
+- Kontak pemulihan bersifat opsional setelah aktivasi dan diverifikasi secara terpisah. Email utama lengkap hanya boleh ditampilkan setelah kontak pemulihan yang terhubung berhasil diverifikasi. Kasus pemulihan alternatif harus mempertimbangkan sinyal perangkat/sesi tepercaya dan pemeriksaan manual oleh petugas berwenang khusus jika bukti otomatis belum cukup.
+- Rancangan status akun harus membedakan penonaktifan sementara dan penghapusan permanen. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus ditetapkan berdasarkan kategori data.
 
 ### B. Profiles and business information
 
