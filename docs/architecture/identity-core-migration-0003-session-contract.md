@@ -25,7 +25,7 @@ Migration ini **tidak** mengimplementasikan endpoint login/logout, validasi pass
 | `revoked_at` | Waktu pencabutan server-side |
 | `revocation_reason` | Reason code pencabutan |
 | `user_agent_summary` | Ringkasan perangkat opsional, maksimal 256 karakter |
-| `ip_prefix_hash` | Hash/HMAC prefix jaringan opsional, tepat 32 byte; bukan alamat IP mentah |
+| `ip_prefix_hash`, `ip_prefix_hmac_key_version` | HMAC 32-byte atas prefix jaringan dan versi key; keduanya opsional dan harus hadir berpasangan, bukan alamat IP mentah |
 
 ## 3. Invariant database
 
@@ -38,7 +38,7 @@ Migration ini **tidak** mengimplementasikan endpoint login/logout, validasi pass
 7. Pencabutan hanya dapat dilakukan satu kali. Sesi yang telah dicabut tidak dapat diaktifkan kembali, dirotasi, atau diperbarui.
 8. Waktu pencabutan ditetapkan database dan wajib memiliki reason code yang valid.
 9. Saat status lifecycle akun berubah dari `active` ke status lain, seluruh sesi yang belum dicabut otomatis dicabut dengan reason `account_status_changed`.
-10. Metadata perangkat dibatasi dan immutable. Jangan menambahkan alamat IP mentah, fingerprint perangkat penuh, atau data sensitif yang tidak dibutuhkan.
+10. Metadata perangkat dibatasi dan immutable. Hash prefix jaringan harus berupa HMAC berkunci dengan versi key yang dicatat. Jangan menambahkan alamat IP mentah, fingerprint perangkat penuh, atau data sensitif yang tidak dibutuhkan.
 
 Reason code yang disediakan: `logout`, `user_revoked`, `logout_all`, `password_reset`, `account_status_changed`, `security_event`, dan `admin_action`.
 
