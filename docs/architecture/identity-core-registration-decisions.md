@@ -20,20 +20,20 @@
 ## Invariant role dan identitas
 
 - Setiap akun klien hanya memiliki satu role utama yang disimpan secara permanen dan tidak dapat diubah: `business_owner` atau `investor`.
-- A person who wants the other role must register a separate account using a different, eligible, unlinked contact identity.
-- Admin accounts are provisioned internally and cannot use public registration.
-- Identity linking must prove control of both the existing account and the new identity. Matching email text alone is never sufficient.
-- No account merge or role mutation is permitted through registration, OAuth, support, or routine Admin operations.
+- Seseorang yang ingin menggunakan role lainnya harus mendaftar akun terpisah dengan identitas kontak berbeda yang memenuhi syarat dan belum terhubung ke akun lain.
+- Akun Admin disediakan melalui proses internal dan tidak dapat menggunakan pendaftaran publik.
+- Pengaitan identitas harus membuktikan kendali atas akun yang sudah ada dan identitas baru. Kecocokan teks alamat email saja tidak pernah cukup.
+- Penggabungan akun atau perubahan role tidak diizinkan melalui pendaftaran, OAuth, bantuan, maupun operasi Admin rutin.
 
 ## Rancangan siklus pendaftaran
 
-1. User selects Owner or Investor.
-2. User selects Email or Phone/WhatsApp.
-3. Server validates and normalizes the contact, applies abuse limits, and creates a pending registration/challenge.
-4. Server sends a one-time code through the selected delivery channel.
-5. User submits the code; the server validates expiry, attempt budget, challenge state, purpose, and destination binding. This verifies contact ownership and anti-bot eligibility; it does not authenticate a login session.
-6. In one transaction, consume the challenge, mark the selected contact verified, and activate the account only when all account-creation conditions are satisfied.
-7. User continues to role-specific onboarding.
+1. Pengguna memilih Owner atau Investor.
+2. Pengguna memilih Email atau Telepon/WhatsApp.
+3. Server memvalidasi dan menormalisasi kontak, menerapkan batas penyalahgunaan, lalu membuat pendaftaran/challenge berstatus pending.
+4. Server mengirim kode sekali pakai melalui kanal pengiriman yang dipilih.
+5. Pengguna mengirim kode; server memvalidasi masa berlaku, batas percobaan, status challenge, tujuan penggunaan, dan keterikatan ke tujuan pengiriman. Proses ini memverifikasi kendali atas kontak dan kelayakan anti-bot; bukan autentikasi sesi login.
+6. Dalam satu transaksi, konsumsi challenge, tandai kontak terpilih sebagai terverifikasi, dan aktifkan akun hanya jika seluruh persyaratan pembuatan akun terpenuhi.
+7. Pengguna melanjutkan onboarding sesuai role.
 
 Pendaftaran tertunda kedaluwarsa setelah **30 menit** jika verifikasi kontak yang diwajibkan belum selesai. Proses kedaluwarsa dan pembersihan harus atomik serta idempotent, melepaskan reservasi kontak tertunda yang memenuhi syarat dengan aman, dan tidak pernah menghapus akun yang sudah aktif. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
 
