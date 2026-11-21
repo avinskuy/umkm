@@ -189,7 +189,7 @@ Add indexes based on known access paths, not speculative optimization. Candidate
 - `user_identities(provider, provider_subject)`: unique.
 - `sessions(user_id, expires_at)` and unique `sessions(token_hash)`.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
-- `recovery_contacts(user_id, status, created_at)` serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk pencarian lintas akun. Jangan menerapkan unique constraint global pada email atau nomor HP pemulihan.
+- `recovery_contacts(user_id, status, created_at)` untuk daftar kontak per akun; unique constraint komposit `(user_id, channel, contact_hash)` untuk mencegah relasi kontak duplikat di akun yang sama; serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk pencarian lintas akun. Jangan menerapkan unique constraint global pada email atau nomor HP pemulihan.
 - `account_recovery_cases(verification_session_id)`: unique dan NOT NULL untuk menjamin satu kasus per sesi verifikasi. `account_recovery_cases(target_user_id, status, created_at)` untuk riwayat kasus per akun setelah target dipilih; `account_recovery_cases(status, created_at)` untuk antrean kasus yang belum memiliki target.
 - `verification_sessions(destination_hash, purpose, created_at)` untuk pencarian alur verifikasi dan penerapan batas pengiriman; bentuk indeks final harus mengikuti strategi penyimpanan rate limit.
 - `businesses(owner_user_id, created_at)`.
