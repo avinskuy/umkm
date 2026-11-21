@@ -96,9 +96,9 @@ PostgreSQL is the proposed relational store. SQLx migrations should be versioned
 | `email_verified_at` | Verification timestamp, independently nullable |
 | `phone_verified_at` | Verification timestamp, independently nullable |
 | `created_at`, `updated_at` | Audit timestamps |
-| `pending_expires_at` | 30-minute expiry for an unactivated pending registration |
-| `deactivated_at` | Temporary deactivation timestamp, if applicable |
-| `deletion_requested_at`, `deletion_due_at` | 30-day deletion waiting-period timestamps |
+| `pending_expires_at` | Masa berlaku 30 menit untuk pendaftaran yang belum diaktifkan |
+| `deactivated_at` | Waktu penonaktifan sementara, jika berlaku |
+| `deletion_requested_at`, `deletion_due_at` | Waktu permintaan dan batas akhir masa tunggu penghapusan 30 hari |
 | `closed_at` | Account closure timestamp, if applicable |
 
 Constraints:
@@ -136,10 +136,10 @@ Opaque, server-managed sessions.
 | `id` | UUID primary key |
 | `user_id` | Session owner |
 | `token_hash` | Hash of a high-entropy opaque session token |
-| `created_at` | Session creation timestamp |
-| `last_seen_at` | Server-updated activity timestamp used to enforce the 7-day idle timeout |
-| `expires_at` | Absolute expiry (30 days from issuance at the initial baseline) |
-| `remember_device` | Whether the browser session uses persistent-cookie behavior; never bypasses idle/absolute expiry |
+| `created_at` | Waktu pembuatan sesi |
+| `last_seen_at` | Waktu aktivitas terakhir yang diperbarui server untuk menegakkan batas 7 hari tanpa aktivitas |
+| `expires_at` | Waktu kedaluwarsa absolut (30 hari sejak sesi dibuat pada batas awal) |
+| `remember_device` | Penanda apakah sesi browser menggunakan cookie persisten; tidak boleh melewati batas idle maupun absolut |
 | `revoked_at` | Revocation timestamp |
 | `user_agent_summary` | Optional minimized device hint |
 | `ip_prefix_hash` | Optional privacy-preserving abuse signal, subject to retention policy |
@@ -162,16 +162,16 @@ Supports email and WhatsApp-delivered phone verification for account activation/
 | `destination_hash` | Hash or protected reference to destination |
 | `code_hash` | Hash of a high-entropy one-time code |
 | `purpose` | Registration verification or contact change |
-| `verification_session_id` | Parent verification flow; failure count and lockout survive OTP resend |
-| `attempt_count` | Failed attempts for this challenge |
-| `expires_at` | 10-minute expiry |
-| `superseded_at` | Set when a replacement OTP invalidates this code |
+| `verification_session_id` | Alur verifikasi induk; jumlah kegagalan dan penguncian tetap berlaku setelah OTP dikirim ulang |
+| `attempt_count` | Jumlah percobaan gagal untuk challenge ini |
+| `expires_at` | Masa berlaku 10 menit |
+| `superseded_at` | Diisi ketika OTP pengganti membatalkan kode ini |
 | `consumed_at` | One-time use marker |
 | `created_at` | Creation timestamp |
 
 Controls:
-- A separate verification-session record must own the aggregate five-failure budget and one-hour lockout; issuing a new challenge must not reset it.
-- Persist or otherwise durably enforce the 60-second resend cooldown and five-send-per-hour destination limit across application instances.
+- Catatan sesi verifikasi terpisah harus menyimpan akumulasi batas lima kegagalan dan penguncian satu jam. Pembuatan challenge baru tidak boleh mengatur ulang batas tersebut.
+- Simpan atau tegakkan secara persisten jeda pengiriman ulang 60 detik dan batas lima pengiriman per jam untuk setiap alamat tujuan di seluruh instance aplikasi.
 - Short expiry, one-time consumption, attempt caps, resend cooldown, and destination/account/IP rate limits.
 - Use a keyed hash/HMAC for short numeric OTPs so database disclosure alone does not make offline guessing trivial.
 - Never log code values or include them in analytics.
@@ -517,16 +517,16 @@ This is a baseline threat model, not a substitute for penetration testing or a f
 
 Implement each step as a small pull request. Do not merge until CI, focused integration tests, and the relevant security checks pass.
 
-## 14. Remaining decisions before implementation
+## 14. Keputusan tersisa sebelum implementasi
 
-The following must be resolved before production readiness:
+Hal-hal berikut harus ditetapkan sebelum sistem siap digunakan di lingkungan produksi:
 
-- Email and WhatsApp Business/API provider selection, sender/template requirements, Indonesia delivery reliability, retries, monitoring, spend limits, and operational ownership.
-- Google OAuth client configuration, production callback origins, and secret management.
-- Exact password hashing parameters and credential recovery behavior for Google-only accounts if local-password setup is later offered.
-- Category-specific retention periods, deletion/backup handling, and contact reuse after closure.
-- Admin MFA methods, recovery process, and manual account-recovery reviewer permissions.
-- Distributed rate-limit storage and operational thresholds; enforcement must work across multiple application instances.
-- Detailed recovery evidence criteria, escalation controls, and high-risk dual-control requirements.
+- Pemilihan penyedia email dan WhatsApp Business/API, persyaratan pengirim/template, keandalan pengiriman di Indonesia, percobaan ulang, pemantauan, batas biaya, dan penanggung jawab operasional.
+- Konfigurasi klien Google OAuth, alamat callback produksi, dan pengelolaan rahasia.
+- Parameter hashing kata sandi yang tepat dan perilaku pemulihan kredensial untuk akun yang hanya menggunakan Google jika pengaturan kata sandi lokal kelak disediakan.
+- Masa retensi berdasarkan kategori data, penanganan penghapusan/cadangan, dan penggunaan kembali kontak setelah akun ditutup.
+- Metode MFA Admin, proses pemulihan, dan kewenangan petugas yang meninjau pemulihan akun secara manual.
+- Penyimpanan pembatasan permintaan terdistribusi dan ambang operasional; penegakannya harus berlaku di seluruh instance aplikasi.
+- Kriteria bukti pemulihan yang terperinci, kendali eskalasi, dan persyaratan persetujuan dua pihak untuk kasus berisiko tinggi.
 
-The approved product baselines (OTP, pending-registration lifetime, session duration, deactivation/deletion waiting period, and recovery behavior) are documented above and are not undecided.
+Batas awal produk yang telah disetujui (OTP, masa berlaku pendaftaran tertunda, durasi sesi, masa tunggu penonaktifan/penghapusan, dan perilaku pemulihan) sudah didokumentasikan di atas dan bukan lagi keputusan yang belum ditetapkan.
