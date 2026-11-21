@@ -65,7 +65,7 @@ Generator kode OTP dan jumlah digit belum diputuskan. `random_bytes` hanya menye
 
 **Batas interface:** `KeyProvider` pada tahap ini hanya mengembalikan raw key material yang memang boleh berada sementara di memori proses. Interface sinkron tersebut bukan adapter universal untuk remote KMS atau key non-exportable. Integrasi remote harus memisahkan I/O async dari primitive kriptografi dan mengikuti [Desain Integrasi Key Management Identity Core](key-management-runtime-design.md). Format `EncryptedPayload` saat ini juga belum memuat wrapped DEK sehingga belum mewakili envelope encryption.
 
-Tahap berikutnya dapat menerapkan envelope encryption: DEK untuk data dienkripsi di aplikasi, sedangkan KEK berada di KMS/secret manager dan tidak meninggalkan boundary KMS. Pemilihan vendor KMS belum dilakukan. Jangan membuat asumsi Google Cloud KMS hanya karena Google menjadi salah satu referensi desain.
+Tahap berikutnya dapat menerapkan envelope encryption: DEK untuk data dienkripsi di aplikasi, sedangkan KEK berada di KMS dan tidak meninggalkan boundary KMS. Secret manager dapat digunakan untuk distribusi secret/key material lain sesuai model kepercayaan, tetapi tidak otomatis menggantikan fungsi KMS. Pemilihan vendor belum dilakukan. Jangan membuat asumsi Google Cloud KMS hanya karena Google menjadi salah satu referensi desain.
 
 Rotasi mengikuti pola keyset:
 1. Tambahkan key version baru sebagai non-primary.
