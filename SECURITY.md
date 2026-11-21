@@ -1,20 +1,20 @@
-# Security Policy
+# Kebijakan Keamanan
 
-## Reporting a vulnerability
+## Melaporkan kerentanan
 
-Do not publish exploitable vulnerability details in public issues or pull requests.
+Jangan memublikasikan detail kerentanan yang dapat dieksploitasi melalui issue atau pull request publik.
 
-Report security concerns privately to the project maintainers through a private channel. Include the affected component, impact, reproduction context, and any suggested mitigation. Avoid sharing real user data or credentials.
+Laporkan masalah keamanan secara privat kepada pengelola proyek melalui kanal komunikasi privat. Sertakan komponen yang terdampak, potensi dampak, konteks untuk mereproduksi masalah, dan saran mitigasi jika tersedia. Hindari membagikan data pengguna asli atau kredensial.
 
-## Security principles
+## Prinsip keamanan
 
-- Enforce authentication, role checks, and resource ownership on the backend.
-- Store passwords using a modern password-hashing algorithm such as Argon2id.
-- Keep secrets outside source control.
-- Apply rate limits to authentication, OTP, and other abuse-sensitive endpoints.
-- Use secure session cookies and appropriate CSRF protections.
-- Minimize personal data collection and apply explicit access controls.
-- Record sensitive administrative actions in an audit trail.
-- Do not expose private business or customer-level data to investors without explicit authorization.
+- Tegakkan autentikasi, pemeriksaan role, dan kepemilikan sumber daya di backend.
+- Simpan kata sandi menggunakan algoritma hashing modern seperti Argon2id.
+- Simpan rahasia di luar source control.
+- Terapkan pembatasan permintaan pada autentikasi, OTP, dan endpoint lain yang rentan disalahgunakan.
+- Gunakan cookie sesi yang aman dan perlindungan CSRF yang sesuai.
+- Minimalkan pengumpulan data pribadi dan terapkan kontrol akses secara eksplisit.
+- Catat tindakan administratif yang sensitif dalam audit trail.
+- Jangan tampilkan data bisnis privat atau data pelanggan pada tingkat individu kepada investor tanpa izin yang jelas.
 
-This document is an initial policy and will be expanded before production release.
+Dokumen ini merupakan kebijakan awal dan akan dilengkapi sebelum rilis produksi.
