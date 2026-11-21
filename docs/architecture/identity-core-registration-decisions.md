@@ -1,6 +1,6 @@
 # Identity Core — Registration Decisions
 
-> Status: partial product decision record; implementation is blocked until the open decisions below are approved.
+> Status: approved product-policy baseline for Identity Core; detailed technical design, provider selection, and security review remain required before implementation.
 
 ## Approved registration policy
 
@@ -35,7 +35,7 @@
 6. In one transaction, consume the challenge, mark the selected contact verified, and activate the account only when all account-creation conditions are satisfied.
 7. User continues to role-specific onboarding.
 
-Pending-registration expiry and cleanup must be specified before migration. Avoid leaving duplicate active pending registrations or reserving contacts indefinitely.
+Pending registration expires after **30 minutes** if required contact verification is not completed. Expiry and cleanup must be atomic and idempotent, safely release eligible pending contact reservations, and never delete an activated account. Prevent duplicate active pending registrations and reservation races.
 
 ## Data-model implications (proposal only)
 
@@ -43,33 +43,63 @@ The eventual schema should distinguish normalized email and E.164 phone values, 
 
 Do not infer that the user supplied both contact methods. Do not create a migration until the complete Identity Core decisions and schema review gate are approved.
 
-## Decisions still required
+## Approved Identity Core policies
 
-### Google OAuth — retained
+### Google OAuth and password model
 
-Google OAuth remains part of the product for sign-in and registration. A new user must explicitly choose Owner or Investor before starting Google registration; that choice is bound to server-side OAuth state. Google registration does not require a separate local password, but it does not replace mandatory email/WhatsApp contact verification.
+Google OAuth is retained for sign-in and registration. A new registrant must choose exactly one immutable client role (Owner or Investor) before OAuth begins; the role is bound to server-side OAuth state. Google-only registration does not require a separate local password. A new Google registrant must still choose and verify one separate registration contact (email or phone through WhatsApp) before activation; a Google-asserted email does not waive this requirement.
 
-- The user must choose Owner or Investor before starting a Google-based registration flow.
-- Role context is bound to server-side OAuth state and cannot be changed by callback parameters or client input.
-- For a new Google identity, the user must still choose exactly one registration contact: email with a code delivered to that email, OR phone with a code delivered through WhatsApp. A Google-asserted email does not waive this separate code-verification requirement.
-- The new account is created only after the selected contact has been verified and all registration requirements are met.
-- A previously linked Google identity may sign in only to its existing account. Its immutable primary role determines the correct portal; a role mismatch must never create a second account or change the existing role.
-- Never automatically link an existing account merely because Google returns an email matching the account's email. Linking requires an authenticated session plus fresh proof of control of the new identity, or an explicitly approved secure recovery process.
-- Admin identities are never created through public Google OAuth.
-- Validate OAuth state, nonce, issuer, audience, signature, expiry, and exact redirect URI. Reject duplicate provider subjects and replayed callbacks.
+Email- or phone-based registration requires a local password. Normal password login uses the registered email or phone plus that password. Registration OTPs are only for contact verification/account activation and anti-bot protection; they are not login credentials and cannot be reused for password recovery. A future local-password setup flow for Google-only accounts remains a separate product decision if needed.
 
-### Password and login model — decided
-Email- or phone-based registration requires a local password; normal password login uses the registered email or phone plus that password. Google OAuth registration does not require a separate local password and Google sign-in is used to authenticate that linked identity. A new Google registrant must choose Owner or Investor before OAuth begins; the selected role is bound to server-side state and cannot be supplied or changed by the callback. Email/WhatsApp codes are only for initial account activation/contact verification and anti-bot protection; they are not login credentials and remain required for new Google registrations. Registration OTPs cannot be reused for password recovery. A later local-password setup for a Google-only account is not yet specified.
+Existing linked Google identities authenticate only their existing account. Never auto-link by matching email. Linking requires an authenticated session and fresh proof of control of the new identity, or an explicitly approved secure recovery process. Validate state, nonce, issuer, audience, signature, expiry, exact redirect URI, provider subject, and replay protection. Admin identities are never created through public OAuth.
+
+### OTP and registration lifecycle
+
+- OTP validity: **10 minutes**.
+- Maximum verification attempts: **5 failed attempts per verification session**.
+- After the fifth failure, lock that verification session for **1 hour**. Resending or requesting a replacement code must not reset or bypass this lock.
+- Resend cooldown: **60 seconds**.
+- Maximum delivery: **5 sends per hour per destination/contact**, with additional adaptive limits by IP/network, account, purpose, and suspicious activity.
+- Issuing a new OTP immediately invalidates the prior code for the same purpose and destination.
+- A new code does not clear the verification-session failure lock or delivery rate limits.
+- All counters, expiry, invalidation, and cooldown enforcement are server-side and concurrency-safe. Client countdowns are presentation only.
+- OTPs are six-digit numeric codes for the initial baseline, generated cryptographically, stored only as keyed hashes, never logged in plaintext, bound to a purpose and destination, and consumed atomically once.
+- Delivery failure never marks a contact verified. Responses must not reveal whether a contact is already registered.
+- Pending registration lifetime is **30 minutes**, independently of the 10-minute OTP lifetime. Expiry cleanup must be idempotent and must never delete an activated account.
+
+### Session management
+
+- Multiple concurrent devices are allowed.
+- Provide an Active Sessions page in Security Settings, individual session revocation, and logout-all-devices.
+- Session revocation is enforced server-side; suspicious sessions may be revoked based on risk signals.
+- Initial duration baseline: **7-day idle timeout** and **30-day absolute timeout**.
+- “Remember this device” may enable a persistent browser session but never bypasses either timeout or server-side revocation. Closing the browser alone does not terminate a deliberately persistent session.
+- Use Secure, HttpOnly cookies and an appropriate SameSite/CSRF strategy. Sensitive actions may require fresh authentication. Manual logout revokes immediately.
 
 ### Account lifecycle
-Before migration, define pending-registration expiry and cleanup; suspension, closure, and deletion states; retention of identity/contact records and audit history after closure; whether and under what verified process a closed account's email/phone can ever be reused; and recovery when a user loses access to the selected contact channel.
 
-### Provider operations
-Select email and WhatsApp Business/API providers. Confirm sender/template requirements, delivery monitoring, cost controls, retries, and operational ownership. Keep credentials server-side.
+- Temporary deactivation and permanent deletion are separate user-initiated flows.
+- Temporary deactivation hides the public profile and restricts normal access while retaining account data and immutable role. Reactivation requires login and security verification.
+- Permanent deletion requires explicit confirmation and fresh authentication, followed by a **30-day waiting period**. During that period the account is hidden/restricted and the user may cancel with fresh security verification.
+- After the waiting period, deletion processing begins. Legal/security-required records and backups follow a transparent, category-specific retention policy; do not promise immediate erasure from backups.
+- Contact reuse after closure/deletion is not automatic; define a verified, abuse-resistant retention and release procedure before implementing it.
 
-### Security parameters
-Approve OTP lifetime, attempt cap, resend cooldown, rate-limit windows, pending-registration lifetime, session idle/absolute expiry, and password hashing parameters through security/configuration review. Do not invent production constants in code or UI.
+### Account recovery
+
+Support distinct flows for **forgot password** and **forgot email**, using previously verified recovery email and/or recovery phone (WhatsApp-delivered verification) where available. Recovery contacts are optional during registration, can be added after activation, and must be independently verified before use. Encourage setup during onboarding without blocking activation.
+
+- Forgot password: verify ownership through an eligible recovery method before allowing a password reset. Registration OTPs cannot be reused as reset credentials.
+- Forgot email: after successful verification of a recovery contact linked to the account, the user may see the full primary email address. Never reveal it before verification.
+- Use uniform unauthenticated responses, rate limits, notifications, and risk assessment to prevent account enumeration and abuse.
+- Recovery is layered and risk-based. Consider trusted devices, prior sessions, previously verified recovery factors, suspicious activity, and recent recovery-factor changes. Use protective delays or additional checks when justified.
+- If the user loses access to both primary and recovery contacts, accept an alternative recovery request and assess trusted devices, prior sessions, and other ownership signals. If automated evidence is insufficient, escalate to manual review by specially authorized support staff. Delay or reject recovery when risk is too high. Notify the user through available safe channels and audit each action.
+- Manual review must use least-privilege access, documented evidence criteria, dual control for exceptional/high-risk overrides where appropriate, and immutable audit records. Support staff must never change the immutable primary role through recovery.
+- Post-recovery controls are adaptive: revoke suspicious sessions, notify the user, and require additional verification for sensitive changes when risk warrants it.
+
+### Provider operations and remaining technical decisions
+
+Email and WhatsApp Business/API providers are not yet selected. Keep provider adapters replaceable, credentials server-side, and define delivery monitoring, retries, cost controls, sender/template requirements, operational ownership, and incident handling before production. Also finalize password hashing parameters, provider configuration, retention schedules, Admin MFA/recovery, and operational thresholds through security review. Do not invent production credentials or put secrets in source control.
 
 ## Implementation gate
 
-Identity Core migrations and runtime endpoints may begin only after pending-registration/account-closure/identity-retention policy, provider integration boundaries, schema concurrency/expiry/cleanup/privacy review, and test plans are approved. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. Google OAuth is retained under the constraints in this document.
+Identity Core migrations and runtime endpoints may begin after this approved policy baseline is translated into reviewed schema constraints, provider boundaries are defined, concurrency/expiry/cleanup/privacy design is reviewed, and the test plan is approved. Provider selection, exact operational thresholds, retention schedules, and Google-only local-password setup remain open technical/product items. Password is mandatory for email/phone registration; Google OAuth registration does not require a local password. Phone/WhatsApp OTP is not a login method. All policies remain revisable through explicit product/security review.
