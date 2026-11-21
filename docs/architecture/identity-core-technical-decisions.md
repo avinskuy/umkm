@@ -73,6 +73,20 @@ Aturan produk yang harus ditegakkan tetap:
 
 PostgreSQL advisory lock dipilih karena bersifat lintas koneksi dan lintas instance yang memakai database yang sama. Pengujian wajib memakai beberapa koneksi bersamaan untuk membuktikan bahwa permintaan paralel tidak melewati batas.
 
+## 2A. Batas percobaan verifikasi lintas sesi
+
+Batas kegagalan OTP tidak boleh hanya bergantung pada `failed_attempt_count` satu sesi. Jika pengguna dapat membuat sesi baru untuk tujuan yang sama, penghitung sesi baru tidak boleh memberi anggaran percobaan kontak yang baru.
+
+Baseline implementasi:
+- Simpan event percobaan verifikasi yang benar-benar diproses secara persisten, dengan fingerprint HMAC tujuan, versi key, kanal, purpose, sesi, challenge, outcome, dan timestamp.
+- Hitung kegagalan lintas sesi berdasarkan fingerprint tujuan/kanal; jangan mempartisi limit berdasarkan purpose.
+- Catat event gagal dan berhasil. Hanya outcome gagal mengonsumsi anggaran kegagalan; sesi tetap memiliki counter dan lock satu jam sendiri sesuai kebijakan OTP.
+- Penolakan karena sesi terkunci/kedaluwarsa/terminal atau rate limit tidak dihitung sebagai tebakan kode yang diproses.
+- Penghitungan event lintas sesi, penambahan counter sesi, dan konsumsi challenge harus konsisten dalam transaksi PostgreSQL.
+- Ambang numerik dan jendela lintas sesi belum ditetapkan dalam kebijakan produk. Nilai tersebut wajib ditentukan dan diuji sebelum runtime verifikasi OTP diaktifkan; migration tidak boleh mengarang ambang.
+
+Kontrak tabel dan tes ada pada [Kontrak Skema Migration 0002 — Verifikasi Kontak dan OTP](identity-core-migration-0002-verification-contract.md).
+
 ## 3. Status akun dan reservasi kontak utama
 
 ### Keputusan
