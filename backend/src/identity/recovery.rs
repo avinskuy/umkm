@@ -6,7 +6,7 @@ use super::{
     registration::ContactChannel,
     verification::{
         contact_aliases, decrypt_destination, destination_associated_data, dispatch_otp_challenge,
-        load_verification_session, new_uuid, normalize_contact, validate_uuid, verify_otp_session,
+        new_uuid, normalize_contact, validate_uuid, verify_otp_session,
         SessionRow, VerificationError,
     },
 };
@@ -145,7 +145,7 @@ impl<'a> RecoveryService<'a> {
         &self,
         case_id: &str,
     ) -> Result<Vec<RecoveryCandidate>, VerificationError> {
-        let (session_id, aliases) = self.selection_context(case_id).await?;
+        let aliases = self.selection_context(case_id).await?;
         let alias_bytes = aliases
             .into_iter()
             .map(|alias| alias.digest.to_vec())
@@ -163,7 +163,6 @@ impl<'a> RecoveryService<'a> {
             return Ok(Vec::new());
         }
 
-        let _ = session_id;
         Ok(candidates
             .into_iter()
             .map(|(user_id, role, display_name)| RecoveryCandidate {
@@ -182,7 +181,7 @@ impl<'a> RecoveryService<'a> {
     ) -> Result<String, VerificationError> {
         validate_uuid(case_id)?;
         validate_uuid(target_user_id)?;
-        let (_session_id, aliases) = self.selection_context(case_id).await?;
+        let aliases = self.selection_context(case_id).await?;
         let alias_bytes = aliases
             .into_iter()
             .map(|alias| alias.digest.to_vec())
@@ -202,7 +201,7 @@ impl<'a> RecoveryService<'a> {
     async fn selection_context(
         &self,
         case_id: &str,
-    ) -> Result<(String, Vec<super::crypto::KeyedDigest>), VerificationError> {
+    ) -> Result<Vec<super::crypto::KeyedDigest>, VerificationError> {
         validate_uuid(case_id)?;
         let context: RecoveryContextRow = sqlx::query_as(
             "SELECT session_id::text, channel, destination_ciphertext, destination_nonce, \
@@ -233,6 +232,6 @@ impl<'a> RecoveryService<'a> {
             _ => return Err(VerificationError::InvalidStoredData),
         };
         let aliases = contact_aliases(self.keys, channel, &destination, &session)?;
-        Ok((context.0, aliases))
+        Ok(aliases)
     }
 }
