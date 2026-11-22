@@ -222,7 +222,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 
 - [x] Lima penghalang teknis memiliki baseline keputusan dan batas implementasi.
 - [x] Kontrak kolom, tipe PostgreSQL, constraint, partial unique index, dan foreign key untuk slice akun telah diterapkan.
-- [x] Tabel `user_identities` disertakan untuk stable Google provider subject.
+- [x] Migration 0006 menghapus tabel identitas provider yang tidak digunakan; skema aktif hanya mendukung password lokal.
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
