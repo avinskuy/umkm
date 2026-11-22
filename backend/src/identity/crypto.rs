@@ -3,6 +3,8 @@
 //! Tidak ada key produksi yang dimuat oleh modul ini. Implementasi produksi
 //! harus menyediakan KeyProvider dari secret manager/KMS yang disetujui.
 
+use std::collections::HashMap;
+
 use ring::{
     aead, hmac,
     rand::{SecureRandom, SystemRandom},
@@ -64,6 +66,165 @@ pub trait KeyProvider: Send + Sync {
     /// Versi key yang masih dapat dipakai untuk membaca event dalam jendela rotasi.
     fn key_versions(&self, _purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
         Ok(Vec::new())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnvironmentKeyProviderError {
+    MissingActiveVersion,
+    MissingVersionList,
+    InvalidVersion,
+    InvalidVersionList,
+    ActiveVersionNotConfigured,
+    MissingKey(KeyPurpose, KeyVersion),
+    InvalidKey(KeyPurpose, KeyVersion),
+}
+
+impl std::fmt::Display for EnvironmentKeyProviderError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::MissingActiveVersion => "IDENTITY_ACTIVE_KEY_VERSION is required",
+            Self::MissingVersionList => "IDENTITY_KEY_VERSIONS is required",
+            Self::InvalidVersion => "identity key version is invalid",
+            Self::InvalidVersionList => "identity key version list is invalid",
+            Self::ActiveVersionNotConfigured => "active identity key version is not configured",
+            Self::MissingKey(_, _) => "required identity key is missing",
+            Self::InvalidKey(_, _) => "identity key must be 32 non-zero bytes encoded as 64 hex characters",
+        };
+        formatter.write_str(message)
+    }
+}
+
+impl std::error::Error for EnvironmentKeyProviderError {}
+
+/// Key ring runtime yang memuat key dari environment/secret manager satu kali saat startup.
+/// Semua versi yang masih dipakai untuk membaca data lama harus tetap tersedia.
+pub struct EnvironmentKeyProvider {
+    active_version: KeyVersion,
+    versions: Vec<KeyVersion>,
+    keys: HashMap<(KeyPurpose, KeyVersion), SecretKey>,
+}
+
+impl EnvironmentKeyProvider {
+    pub fn from_env() -> Result<Self, EnvironmentKeyProviderError> {
+        let active_label = std::env::var("IDENTITY_ACTIVE_KEY_VERSION")
+            .map_err(|_| EnvironmentKeyProviderError::MissingActiveVersion)?;
+        let active_version = parse_key_version(&active_label)
+            .map_err(|_| EnvironmentKeyProviderError::InvalidVersion)?;
+
+        let versions_value = std::env::var("IDENTITY_KEY_VERSIONS")
+            .map_err(|_| EnvironmentKeyProviderError::MissingVersionList)?;
+        let versions = parse_key_versions(&versions_value)?;
+        if !versions.contains(&active_version) {
+            return Err(EnvironmentKeyProviderError::ActiveVersionNotConfigured);
+        }
+
+        let mut keys = HashMap::new();
+        for version in &versions {
+            for purpose in [
+                KeyPurpose::DataEncryption,
+                KeyPurpose::ContactFingerprint,
+                KeyPurpose::OtpVerification,
+            ] {
+                let variable = key_environment_variable(purpose, *version);
+                let value = Zeroizing::new(
+                    std::env::var(&variable)
+                        .map_err(|_| EnvironmentKeyProviderError::MissingKey(purpose, *version))?,
+                );
+                let key = parse_environment_key(value.as_str())
+                    .map_err(|_| EnvironmentKeyProviderError::InvalidKey(purpose, *version))?;
+                keys.insert((purpose, *version), SecretKey::from_bytes(*key));
+            }
+        }
+
+        Ok(Self {
+            active_version,
+            versions,
+            keys,
+        })
+    }
+}
+
+impl KeyProvider for EnvironmentKeyProvider {
+    fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+        self.key(purpose, self.active_version)
+            .map(|key| VersionedKey::new(self.active_version, key))
+    }
+
+    fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+        self.keys
+            .get(&(purpose, version))
+            .map(|key| SecretKey::from_bytes(*key.expose()))
+            .ok_or(CryptoError::KeyUnavailable)
+    }
+
+    fn key_versions(&self, purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
+        Ok(self
+            .versions
+            .iter()
+            .copied()
+            .filter(|version| self.keys.contains_key(&(purpose, *version)))
+            .collect())
+    }
+}
+
+fn parse_key_versions(value: &str) -> Result<Vec<KeyVersion>, EnvironmentKeyProviderError> {
+    if value.is_empty() || value.trim() != value {
+        return Err(EnvironmentKeyProviderError::InvalidVersionList);
+    }
+
+    let mut versions = value
+        .split(',')
+        .map(|label| {
+            if label.trim() != label {
+                return Err(EnvironmentKeyProviderError::InvalidVersionList);
+            }
+            parse_key_version(label).map_err(|_| EnvironmentKeyProviderError::InvalidVersion)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if versions.is_empty() {
+        return Err(EnvironmentKeyProviderError::InvalidVersionList);
+    }
+    versions.sort_by_key(|version| version.0);
+    if versions.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(EnvironmentKeyProviderError::InvalidVersionList);
+    }
+    Ok(versions)
+}
+
+fn key_environment_variable(purpose: KeyPurpose, version: KeyVersion) -> String {
+    let purpose_name = match purpose {
+        KeyPurpose::DataEncryption => "IDENTITY_DATA_ENCRYPTION_KEY",
+        KeyPurpose::ContactFingerprint => "IDENTITY_CONTACT_FINGERPRINT_KEY",
+        KeyPurpose::OtpVerification => "IDENTITY_OTP_VERIFICATION_KEY",
+    };
+    format!("{purpose_name}_V{}", version.0)
+}
+
+fn parse_environment_key(value: &str) -> Result<Zeroizing<[u8; KEY_LEN]>, CryptoError> {
+    if value.len() != KEY_LEN * 2 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(CryptoError::InvalidKey);
+    }
+
+    let mut key = Zeroizing::new([0_u8; KEY_LEN]);
+    for (index, chunk) in value.as_bytes().chunks_exact(2).enumerate() {
+        let high = hex_nibble(chunk[0]).ok_or(CryptoError::InvalidKey)?;
+        let low = hex_nibble(chunk[1]).ok_or(CryptoError::InvalidKey)?;
+        key[index] = (high << 4) | low;
+    }
+    if key.iter().all(|byte| *byte == 0) {
+        return Err(CryptoError::InvalidKey);
+    }
+    Ok(key)
+}
+
+fn hex_nibble(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
     }
 }
 
