@@ -293,23 +293,27 @@ impl<'a> RecoveryReviewService<'a> {
         Self { pool }
     }
 
-    /// reviewer_user_id wajib berasal dari sesi Admin aktif yang sudah divalidasi server.
-    /// Jangan menerima identifier reviewer langsung dari payload klien.
+    /// reviewer_user_id dan reviewer_session_token wajib berasal dari sesi Admin aktif
+    /// yang sudah divalidasi server. Jangan menerima keduanya dari payload klien.
     pub async fn review_case(
         &self,
         case_id: &str,
         reviewer_user_id: &str,
+        reviewer_session_token: &str,
         decision: RecoveryReviewDecision,
         reason: RecoveryReviewReason,
     ) -> Result<(), VerificationError> {
         validate_uuid(case_id)?;
         validate_uuid(reviewer_user_id)?;
+        let reviewer_session_hash =
+            session_token_hash(reviewer_session_token).map_err(|_| VerificationError::InvalidInput)?;
 
         sqlx::query_scalar::<_, bool>(
-            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, $4)",
+            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, $4, $5)",
         )
         .bind(case_id)
         .bind(reviewer_user_id)
+        .bind(reviewer_session_hash.to_vec())
         .bind(decision.as_db_value())
         .bind(reason.as_db_value())
         .fetch_one(self.pool)
