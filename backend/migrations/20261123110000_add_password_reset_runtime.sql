@@ -248,7 +248,7 @@ BEGIN
         )
     );
 
-    RETURN QUERY SELECT pg_catalog.floor(pg_catalog.extract(epoch FROM v_expires_at))::BIGINT;
+    RETURN QUERY SELECT floor(extract(epoch FROM v_expires_at))::BIGINT;
 END;
 $$;
 
