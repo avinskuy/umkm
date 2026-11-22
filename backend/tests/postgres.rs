@@ -1558,13 +1558,32 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     );
 
     let token_hash = vec![41_u8; 32];
-    let session_id: String =
-        sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
-            .bind(&user_id)
-            .bind(&token_hash)
-            .fetch_one(pool)
-            .await
-            .expect("active password account should create a session through the guarded function");
+    let session_id: String = sqlx::query_scalar(
+        "SELECT public.create_password_login_session($1::uuid, $2, TRUE, $3, $4, 'v1')::text",
+    )
+    .bind(&user_id)
+    .bind(&token_hash)
+    .bind("integration-test-browser/1.0")
+    .bind(vec![0xabu8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("active password account should create a device-aware session");
+
+    let device_metadata: (bool, Option<String>, Vec<u8>, String) = sqlx::query_as(
+        "SELECT remember_device, user_agent_summary, ip_prefix_hash, ip_prefix_hmac_key_version \
+           FROM public.sessions WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("device signals should be persisted with the session");
+    assert!(device_metadata.0);
+    assert_eq!(
+        device_metadata.1.as_deref(),
+        Some("integration-test-browser/1.0")
+    );
+    assert_eq!(device_metadata.2, vec![0xabu8; 32]);
+    assert_eq!(device_metadata.3, "v1");
     let session_owner: String =
         sqlx::query_scalar("SELECT user_id::text FROM public.sessions WHERE id = $1::uuid")
             .bind(&session_id)
@@ -1741,17 +1760,23 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
 
     let second_token_hash = vec![43_u8; 32];
     let second_session_id: String =
-        sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
+        sqlx::query_scalar(
+            "SELECT public.create_password_login_session($1::uuid, $2, FALSE, NULL, $3, 'v1')::text",
+        )
             .bind(&user_id)
             .bind(&second_token_hash)
+            .bind(vec![0xbbu8; 32])
             .fetch_one(pool)
             .await
             .expect("active user should be able to create another device session");
     let third_token_hash = vec![44_u8; 32];
     let third_session_id: String =
-        sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
+        sqlx::query_scalar(
+            "SELECT public.create_password_login_session($1::uuid, $2, FALSE, NULL, $3, 'v1')::text",
+        )
             .bind(&user_id)
             .bind(&third_token_hash)
+            .bind(vec![0xccu8; 32])
             .fetch_one(pool)
             .await
             .expect("active user should be able to create a third device session");
