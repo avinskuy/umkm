@@ -9,7 +9,9 @@ use super::{
     verification::VerificationService,
 };
 
+mod authentication;
 mod handlers;
+pub use authentication::{authentication_router, AuthenticationApiState};
 pub use handlers::registration_router;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
