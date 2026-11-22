@@ -1,8 +1,8 @@
 //! Autentikasi password dan lifecycle sesi opaque.
 
 use ring::{digest, hmac, rand::SecureRandom};
-use std::{net::IpAddr, sync::Arc};
 use sqlx::PgPool;
+use std::{net::IpAddr, sync::Arc};
 use zeroize::Zeroizing;
 
 use super::{
@@ -20,7 +20,8 @@ pub enum AuthenticationConfigError {
 
 impl std::fmt::Display for AuthenticationConfigError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("AUTH_RATE_LIMIT_HMAC_KEY must contain exactly 64 hexadecimal characters")
+        formatter
+            .write_str("AUTH_RATE_LIMIT_HMAC_KEY must contain exactly 64 hexadecimal characters")
     }
 }
 
@@ -120,7 +121,10 @@ pub struct AuthenticationService<'a> {
 
 impl<'a> AuthenticationService<'a> {
     pub fn new(pool: &'a PgPool, rate_limit_key: &'a AuthenticationRateLimitKey) -> Self {
-        Self { pool, rate_limit_key }
+        Self {
+            pool,
+            rate_limit_key,
+        }
     }
 
     pub async fn login(
@@ -135,24 +139,21 @@ impl<'a> AuthenticationService<'a> {
             return Err(AuthenticationError::InvalidInput);
         }
 
-        let identifier_hash = self.rate_limit_key.fingerprint(
-            b"usahapintar:login-identifier:v1",
-            normalized.as_bytes(),
-        );
+        let identifier_hash = self
+            .rate_limit_key
+            .fingerprint(b"usahapintar:login-identifier:v1", normalized.as_bytes());
         let ip_subject = ip_rate_limit_subject(peer_ip);
-        let ip_hash = self.rate_limit_key.fingerprint(
-            b"usahapintar:login-ip:v1",
-            &ip_subject,
-        );
+        let ip_hash = self
+            .rate_limit_key
+            .fingerprint(b"usahapintar:login-ip:v1", &ip_subject);
 
-        let allowed: bool = sqlx::query_scalar(
-            "SELECT public.reserve_password_login_attempt($1, $2)",
-        )
-        .bind(identifier_hash.to_vec())
-        .bind(ip_hash.to_vec())
-        .fetch_one(self.pool)
-        .await
-        .map_err(|_| AuthenticationError::Database)?;
+        let allowed: bool =
+            sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+                .bind(identifier_hash.to_vec())
+                .bind(ip_hash.to_vec())
+                .fetch_one(self.pool)
+                .await
+                .map_err(|_| AuthenticationError::Database)?;
 
         if !allowed {
             return Err(AuthenticationError::RateLimited);
@@ -191,15 +192,18 @@ impl<'a> AuthenticationService<'a> {
         let raw_token = random_session_token()?;
         let token_hash = hash_session_token(&raw_token);
 
-        let mut transaction = self.pool.begin().await.map_err(|_| AuthenticationError::Database)?;
-        let session_id: String = sqlx::query_scalar(
-            "SELECT public.create_password_login_session($1::uuid, $2)::text",
-        )
-        .bind(&user_id)
-        .bind(token_hash.to_vec())
-        .fetch_one(&mut *transaction)
-        .await
-        .map_err(|_| AuthenticationError::Database)?;
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+        let session_id: String =
+            sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
+                .bind(&user_id)
+                .bind(token_hash.to_vec())
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|_| AuthenticationError::Database)?;
 
         sqlx::query("SELECT public.clear_password_login_identifier_limit($1)")
             .bind(identifier_hash.to_vec())
@@ -220,7 +224,10 @@ impl<'a> AuthenticationService<'a> {
         append_audit_event(&mut transaction, &audit_event)
             .await
             .map_err(|_| AuthenticationError::Database)?;
-        transaction.commit().await.map_err(|_| AuthenticationError::Database)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
 
         Ok(LoginSession {
             user_id,
@@ -230,7 +237,11 @@ impl<'a> AuthenticationService<'a> {
     }
 
     async fn append_failed_login(&self, role: LoginRole) -> Result<(), AuthenticationError> {
-        let mut transaction = self.pool.begin().await.map_err(|_| AuthenticationError::Database)?;
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
         let audit_event = AuditEvent {
             actor_type: AuditActorType::System,
             actor_id: None,
@@ -244,7 +255,10 @@ impl<'a> AuthenticationService<'a> {
         append_audit_event(&mut transaction, &audit_event)
             .await
             .map_err(|_| AuthenticationError::Database)?;
-        transaction.commit().await.map_err(|_| AuthenticationError::Database)
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AuthenticationError::Database)
     }
 
     pub async fn logout(&self, token: &str) -> Result<(), AuthenticationError> {
@@ -252,9 +266,7 @@ impl<'a> AuthenticationService<'a> {
             return Ok(());
         }
         let token_hash = hash_session_token(token);
-        sqlx::query_scalar::<_, bool>(
-            "SELECT public.revoke_password_login_session($1)",
-        )
+        sqlx::query_scalar::<_, bool>("SELECT public.revoke_password_login_session($1)")
         .bind(token_hash.to_vec())
         .fetch_one(self.pool)
         .await
@@ -288,7 +300,9 @@ pub fn normalize_identifier(value: &str) -> Result<String, AuthenticationError> 
         .chars()
         .filter(|character| !matches!(character, ' ' | '-' | '(' | ')'))
         .collect::<String>();
-    let digits = compact.strip_prefix('+').ok_or(AuthenticationError::InvalidInput)?;
+    let digits = compact
+        .strip_prefix('+')
+        .ok_or(AuthenticationError::InvalidInput)?;
     if !(8..=15).contains(&digits.len())
         || digits.starts_with('0')
         || !digits.bytes().all(|byte| byte.is_ascii_digit())
@@ -356,11 +370,26 @@ mod tests {
 
     #[test]
     fn rejects_invalid_login_identifiers() {
-        assert_eq!(normalize_identifier(""), Err(AuthenticationError::InvalidInput));
-        assert_eq!(normalize_identifier("user@@example.test"), Err(AuthenticationError::InvalidInput));
-        assert_eq!(normalize_identifier("081234567890"), Err(AuthenticationError::InvalidInput));
-        assert_eq!(normalize_identifier("6281234567890"), Err(AuthenticationError::InvalidInput));
-        assert_eq!(normalize_identifier("+62abcdefgh"), Err(AuthenticationError::InvalidInput));
+        assert_eq!(
+            normalize_identifier(""),
+            Err(AuthenticationError::InvalidInput)
+        );
+        assert_eq!(
+            normalize_identifier("user@@example.test"),
+            Err(AuthenticationError::InvalidInput)
+        );
+        assert_eq!(
+            normalize_identifier("081234567890"),
+            Err(AuthenticationError::InvalidInput)
+        );
+        assert_eq!(
+            normalize_identifier("6281234567890"),
+            Err(AuthenticationError::InvalidInput)
+        );
+        assert_eq!(
+            normalize_identifier("+62abcdefgh"),
+            Err(AuthenticationError::InvalidInput)
+        );
     }
 
     #[test]
