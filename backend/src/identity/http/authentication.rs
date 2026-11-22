@@ -154,10 +154,10 @@ async fn login(
         .await
     {
         Ok(session) => {
-            let cookie = format!(
+            let cookie = Zeroizing::new(format!(
                 "{SESSION_COOKIE}={}; Path=/; Max-Age={SESSION_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax",
                 session.token
-            );
+            ));
             let Ok(cookie_value) = HeaderValue::from_str(&cookie) else {
                 return error(
                     StatusCode::SERVICE_UNAVAILABLE,
