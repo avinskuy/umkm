@@ -110,12 +110,12 @@ Detail lengkap berada di [Tinjauan Skema Identity Core — Verifikasi dan Pemuli
 ## 8. Status implementasi repository
 
 Status implementasi:
-- Migration Identity Core 0001–0015 tersedia dan diuji melalui PostgreSQL CI.
+- Migration Identity Core 0001–0016 tersedia dan diuji melalui PostgreSQL CI.
 - `VerificationService` menyediakan orkestrasi registrasi, OTP, verifikasi, dan aktivasi dengan fake provider pada pengujian.
 - Login password Owner/Investor dan session management tersedia pada endpoint identitas.
 - Router HTTP registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default.
 - Recovery Service mendukung pembuatan sesi tanpa akun terikat, verifikasi kontak, penemuan kandidat akun, dan pengaitan akun secara atomik.
-- Recovery berhenti pada status `under_review`; approval/rejection, password reset, dan pencabutan sesi setelah reset belum tersedia.
+- Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal yang memerlukan sesi Admin aktif. Endpoint Admin, password reset, dan pencabutan sesi setelah reset belum tersedia.
 - Adapter Resend/FlowKirim nyata dan production key provider belum dikonfigurasi.
 - Versi Terms/Privacy aktif harus disediakan melalui konfigurasi server-side sebelum registrasi publik diaktifkan.
 - Migration belum diterapkan pada database production. Provisioning, migration, dan deployment merupakan operasi terpisah.

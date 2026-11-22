@@ -14,12 +14,12 @@ Fondasi repository, standar engineering, kebijakan produk dan keamanan, serta Id
 
 - Backend menyediakan liveness `GET /api/v1/health` dan readiness `GET /api/v1/readyz`.
 - PostgreSQL runtime menggunakan principal aplikasi melalui `APP_DATABASE_URL`. Migration dijalankan secara eksplisit oleh principal migrator dan tidak dijalankan saat HTTP server startup.
-- Lima belas migration Identity Core tersedia dan diuji melalui PostgreSQL CI.
+- Enam belas migration Identity Core tersedia dan diuji melalui PostgreSQL CI.
 - Login Business Owner dan Investor menggunakan email/nomor telepon serta password. Login rutin tidak meminta OTP.
 - Registrasi menggunakan password dan verifikasi OTP melalui email atau WhatsApp. Service dan router HTTP tersedia, tetapi router registrasi belum dipasang pada server default.
 - Session validation, idle timeout, absolute expiry, token rotation, logout, dan logout seluruh perangkat tersedia pada endpoint identitas.
-- Account Recovery memiliki database operations, service core, dan router HTTP. Router belum dipasang pada server default; alur saat ini berhenti pada status `under_review`.
-- Provider OTP nyata, key provider produksi, persetujuan recovery, password reset, dan integrasi fitur produk belum tersedia.
+- Account Recovery memiliki database operations, service core, router HTTP, sinyal sesi aktif sebelumnya, dan service review Admin. Router belum dipasang pada server default; password reset belum tersedia.
+- Provider OTP nyata, key provider produksi, endpoint Admin untuk review, password reset, notifikasi keamanan, dan integrasi fitur produk belum tersedia.
 - Frontend masih berupa shell awal dan belum mengimplementasikan alur produk utama.
 
 Ketersediaan kode atau dokumen tidak dengan sendirinya membuktikan bahwa fitur telah diaktifkan di production atau seluruh kontrol telah memenuhi sertifikasi tertentu.

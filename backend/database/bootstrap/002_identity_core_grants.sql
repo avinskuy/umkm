@@ -347,3 +347,38 @@ GRANT EXECUTE ON FUNCTION public.get_account_recovery_selection_context(UUID)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.list_account_recovery_candidates(UUID, BYTEA[])
     TO usahapintar_app;
+
+-- Account recovery review and prior-session signal operations.
+DO $account_recovery_review_ownership_guard$
+DECLARE
+    v_signature TEXT;
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    FOREACH v_signature IN ARRAY ARRAY[
+        'public.record_account_recovery_session_signal(uuid,bytea)',
+        'public.review_account_recovery_case(uuid,uuid,bytea,text,text)'
+    ] LOOP
+        SELECT pg_catalog.pg_get_userbyid(p.proowner),
+               p.prosecdef,
+               COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+          INTO v_owner, v_is_security_definer, v_has_safe_search_path
+          FROM pg_catalog.pg_proc AS p
+         WHERE p.oid = pg_catalog.to_regprocedure(v_signature);
+
+        IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+           OR v_is_security_definer IS DISTINCT FROM TRUE
+           OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+            RAISE EXCEPTION
+                'Refusing account recovery review grants: % must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path',
+                v_signature;
+        END IF;
+    END LOOP;
+END;
+$account_recovery_review_ownership_guard$;
+
+GRANT EXECUTE ON FUNCTION public.record_account_recovery_session_signal(UUID, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.review_account_recovery_case(UUID, UUID, BYTEA, TEXT, TEXT)
+    TO usahapintar_app;

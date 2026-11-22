@@ -1807,6 +1807,45 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
 async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     let first_user_id = insert_active_email(pool, "recovery-contact-first@example.test").await;
     let second_user_id = insert_active_email(pool, "recovery-contact-second@example.test").await;
+    let reviewer_email = format!(
+        "recovery-review-admin-{}-{}@example.test",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after epoch")
+            .as_nanos()
+    );
+    let reviewer_user_id: String = sqlx::query_scalar(
+        "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at, password_hash) \
+         VALUES ('admin', 'active', $1, 'email', clock_timestamp(), clock_timestamp(), '$argon2id$test-review-hash') \
+         RETURNING id::text",
+    )
+    .bind(&reviewer_email)
+    .fetch_one(pool)
+    .await
+    .expect("active Admin reviewer should be created");
+
+    let unrelated_session_hash = vec![62_u8; 32];
+    sqlx::query(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
+    )
+    .bind(&second_user_id)
+    .bind(&unrelated_session_hash)
+    .execute(pool)
+    .await
+    .expect("a session for a different account should be created");
+
+    let reviewer_session_hash = vec![61_u8; 32];
+    let reviewer_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days') RETURNING id::text",
+    )
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active Admin session should be created for recovery review");
 
     let first_contact_session: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at)  VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
@@ -2016,11 +2055,61 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         "selected recovery account cannot be changed"
     );
 
-    sqlx::query("UPDATE public.account_recovery_cases SET status = 'approved' WHERE id = $1::uuid")
+    let unrelated_session_match: bool =
+        sqlx::query_scalar("SELECT public.record_account_recovery_session_signal($1::uuid, $2)")
+            .bind(&recovery_case_id)
+            .bind(&unrelated_session_hash)
+            .fetch_one(pool)
+            .await
+            .expect("session signal check should safely reject a different account session");
+    assert!(!unrelated_session_match);
+
+    assert!(
+        sqlx::query_scalar::<_, bool>(
+            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
+        )
+        .bind(&recovery_case_id)
+        .bind(&first_user_id)
+        .bind(&reviewer_session_hash)
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "a non-Admin account must not approve a recovery case"
+    );
+
+    let approved: bool = sqlx::query_scalar(
+        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
+    )
+    .bind(&recovery_case_id)
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active Admin may approve an eligible recovery case");
+    assert!(approved);
+
+    let review_row: (String, String, String) = sqlx::query_as(
+        "SELECT decision, reason_code, reviewer_session_id::text \
+           FROM public.account_recovery_review_decisions WHERE recovery_case_id = $1::uuid",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(pool)
+    .await
+    .expect("review decision should be persisted");
+    assert_eq!(review_row.0, "approved");
+    assert_eq!(review_row.1, "ownership_confirmed");
+    assert_eq!(review_row.2, reviewer_session_id);
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.account_recovery_review_decisions SET reason_code = 'policy_violation' WHERE recovery_case_id = $1::uuid",
+        )
         .bind(&recovery_case_id)
         .execute(pool)
         .await
-        .expect("reviewed recovery case may be approved");
+        .is_err(),
+        "review decisions must be append-only"
+    );
 
     let token_id: String = sqlx::query_scalar(
         "INSERT INTO public.password_reset_tokens (recovery_case_id, user_id, token_hash, expires_at)  VALUES ($1::uuid, $2::uuid, $3, clock_timestamp() + INTERVAL '15 minutes') RETURNING id::text",
@@ -2112,6 +2201,88 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .execute(pool)
     .await
     .expect("approved recovery case may be completed");
+
+    let rejected_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions (purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at) \
+         VALUES ('account_recovery', 'email', $1, $2, 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') \
+         RETURNING id::text",
+    )
+    .bind(vec![51_u8])
+    .bind(vec![52_u8])
+    .bind(vec![53_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("second recovery verification session should be created");
+
+    let rejected_case_id: String = sqlx::query_scalar(
+        "INSERT INTO public.account_recovery_cases (verification_session_id, requested_action) \
+         VALUES ($1::uuid, 'password_reset') RETURNING id::text",
+    )
+    .bind(&rejected_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("second recovery case should be created");
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&rejected_session_id)
+    .execute(pool)
+    .await
+    .expect("second recovery session should be verified");
+
+    sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
+        .bind(&rejected_session_id)
+        .bind(&second_user_id)
+        .execute(pool)
+        .await
+        .expect("verified recovery session should be bound to the selected account");
+
+    sqlx::query(
+        "UPDATE public.account_recovery_cases SET target_user_id = $2::uuid, status = 'under_review' WHERE id = $1::uuid",
+    )
+    .bind(&rejected_case_id)
+    .bind(&second_user_id)
+    .execute(pool)
+    .await
+    .expect("second recovery case should enter review");
+
+    let first_review = sqlx::query_scalar::<_, bool>(
+        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'rejected', 'insufficient_evidence')",
+    )
+    .bind(&rejected_case_id)
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool);
+    let second_review = sqlx::query_scalar::<_, bool>(
+        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'rejected', 'insufficient_evidence')",
+    )
+    .bind(&rejected_case_id)
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool);
+
+    let (first_review, second_review) = tokio::join!(first_review, second_review);
+    assert_ne!(
+        first_review.is_ok(),
+        second_review.is_ok(),
+        "concurrent review attempts must produce exactly one decision"
+    );
+    assert!(
+        first_review
+            .or(second_review)
+            .expect("one review should succeed"),
+        "the winning review should be recorded"
+    );
+
+    let rejected_status: (String, bool) = sqlx::query_as(
+        "SELECT status, resolved_at IS NOT NULL FROM public.account_recovery_cases WHERE id = $1::uuid",
+    )
+    .bind(&rejected_case_id)
+    .fetch_one(pool)
+    .await
+    .expect("rejected recovery case state should be queryable");
+    assert_eq!(rejected_status, ("rejected".to_owned(), true));
 }
 
 async fn assert_identity_audit_event_invariants(pool: &PgPool) {
@@ -2388,6 +2559,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
+                   'account_recovery_case_signals', 'account_recovery_review_decisions', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
@@ -2427,7 +2599,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit table privileges should be queryable");
     assert_eq!(audit_access, (true, false, false, false, false));
 
-    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
         "SELECT has_function_privilege(current_user, \
                     'public.create_client_user(text,text,text,text,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
@@ -2447,14 +2619,18 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE')",
+                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.record_account_recovery_session_signal(uuid,bytea)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.review_account_recovery_case(uuid,uuid,bytea,text,text)', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
     .expect("function privileges should be queryable");
     assert_eq!(
         function_access,
-        (false, true, false, true, true, true, true, true, true, true)
+        (false, true, false, true, true, true, true, true, true, true, true, true)
     );
 
     let created_user_id: String =
