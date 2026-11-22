@@ -103,9 +103,9 @@ DECLARE
 BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
         'public.create_registration_verification_session(uuid,text,bytea,bytea,text,bytea,text,timestamp with time zone)',
-        'public.reserve_otp_challenge(uuid,bytea,text)',
+        'public.reserve_otp_challenge(uuid,bytea,text,bytea[])',
         'public.record_otp_delivery_result(uuid,text)',
-        'public.record_otp_verification_attempt(uuid,uuid,boolean)'
+        'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])'
     ] LOOP
         SELECT pg_catalog.pg_get_userbyid(p.proowner),
                p.prosecdef,
@@ -128,9 +128,9 @@ $verification_ownership_guard$;
 -- verification function grants --
 GRANT EXECUTE ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT)
+GRANT EXECUTE ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT, BYTEA[])
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.record_otp_delivery_result(UUID, TEXT)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN)
+GRANT EXECUTE ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[])
     TO usahapintar_app;
