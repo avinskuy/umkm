@@ -55,7 +55,18 @@ struct ErrorResponse {
 }
 
 fn error(status: StatusCode, message: &'static str) -> Response {
-    (status, Json(ErrorResponse { error: message })).into_response()
+    let mut response = (status, Json(ErrorResponse { error: message })).into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
+fn is_cross_site_request(headers: &HeaderMap) -> bool {
+    headers
+        .get("sec-fetch-site")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.eq_ignore_ascii_case("cross-site"))
 }
 
 fn login_error(error_value: AuthenticationError) -> Response {
@@ -89,16 +100,24 @@ pub fn authentication_router(state: AuthenticationApiState) -> Router {
 async fn login_owner(
     State(state): State<AuthenticationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Response {
+    if is_cross_site_request(&headers) {
+        return error(StatusCode::FORBIDDEN, "Permintaan login lintas situs ditolak.");
+    }
     login(state, peer, request, LoginRole::BusinessOwner).await
 }
 
 async fn login_investor(
     State(state): State<AuthenticationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Response {
+    if is_cross_site_request(&headers) {
+        return error(StatusCode::FORBIDDEN, "Permintaan login lintas situs ditolak.");
+    }
     login(state, peer, request, LoginRole::Investor).await
 }
 
@@ -134,6 +153,9 @@ async fn login(
                 .into_response();
             response.headers_mut().insert(header::SET_COOKIE, cookie_value);
             response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            response
         }
         Err(authentication_error) => login_error(authentication_error),
     }
@@ -143,6 +165,9 @@ async fn logout(
     State(state): State<AuthenticationApiState>,
     headers: HeaderMap,
 ) -> Response {
+    if is_cross_site_request(&headers) {
+        return error(StatusCode::FORBIDDEN, "Permintaan logout lintas situs ditolak.");
+    }
     let token = session_cookie(&headers);
     if let Some(token) = token {
         if state.service().logout(&token).await.is_err() {
@@ -157,6 +182,9 @@ async fn logout(
 
     let mut response = StatusCode::NO_CONTENT.into_response();
     clear_session_cookie(&mut response);
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
 
