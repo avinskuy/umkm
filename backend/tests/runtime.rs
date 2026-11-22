@@ -1010,6 +1010,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             .expect("session cookie header should be valid"),
     );
     let selected = recovery_router
+        .clone()
         .oneshot(select_request)
         .await
         .expect("account selection route should respond");
