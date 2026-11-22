@@ -1,12 +1,12 @@
 # Aturan Produk Autentikasi
 
-> Keputusan tahap pertama (22 November 2026): email/telepon + password atau Google OAuth. OTP tidak diminta saat registrasi maupun login; verifikasi kontak ditunda. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](../architecture/identity-core-authentication-stage-one-decision.md).
+> Keputusan terbaru (22 November 2026): registrasi email + password wajib OTP email; registrasi telepon/WhatsApp + password wajib OTP WhatsApp. Login rutin menggunakan email/telepon + password tanpa OTP. Google OAuth tidak termasuk cakupan. Lihat [Keputusan Autentikasi Identity Core](../architecture/identity-core-authentication-stage-one-decision.md).
 
 ## Model akun
 
 - Akun publik hanya memiliki satu role utama: `business_owner` atau `investor`.
 - Pendaftaran publik wajib meminta pengguna memilih role secara eksplisit.
-- Role tidak dapat diubah melalui pengaturan profil, support, tindakan Admin, migrasi akun, atau OAuth.
+- Role tidak dapat diubah melalui pengaturan profil, support, tindakan Admin, migrasi akun, atau proses internal lainnya.
 - Pengguna yang ingin menggunakan role klien lainnya harus membuat akun terpisah dengan identitas login yang memenuhi syarat dan belum terhubung ke akun lain.
 - Akun Admin disediakan melalui proses internal dan tidak pernah ditawarkan dalam pendaftaran publik.
 - Identitas utama yang dipakai untuk pendaftaran tunduk pada keunikan dan reservasi kontak akun; kontak pemulihan opsional dapat digunakan bersama oleh beberapa akun sesuai kebijakan Identity Core.
@@ -26,17 +26,17 @@ Halaman login klien yang terpisah merupakan kebutuhan pengalaman pengguna. Kedua
 
 ## Metode autentikasi dan verifikasi
 
-- Pendaftaran email atau nomor HP wajib menggunakan kata sandi lokal.
-- Pengguna memilih satu identifier awal: email atau nomor HP. Pada tahap pertama, kontak tidak harus diverifikasi dengan OTP sebelum akun dibuat atau digunakan untuk login.
-- Pendaftaran Google OAuth tidak memerlukan kata sandi lokal. Pengguna baru wajib memilih role sebelum OAuth; pilihan role diikat pada state server.
-- OTP ditunda ke tahap berikutnya dan tidak dapat digunakan sebagai kredensial login atau reset password.
-- Kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan atau tindakan sensitif.
-- Klaim email Google hanya ditandai terverifikasi jika token tervalidasi menyatakan `email_verified=true`; kecocokan email tidak menggabungkan akun otomatis.
+- Registrasi publik hanya menyediakan email + password dengan OTP email, atau nomor telepon/WhatsApp + password dengan OTP WhatsApp.
+- Pengguna memilih tepat satu kontak awal dan satu role klien (Business Owner atau Investor). Role utama bersifat tetap.
+- Akun berstatus `pending_verification` sampai OTP pada kontak awal berhasil diverifikasi; akun baru aktif setelah verifikasi berhasil.
+- Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login.
+- Google OAuth dan jalur registrasi tanpa OTP tidak termasuk cakupan yang disetujui.
+- Kontak awal yang belum diverifikasi tidak boleh digunakan sebagai bukti pemulihan atau untuk tindakan sensitif.
 - Password harus disimpan menggunakan Argon2id.
-- Google OAuth harus terikat pada identitas penyedia yang stabil; jangan menghubungkan akun hanya berdasarkan kecocokan email.
+- OTP tidak dapat digunakan sebagai kredensial login atau pengganti password; OTP hanya untuk verifikasi kontak dan alur keamanan yang telah ditetapkan.
 - MFA Admin wajib tersedia sebelum sistem digunakan di produksi. Metode dan penyedianya masih merupakan keputusan implementasi.
 
-Baseline masa berlaku, batas percobaan, lock, dan resend OTP pada [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md) berlaku untuk tahap verifikasi kontak berikutnya, bukan registrasi/login tahap pertama.
+Baseline masa berlaku, batas percobaan, lock, cooldown, dan rate limit OTP mengikuti [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md) serta implementasi runtime yang telah diuji. Nilai konfigurasi produksi tetap harus divalidasi sebelum endpoint publik diaktifkan.
 
 ## Sesi dan pemulihan akun
 

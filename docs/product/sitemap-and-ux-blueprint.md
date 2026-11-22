@@ -54,12 +54,12 @@ Pengunjung publik dapat memahami layanan dan model keanggotaan. Feed penemuan in
 | `/daftar` | Pilihan role pendaftaran | Memilih Owner atau Investor; tanpa pilihan Admin publik |
 | `/daftar/pemilik` | Pendaftaran Owner | Membuat akun Owner dan memulai onboarding usaha |
 | `/daftar/investor` | Pendaftaran Investor | Membuat akun Investor dan memulai onboarding investor |
-| `/verifikasi/email` | Verifikasi email (tahap berikutnya) | Memverifikasi alamat email setelah fitur verifikasi tersedia |
-| `/verifikasi/telepon` | Verifikasi OTP telepon (tahap berikutnya) | Memverifikasi nomor telepon setelah fitur verifikasi tersedia |
+| `/verifikasi/email` | Verifikasi OTP email | Memverifikasi email sebelum akun diaktifkan |
+| `/verifikasi/telepon` | Verifikasi OTP WhatsApp | Memverifikasi nomor telepon/WhatsApp sebelum akun diaktifkan |
 | `/lupa-kata-sandi` | Pemulihan kata sandi | Meminta pengaturan ulang kata sandi |
 | `/atur-kata-sandi` | Atur kata sandi baru | Menyelesaikan pemulihan kata sandi |
 
-Pendaftaran tahap pertama menggunakan email atau nomor telepon + password, atau Google OAuth sebagai alternatif. OTP tidak diminta saat registrasi maupun login. Kontak yang dimasukkan melalui formulir password tetap berstatus belum terverifikasi sampai fitur verifikasi kontak tersedia; jangan gunakan kontak tersebut untuk pemulihan atau tindakan sensitif. Pendaftar baru melalui Google wajib memilih Owner atau Investor sebelum OAuth, tidak perlu membuat kata sandi lokal terpisah, dan tidak memerlukan OTP tambahan. Klaim email Google hanya dianggap terverifikasi jika token tervalidasi menyatakan `email_verified=true`; jangan menggabungkan akun hanya karena email cocok. Jalur login berdasarkan role tetap terpisah dan backend harus menolak ketidaksesuaian role tanpa membocorkan informasi akun. Sediakan kontrol tampil/sembunyi kata sandi, status loading/error, tautan ketentuan/privasi, dan validasi yang aksesibel.
+Registrasi publik hanya menggunakan email + password dengan OTP email, atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Akun berstatus `pending_verification` sampai OTP berhasil diverifikasi. Login rutin menggunakan email atau nomor telepon + password tanpa OTP. Google OAuth tidak termasuk cakupan. Role Owner/Investor dipilih sebelum akun dibuat dan menjadi role utama tetap. Jalur login berdasarkan role tetap terpisah; backend harus menolak ketidaksesuaian role tanpa membocorkan informasi akun. Sediakan kontrol tampil/sembunyi password, status loading/error, tautan Ketentuan dan Kebijakan Privasi, serta validasi yang aksesibel.
 
 Admin menggunakan jalur internal terpisah di `/admin/login`, dengan kontrol sesi yang lebih ketat dan MFA. Jalur ini tidak ditampilkan sebagai pilihan pendaftaran publik.
 
@@ -167,7 +167,7 @@ Gunakan izin least privilege, MFA, masa sesi yang ketat, rate limit, dan catatan
 ### Alur Owner
 
 1. Beranda publik → pilih pendaftaran Owner.
-2. Pilih Business Owner sebagai role utama permanen, lalu buat akun menggunakan email/telepon + password atau Google OAuth. Tidak ada OTP pada tahap pertama; kontak yang belum terverifikasi dibatasi untuk pemulihan dan tindakan sensitif.
+2. Pilih Business Owner sebagai role utama permanen, lalu daftar menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Akun aktif setelah OTP berhasil diverifikasi.
 3. Selesaikan onboarding usaha sesuai tahap bisnis.
 4. Masuk ke dashboard Owner dan lengkapi profil usaha.
 5. Terbitkan posting promosi/peluang sesuai batas keanggotaan.
@@ -178,7 +178,7 @@ Gunakan izin least privilege, MFA, masa sesi yang ketat, rate limit, dan catatan
 ### Alur Investor
 
 1. Beranda publik → pilih pendaftaran Investor.
-2. Pilih Investor sebagai role utama permanen, lalu buat akun menggunakan email/telepon + password atau Google OAuth. Tidak ada OTP pada tahap pertama; kontak yang belum terverifikasi dibatasi untuk pemulihan dan tindakan sensitif.
+2. Pilih Investor sebagai role utama permanen, lalu daftar menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Akun aktif setelah OTP berhasil diverifikasi.
 3. Lengkapi profil Investor dan preferensi penemuan.
 4. Masuk ke dashboard Investor dan jelajahi peluang.
 5. Tinjau peluang beserta label sumber data/verifikasinya.

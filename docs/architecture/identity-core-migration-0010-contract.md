@@ -23,7 +23,7 @@ Setiap registrasi menyimpan dua baris terpisah pada `policy_acceptance_records`:
 
 Setiap catatan menyimpan versi kebijakan dan timestamp server. Versi disediakan oleh konfigurasi backend, bukan dipercaya dari input klien. Perubahan versi menghasilkan catatan penerimaan baru; riwayat lama tidak ditimpa.
 
-Repository saat migration ini dibuat belum memiliki dokumen final Terms of Service yang dipublikasikan. Karena itu, nilai versi aktual dan isi dokumen harus ditetapkan sebelum endpoint registrasi publik diaktifkan. Test menggunakan label versi sintetis dan bukan menyatakan dokumen legal telah final.
+Repository kini memiliki draf [Ketentuan Layanan](../legal/terms-of-service-draft.md), [Pemberitahuan Privasi](../legal/privacy-notice-draft.md), dan [Pemberitahuan Persetujuan Marketing](../legal/marketing-consent-notice-draft.md). Semua masih berstatus draf dan memuat keputusan terbuka. Nilai versi aktual dan isi dokumen harus ditetapkan melalui [Registry Versi Kebijakan](../legal/policy-version-registry.md) sebelum endpoint registrasi publik diaktifkan. Test menggunakan label versi sintetis dan bukan menyatakan dokumen legal telah final.
 
 ## 3. Consent marketing opsional
 
