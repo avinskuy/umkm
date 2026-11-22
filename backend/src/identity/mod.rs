@@ -25,4 +25,7 @@ pub use registration::{create_client_user, ClientRegistration, ClientRole, Conta
 
 pub use verification::{RegistrationStart, VerificationError, VerificationService};
 
-pub use recovery::{RecoveryAction, RecoveryCandidate, RecoveryService, RecoveryStart};
+pub use recovery::{
+    RecoveryAction, RecoveryCandidate, RecoveryReviewDecision, RecoveryReviewReason,
+    RecoveryReviewService, RecoveryService, RecoveryStart,
+};
