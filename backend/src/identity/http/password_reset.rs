@@ -19,7 +19,7 @@ use super::{
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct PasswordResetRequest {
+pub(super) struct PasswordResetRequest {
     token: String,
     new_password: String,
     confirm_password: String,
