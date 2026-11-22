@@ -815,6 +815,10 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .await
         .expect("recovery start route should respond");
     assert_eq!(started.status(), axum::http::StatusCode::ACCEPTED);
+    assert_eq!(
+        started.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
     let started_body = started
         .into_body()
         .collect()
@@ -831,6 +835,22 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .as_str()
         .expect("recovery start should return an opaque case ID")
         .to_owned();
+
+    let resend = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            format!("/api/v1/identity/recovery/{verification_id}/resend"),
+            None,
+            false,
+        ))
+        .await
+        .expect("recovery resend route should respond");
+    assert_eq!(
+        resend.status(),
+        axum::http::StatusCode::TOO_MANY_REQUESTS,
+        "OTP delivery cooldown must be enforced across resend requests"
+    );
 
     let premature_candidates = recovery_router
         .clone()
@@ -896,6 +916,10 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .await
         .expect("candidate list route should respond");
     assert_eq!(candidates.status(), axum::http::StatusCode::OK);
+    assert_eq!(
+        candidates.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
     let candidates_body = candidates
         .into_body()
         .collect()
