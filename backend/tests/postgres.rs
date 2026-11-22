@@ -2191,13 +2191,21 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("second recovery case should be created");
 
     sqlx::query(
-        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp(), user_id = $2::uuid WHERE id = $1::uuid",
+        "UPDATE public.verification_sessions SET status = 'verified', verified_at = clock_timestamp() WHERE id = $1::uuid",
+    )
+    .bind(&rejected_session_id)
+    .execute(pool)
+    .await
+    .expect("second recovery session should be verified");
+
+    sqlx::query(
+        "UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid",
     )
     .bind(&rejected_session_id)
     .bind(&second_user_id)
     .execute(pool)
     .await
-    .expect("second recovery session should be verified and bound");
+    .expect("verified recovery session should be bound to the selected account");
 
     sqlx::query(
         "UPDATE public.account_recovery_cases SET target_user_id = $2::uuid, status = 'under_review' WHERE id = $1::uuid",
@@ -2502,6 +2510,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
+                   'account_recovery_case_signals', 'account_recovery_review_decisions', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
@@ -2541,7 +2550,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit table privileges should be queryable");
     assert_eq!(audit_access, (true, false, false, false, false));
 
-    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
         "SELECT has_function_privilege(current_user, \
                     'public.create_client_user(text,text,text,text,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
@@ -2561,14 +2570,18 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE')",
+                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.record_account_recovery_session_signal(uuid,bytea)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.review_account_recovery_case(uuid,uuid,text,text)', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
     .expect("function privileges should be queryable");
     assert_eq!(
         function_access,
-        (false, true, false, true, true, true, true, true, true, true)
+        (false, true, false, true, true, true, true, true, true, true, true, true)
     );
 
     let created_user_id: String =
