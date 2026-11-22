@@ -298,7 +298,7 @@ async fn verify(
         .abuse_guard
         .check(
             RegistrationAction::Verify,
-            peer.ip(),
+            resolved_client_ip(&headers, peer.ip()),
             Some(&verification_id),
         )
         .await;
