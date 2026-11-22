@@ -5,9 +5,9 @@ use sqlx::PgPool;
 use super::{
     crypto::{random_bytes, KeyProvider},
     delivery::OtpDeliveryProvider,
+    recovery::RecoveryService,
     registration::ContactChannel,
     verification::VerificationService,
-    recovery::RecoveryService,
 };
 
 mod authentication;
