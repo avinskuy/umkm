@@ -330,7 +330,7 @@ fn ip_rate_limit_subject(ip: IpAddr) -> Vec<u8> {
 fn random_session_token() -> Result<String, AuthenticationError> {
     let mut bytes = Zeroizing::new([0_u8; 32]);
     ring::rand::SystemRandom::new()
-        .fill(&mut bytes)
+        .fill(&mut bytes[..])
         .map_err(|_| AuthenticationError::Internal)?;
     Ok(hex_encode(&bytes[..]))
 }
