@@ -1766,11 +1766,11 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     let first_revoke =
         sqlx::query_scalar::<_, i32>("SELECT public.revoke_all_password_login_sessions($1)")
             .bind(&second_token_hash)
-    .fetch_one(pool);
+            .fetch_one(pool);
     let second_revoke =
         sqlx::query_scalar::<_, i32>("SELECT public.revoke_all_password_login_sessions($1)")
             .bind(&third_token_hash)
-    .fetch_one(pool);
+            .fetch_one(pool);
     let (first_revoke, second_revoke) = tokio::join!(first_revoke, second_revoke);
     let revoked_counts = [
         first_revoke.expect("first concurrent logout-all should complete"),
