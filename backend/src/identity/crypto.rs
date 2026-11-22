@@ -89,7 +89,9 @@ impl std::fmt::Display for EnvironmentKeyProviderError {
             Self::InvalidVersionList => "identity key version list is invalid",
             Self::ActiveVersionNotConfigured => "active identity key version is not configured",
             Self::MissingKey(_, _) => "required identity key is missing",
-            Self::InvalidKey(_, _) => "identity key must be 32 non-zero bytes encoded as 64 hex characters",
+            Self::InvalidKey(_, _) => {
+                "identity key must be 32 non-zero bytes encoded as 64 hex characters"
+            }
         };
         formatter.write_str(message)
     }
