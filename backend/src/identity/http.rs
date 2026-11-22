@@ -5,7 +5,6 @@ use sqlx::PgPool;
 use super::{
     crypto::{random_bytes, KeyProvider},
     delivery::OtpDeliveryProvider,
-    password::PasswordPolicy,
     recovery::RecoveryService,
     registration::ContactChannel,
     verification::VerificationService,
@@ -18,7 +17,7 @@ mod password_reset;
 pub use authentication::{authentication_router, AuthenticationApiState};
 pub use handlers::registration_router;
 pub use recovery::recovery_router;
-pub use password::PasswordPolicy as RegistrationPasswordPolicy;
+pub use super::password::PasswordPolicy as RegistrationPasswordPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegistrationAction {
@@ -139,7 +138,7 @@ pub struct RegistrationApiState {
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
-    pub(super) password_policy: Arc<dyn PasswordPolicy>,
+    pub(super) password_policy: Arc<dyn RegistrationPasswordPolicy>,
     pub(super) policy_versions: RegistrationPolicyVersions,
 }
 
