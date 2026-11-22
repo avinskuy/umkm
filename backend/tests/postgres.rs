@@ -2638,7 +2638,10 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("function privileges should be queryable");
     assert_eq!(
         function_access,
-        (false, true, false, true, true, true, true, true, true, true, true, true, true, true, true, true)
+        (
+            false, true, false, true, true, true, true, true, true, true, true, true, true, true,
+            true, true
+        )
     );
 
     let created_user_id: String =
