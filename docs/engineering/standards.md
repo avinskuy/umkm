@@ -84,6 +84,6 @@ Persetujuan kebijakan merupakan baseline desain dan implementasi; hal tersebut t
 - [Secure Software Development Lifecycle](secure-software-development-lifecycle.md) mengatur integrasi keamanan dari perencanaan sampai pemeliharaan.
 - [Kebijakan Keamanan Dependency & Komponen Pihak Ketiga](../security/dependency-third-party-security.md) mengatur supply chain software, package, SDK, dan komponen vendor.
 - [Kesiapan Operasional](../operations/README.md) mengatur respons insiden, kesinambungan layanan, observability, release/change control, dan runbook operasional.
-- [Audit Repository 21 November 2026](repository-audit-2026-11-21.md) mencatat status implementasi, hasil pemeriksaan, dan kesenjangan yang masih terbuka pada snapshot audit.
+- [Pemeliharaan Repository](repository-maintenance.md) menetapkan praktik audit, dokumentasi, kualitas kode, dan pemeriksaan sebelum merge.
 
 Status implementasi setiap kontrol harus dibuktikan melalui kode, konfigurasi, hasil pengujian, atau catatan operasional yang relevan. Dokumen kebijakan dan prosedur tidak dengan sendirinya membuktikan kontrol sudah berjalan.

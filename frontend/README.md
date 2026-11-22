@@ -4,8 +4,8 @@ Aplikasi web USahapintar menggunakan React, TypeScript, dan Vite.
 
 ## Persyaratan
 
-- Node.js 22 (versi yang digunakan oleh CI).
-- npm yang kompatibel dengan lockfile proyek.
+- Node.js 22.
+- npm yang kompatibel dengan lockfile repository.
 
 ## Menyiapkan lingkungan lokal
 
@@ -16,7 +16,7 @@ npm ci
 npm run dev
 ```
 
-Vite akan menampilkan alamat lokal untuk membuka aplikasi di browser. Gunakan terminal yang sama untuk melihat output development server.
+Vite menampilkan alamat lokal untuk membuka aplikasi. Output development server tersedia pada terminal yang sama.
 
 ## Pemeriksaan kualitas
 
@@ -30,22 +30,21 @@ npm test
 npm run build
 ```
 
-Untuk menjalankan test dalam mode watch:
+Perintah tambahan:
 
 ```sh
 npm run test:watch
-```
-
-Untuk melihat hasil production build secara lokal:
-
-```sh
 npm run preview
 ```
 
-## Catatan proyek
+## Struktur dan batas frontend
 
-Frontend saat ini masih berupa shell awal proyek, belum mengimplementasikan alur produk seperti autentikasi, profil, discovery, koneksi, pesan, membership, atau Admin.
+- Kelompokkan komponen, halaman, hooks, dan layanan berdasarkan fitur.
+- Tempatkan komponen UI lintas fitur pada area bersama hanya jika memiliki tanggung jawab dan pemakai yang jelas.
+- Hindari duplikasi komponen, validasi keamanan, dan aturan bisnis yang seharusnya menjadi tanggung jawab backend.
+- Frontend tidak boleh menjadi sumber kebenaran untuk role, status akun, kepemilikan resource, atau keputusan otorisasi.
+- Secret dan credential server tidak boleh dimasukkan ke bundle browser.
 
-Ikuti [Standar Engineering](../docs/engineering/standards.md), [Prinsip Pengalaman Pengguna yang Inklusif](../docs/product/prinsip-pengalaman-pengguna.md), dan [Panduan Kontribusi](../CONTRIBUTING.md).
+Frontend saat ini merupakan shell awal. Alur autentikasi, profil, discovery, koneksi, pesan, membership, dan administrasi belum tersedia sebagai fitur produk lengkap.
 
-Jangan menaruh secret di source code atau variabel yang dikirim ke browser. Konfigurasi yang bersifat rahasia harus tetap berada di backend atau lingkungan server yang sesuai.
+Ikuti [Engineering Standards](../docs/engineering/standards.md), [Inclusive UX Principles](../docs/product/prinsip-pengalaman-pengguna.md), dan [Contributing Guide](../CONTRIBUTING.md).

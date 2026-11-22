@@ -1,41 +1,54 @@
 # Migrasi Database
 
-Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0015):
+Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan pada database bersama bersifat immutable; perubahan skema berikutnya harus menggunakan migration baru.
 
-- `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
-- `20261122100000_create_identity_verification.sql` — membuat `verification_sessions`, `verification_challenges`, `otp_verification_attempt_events`, dan `otp_delivery_events`, termasuk state constraints, batas umur challenge 10 menit, satu challenge pending per sesi, binding recovery pra-pemilihan akun, serta indeks event lintas sesi.
-- `20261122110000_create_identity_sessions.sql` — membuat `sessions` dengan hash token SHA-256 unik, batas absolut 30 hari, batas idle 7 hari, rotasi token, pencabutan individual, metadata perangkat minimum, serta pencabutan otomatis saat status lifecycle akun tidak lagi aktif.
-- `20261122120000_create_account_recovery.sql` — membuat `recovery_contacts` dengan relasi lintas akun yang diizinkan dan deduplikasi per akun, `account_recovery_cases` dengan pemilihan target setelah verifikasi, serta `password_reset_tokens` yang hanya menyimpan hash dan terikat ke kasus/akun.
-- `20261122130000_create_identity_audit_events.sql` — membuat `identity_audit_events` append-only dengan actor/subject, action/outcome/reason code, korelasi request, metadata JSONB terbatas, serta perlindungan terhadap UPDATE, DELETE, dan TRUNCATE.
-- `20261122140000_remove_google_oauth_identity_support.sql` — menghapus tabel dan jalur identitas Google OAuth dari skema aktif serta mengunci pembuatan akun klien pada password lokal.
-- `20261122160000_add_verification_database_operations.sql` — menambahkan fungsi terkontrol untuk pembuatan/pembacaan sesi, reservasi challenge, pencatatan hasil dispatch, dan verifikasi OTP registrasi dengan rate limit lintas sesi.
-- `20261122170000_bind_verification_ids_from_runtime.sql` — mengubah fungsi pembuatan sesi dan reservasi challenge agar UUID dibuat runtime sebelum AEAD/AAD dan keyed OTP digest dihitung.
-- `20261122180000_audit_verification_runtime_events.sql` — menambahkan audit event untuk permintaan/hasil dispatch OTP dan percobaan verifikasi gagal, serta mengikat event registrasi/aktivasi ke akun terkait.
-- `20261122190000_add_public_profile_and_policy_acceptance.sql` — menambahkan profil publik satu-ke-satu, nama tampilan publik, catatan penerimaan Terms of Service dan Privacy Policy per versi, serta event consent marketing opsional yang append-only. Fungsi registrasi terkontrol menyimpan akun, profil, penerimaan kebijakan, dan pilihan marketing secara atomik.
-- `20261122200000_allow_otp_resend_during_verification_lock.sql` — mengizinkan penerbitan ulang OTP selama lock verifikasi aktif tanpa mengubah penghitung kegagalan atau `locked_until`; verifikasi tetap ditolak sampai lock berakhir.
-- `20261122210000_add_password_authentication_runtime.sql` — menambahkan operasi login berbasis role, pembuatan/pencabutan sesi opaque, dan rate limit HMAC per identifier/IP.
-- `20261122220000_add_session_runtime_operations.sql` — menambahkan validasi sesi aktif, pembaruan `last_seen_at`, rotasi token, dan pencabutan semua sesi satu akun.
-- `20261122230000_add_account_recovery_database_operations.sql` — menambahkan pembuatan sesi recovery tanpa akun terikat, memakai ulang mekanisme OTP dan rate limit lintas sesi yang sama, serta pemilihan akun secara atomik hanya jika akun aktif memiliki kontak pemulihan terverifikasi dengan kanal dan fingerprint yang cocok.
-- `20261122240000_add_account_recovery_account_candidates.sql` — menyediakan konteks recovery dan daftar akun aktif yang berbagi kontak pemulihan terverifikasi, hanya setelah sesi OTP diverifikasi dan dengan kecocokan fingerprint yang sama.
+## Daftar migration Identity Core
 
-## Status runtime
+| Urutan | File | Tanggung jawab |
+| ---: | --- | --- |
+| 0001 | `20261121170000_create_identity_accounts.sql` | Akun, identitas utama, role, lifecycle, reservasi kontak, dan fungsi pembuatan akun terbatas. |
+| 0002 | `20261122100000_create_identity_verification.sql` | Sesi verifikasi, challenge OTP, event percobaan, dan event pengiriman. |
+| 0003 | `20261122110000_create_identity_sessions.sql` | Sesi autentikasi, hash token, expiry, rotasi, dan pencabutan. |
+| 0004 | `20261122120000_create_account_recovery.sql` | Kontak pemulihan, kasus recovery, dan token reset yang disimpan sebagai hash. |
+| 0005 | `20261122130000_create_identity_audit_events.sql` | Audit event append-only dan perlindungan perubahan data. |
+| 0006 | `20261122140000_remove_google_oauth_identity_support.sql` | Menghapus dukungan identitas Google OAuth dari skema aktif. |
+| 0007 | `20261122160000_add_verification_database_operations.sql` | Operasi database terkontrol untuk sesi, challenge, dispatch, verifikasi, dan rate limit OTP. |
+| 0008 | `20261122170000_bind_verification_ids_from_runtime.sql` | Mengikat identifier verifikasi yang dibuat runtime ke operasi kriptografi. |
+| 0009 | `20261122180000_audit_verification_runtime_events.sql` | Audit event lifecycle verifikasi dan pengiriman OTP. |
+| 0010 | `20261122190000_add_public_profile_and_policy_acceptance.sql` | Profil publik, penerimaan Terms/Privacy, dan consent marketing opsional. |
+| 0011 | `20261122200000_allow_otp_resend_during_verification_lock.sql` | Mengizinkan resend saat lock tanpa membuka verifikasi sebelum lock berakhir. |
+| 0012 | `20261122210000_add_password_authentication_runtime.sql` | Operasi login password, session creation/revocation, dan rate limit login. |
+| 0013 | `20261122220000_add_session_runtime_operations.sql` | Validasi sesi, pembaruan aktivitas, rotasi token, dan logout semua sesi. |
+| 0014 | `20261122230000_add_account_recovery_database_operations.sql` | Pembuatan sesi recovery dan pengaitan akun secara atomik. |
+| 0015 | `20261122240000_add_account_recovery_account_candidates.sql` | Daftar kandidat akun setelah OTP diverifikasi dan pencocokan kontak pemulihan. |
 
-Modul Rust `identity` menyediakan pembuatan akun pending, profil publik, penerimaan kebijakan wajib per versi, consent marketing opsional, password hashing, dan `VerificationService` untuk registrasi email/WhatsApp, issue/resend OTP, pencatatan hasil dispatch, serta verifikasi dan aktivasi. Router HTTP registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Provider pengiriman masih berupa abstraksi; CI memakai fake provider dan tidak mengirim pesan nyata. Adapter provider nyata dan konfigurasi key produksi belum tersedia.
+## Batas runtime
 
-Rate limit pengiriman dan percobaan verifikasi ditegakkan melalui fungsi PostgreSQL terkontrol. Batas pengiriman adalah lima kali per kontak dalam 60 menit dengan cooldown 60 detik; batas kegagalan verifikasi lintas sesi adalah lima kali per kontak dalam 60 menit, dengan lock sesi satu jam setelah lima kegagalan. Challenge berlaku maksimal 10 menit. Akun pending memiliki masa berlaku 30 menit.
+- HTTP runtime memakai `APP_DATABASE_URL` dan principal aplikasi berhak minimum.
+- `DATABASE_URL` digunakan oleh proses migration dan pengujian integrasi yang dijalankan secara eksplisit.
+- HTTP server tidak menjalankan migration otomatis saat startup.
+- Provisioning principal PostgreSQL berada di `backend/database/bootstrap/`.
+- Jalankan migration dengan principal migrator; jangan gunakan principal aplikasi atau DBA untuk runtime.
+- Jangan menerapkan migration pada production tanpa prosedur deployment dan pemeriksaan terpisah.
 
-Migration 0003 menyediakan penyimpanan sesi autentikasi. Runtime menyediakan login password terpisah untuk Owner/Investor, cookie `__Host-` HttpOnly/Secure/SameSite=Lax, logout, dan rate limit PostgreSQL berbasis HMAC. Sesi memiliki expiry absolut 30 hari dan batas idle 7 hari pada skema; validasi sesi dan pembaruan idle timeout pada endpoint identitas terproteksi, rotasi token melalui endpoint refresh eksplisit, serta logout semua perangkat tersedia. Middleware belum diterapkan ke endpoint fitur yang belum dibangun; daftar sesi perangkat dan pencabutan individual melalui UI belum tersedia. Migration 0004 dan operasi database 0014 menyediakan sesi recovery tanpa akun terikat, challenge OTP yang memakai mekanisme verifikasi bersama, pemilihan akun yang memvalidasi kepemilikan kontak secara atomik, dan audit event. Recovery Service, adapter provider, persetujuan/manual review, penerbitan token reset, reset password, serta pencabutan sesi setelah reset belum tersedia. Pembacaan audit, retensi, forwarding eksternal, cleanup job, dan proses operasional lainnya belum termasuk.
+## Status integrasi
 
-## Pemisahan runtime dan migration
+Migration 0001–0015 tersedia pada repository dan diuji melalui PostgreSQL CI. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan sebagian alur account recovery.
 
-HTTP runtime membuat pool PostgreSQL melalui `DatabaseConfig::from_app_env()` dan hanya menggunakan `APP_DATABASE_URL` milik `usahapintar_app_login`. Pool dibatasi oleh `DATABASE_MAX_CONNECTIONS` (default 10, maksimum 100), acquire timeout 5 detik, idle timeout 10 menit, dan masa hidup koneksi 30 menit. Startup gagal tertutup jika konfigurasi atau koneksi database aplikasi tidak tersedia.
+Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery berhenti pada status `under_review`; approval, password reset, dan pencabutan sesi setelah reset belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
 
-`DATABASE_URL` digunakan untuk proses migration dan pengujian integrasi yang berjalan eksplisit dengan principal `usahapintar_migrator`. Fungsi `database::migrations::run(&pool)` tetap tersedia untuk tooling tersebut, tetapi tidak dipanggil oleh startup HTTP. Jangan menjalankan migrasi otomatis saat server aplikasi mulai.
+## Pengujian
 
-Endpoint `GET /api/v1/health` merupakan liveness check yang tidak bergantung pada database. Endpoint `GET /api/v1/readyz` menjalankan `SELECT 1` melalui pool runtime dan mengembalikan HTTP 503 jika database tidak siap.
+Pengujian migration, invariant database, principal/privilege, dan operasi PostgreSQL berada di `backend/tests/postgres.rs`. Pengujian runtime HTTP berada di `backend/tests/runtime.rs`. CI menggunakan database disposable dan fake provider; pengujian tidak mengirim OTP nyata.
 
-Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0015 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
+Perintah pemeriksaan backend tersedia di [Backend README](../README.md).
 
-Pengujian PostgreSQL untuk migration, invariant identitas, privilege principal, dan orchestration OTP berada di `backend/tests/postgres.rs`. Pengujian readiness runtime berada di `backend/tests/runtime.rs` dan memakai `APP_DATABASE_URL` melalui principal aplikasi. Keduanya dijalankan terhadap database disposable di CI.
+## Provisioning dan urutan operasi
 
-Jangan pernah mengubah migration setelah diterapkan pada database bersama. Perubahan skema berikutnya harus menggunakan migration baru dengan versi SQLx berikutnya. Migration, provisioning principal, dan deployment produksi tetap merupakan operasi terpisah dengan prosedur serta persetujuan masing-masing.
+1. Provision principal dan grant dasar melalui skrip pada `backend/database/bootstrap/`.
+2. Jalankan migration secara eksplisit menggunakan principal migrator.
+3. Terapkan grant runtime setelah ownership fungsi dan privilege diperiksa.
+4. Jalankan pengujian PostgreSQL menggunakan principal yang sesuai.
+5. Verifikasi konfigurasi runtime sebelum layanan diaktifkan.
+
+Jangan mengubah file migration yang telah digunakan pada database bersama. Buat migration baru untuk setiap perubahan skema berikutnya.

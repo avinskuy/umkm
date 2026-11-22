@@ -2,7 +2,7 @@
 
 > Cakupan: kontrak kontak pemulihan bersama, pemilihan akun sasaran, dan perlindungan terhadap penyalahgunaan. Registrasi email/WhatsApp tetap mewajibkan OTP; login rutin menggunakan password tanpa OTP.
 
-> Status: keputusan produk dan implikasi skema yang disetujui sebagai baseline; rancangan SQL final tetap memerlukan tinjauan keamanan dan pengujian.
+> Status implementasi: skema recovery, operasi PostgreSQL, service core, dan router HTTP telah tersedia serta diuji. Router belum dipasang pada server default. Proses recovery saat ini berhenti pada `under_review`; approval, password reset, dan pencabutan sesi setelah reset belum tersedia.
 > Cakupan: sesi verifikasi, kontak pemulihan bersama, pemilihan akun tujuan, batas penyalahgunaan, dan masa tunggu penghapusan.
 
 Dokumen ini melengkapi [Rancangan Skema Database](database-schema-design.md). Dokumen ini tidak menyatakan bahwa tabel atau alur sudah diimplementasikan.
@@ -73,7 +73,7 @@ Batas percobaan dan pengiriman tidak boleh dapat diakali dengan membuat sesi bar
 - Batas lintas sesi harus mencegah penggandaan kesempatan, tetapi jangan sampai pengguna yang sah terkunci permanen karena penyalahgunaan pihak lain. Tetapkan mekanisme pemulihan pembatasan yang aman dan dapat diaudit.
 - Jangan membocorkan aturan deteksi atau nilai ambang internal melalui pesan error.
 
-Strategi penyimpanan akhir (tabel penghitung, bucket waktu, atau layanan rate-limit terdistribusi) belum dipilih. Pilihan tersebut harus dibuat saat desain implementasi dengan mempertimbangkan konkurensi, retensi, privasi, dan operasi multi-instance.
+Operasi verifikasi OTP menggunakan PostgreSQL untuk menegakkan batas lintas sesi dengan fingerprint kontak berbasis HMAC. Kontrol tambahan berdasarkan IP, perangkat, jaringan, dan risiko harus diterapkan melalui abuse guard pada lapisan HTTP; router recovery saat ini menerima guard melalui dependency injection.
 
 ## 6. Reservasi kontak utama selama penghapusan
 
@@ -86,25 +86,25 @@ Strategi penyimpanan akhir (tabel penghitung, bucket waktu, atau layanan rate-li
 
 Rancangan constraint dan indeks harus membedakan kontak utama pada users dari relasi di recovery_contacts. Jangan mengandalkan validasi frontend untuk menjamin reservasi.
 
-## 7. Checklist sebelum migrasi
+## 7. Invariant database dan runtime
 
-- [ ] verification_sessions.user_id nullable hanya untuk purpose pemulihan sebelum pemilihan akun.
-- [ ] Setiap account_recovery_cases memiliki tepat satu verification_session_id yang wajib dan unique; satu sesi hanya memiliki maksimal satu kasus. OTP resend memakai kasus/sesi yang sama, percobaan baru membuat keduanya baru.
-- [ ] account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; target dikaitkan atomik setelah pemeriksaan.
-- [ ] Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
-- [ ] Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
-- [ ] Relasi kontak yang sama tidak dapat didaftarkan dua kali pada akun yang sama, tetapi tetap boleh dipakai akun berbeda.
-- [ ] Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
-- [ ] Nilai kontak yang perlu dipakai kembali dilindungi dengan enkripsi yang sesuai.
-- [ ] OTP terikat pada purpose, kanal, dan kontak; tidak dapat dipakai lintas akun atau tujuan.
-- [ ] Pemilihan akun tidak membocorkan daftar atau jumlah akun kepada pihak yang belum berwenang.
-- [ ] Pengaitan akun tujuan atomik, satu kali, dan diaudit.
-- [ ] Rate limit berlaku lintas sesi dan instance serta tahan terhadap request bersamaan.
-- [ ] Kontak utama tetap direservasi selama masa tunggu penghapusan 30 hari.
-- [ ] Kontak pemulihan email dan nomor HP tidak ikut terkena aturan keunikan kontak utama.
-- [ ] Tes integrasi mencakup kontak bersama, beberapa akun, pemilihan akun, enumerasi, concurrency, penguncian, kedaluwarsa, pembatalan penghapusan, dan pelepasan reservasi.
+- verification_sessions.user_id nullable hanya untuk purpose pemulihan sebelum pemilihan akun.
+- Setiap account_recovery_cases memiliki tepat satu verification_session_id yang wajib dan unique; satu sesi hanya memiliki maksimal satu kasus. OTP resend memakai kasus/sesi yang sama, percobaan baru membuat keduanya baru.
+- account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; target dikaitkan atomik setelah pemeriksaan.
+- Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
+- Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
+- Relasi kontak yang sama tidak dapat didaftarkan dua kali pada akun yang sama, tetapi tetap boleh dipakai akun berbeda.
+- Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
+- Nilai kontak yang perlu dipakai kembali dilindungi dengan enkripsi yang sesuai.
+- OTP terikat pada purpose, kanal, dan kontak; tidak dapat dipakai lintas akun atau tujuan.
+- Pemilihan akun tidak membocorkan daftar atau jumlah akun kepada pihak yang belum berwenang.
+- Pengaitan akun tujuan atomik, satu kali, dan diaudit.
+- Rate limit berlaku lintas sesi dan instance serta tahan terhadap request bersamaan.
+- Kontak utama tetap direservasi selama masa tunggu penghapusan 30 hari.
+- Kontak pemulihan email dan nomor HP tidak ikut terkena aturan keunikan kontak utama.
+- Tes integrasi mencakup kontak bersama, beberapa akun, pemilihan akun, enumerasi, concurrency, penguncian, kedaluwarsa, pembatalan penghapusan, dan pelepasan reservasi.
 
-Tidak ada SQL migration yang dibuat oleh dokumen ini. Keputusan tentang state machine final, kolom tambahan, strategi rate-limit, enkripsi, dan retensi tetap memerlukan review sebelum implementasi.
+Migration dan operasi database untuk recovery telah tersedia. Perubahan skema berikutnya harus menggunakan migration baru dan mempertahankan invariant yang dijelaskan pada dokumen ini.
 
 
 ## 8. Pembukaan kembali sesi setelah penguncian OTP
@@ -118,7 +118,7 @@ Setelah lima percobaan verifikasi gagal, sesi dikunci selama satu jam. Aturan pe
 - Batas pengiriman per kontak serta rate limit lintas sesi dan instance tetap berlaku. Sesi baru tidak boleh menjadi cara untuk menghindari pembatasan.
 - Pemeriksaan waktu dan reset penghitung dilakukan di server secara atomik. Request bersamaan pada batas akhir penguncian tidak boleh menghasilkan lebih dari satu reset yang tidak konsisten.
 
-Reset penghitung sesi setelah masa penguncian adalah keputusan kebijakan yang disetujui. Strategi penyimpanan counter dan rate limit terdistribusi tetap menjadi keputusan implementasi yang memerlukan review.
+Reset penghitung sesi setelah masa penguncian dilakukan secara atomik oleh operasi verifikasi. Penyimpanan rate limit OTP menggunakan operasi PostgreSQL terkontrol agar batas lintas sesi tetap konsisten.
 
 ## 9. Status siklus hidup dan kondisi penguncian sesi
 
@@ -142,7 +142,7 @@ Aturan perilaku:
 - Status challenge OTP individual tetap terpisah. Challenge yang kedaluwarsa, dibatalkan/digantikan, atau sudah digunakan tidak pernah diaktifkan kembali.
 - Pemeriksaan status, waktu penguncian, dan reset penghitung harus dilakukan di server dalam operasi yang aman terhadap request bersamaan.
 
-Status di atas merupakan baseline konseptual untuk desain. Nama kolom final, constraint, seluruh transisi, serta pemetaan status challenge perlu ditinjau bersama rancangan state machine sebelum migrasi SQL dibuat.
+Status di atas merupakan kontrak lifecycle sesi dan challenge yang harus dipertahankan oleh implementasi database dan runtime.
 
 
 
@@ -185,14 +185,14 @@ UX mengikuti pola yang familier dari aplikasi verifikasi yang telah digunakan lu
 7. Ingatkan pengguna agar tidak membagikan kode kepada siapa pun.
 8. Jangan tampilkan istilah status internal seperti `consumed` atau `superseded`; tampilkan pesan dan tindakan yang dipahami pengguna.
 
-Panjang kode OTP dan pilihan kanal cadangan tetap belum ditetapkan. Autofill mengikuti kemampuan platform dan tidak boleh meminta izin luas untuk membaca SMS. Validasi kode wajib dilakukan di server.
+Kode OTP menggunakan enam digit numerik sesuai kebijakan verifikasi. Autofill mengikuti kemampuan platform dan tidak boleh meminta izin luas untuk membaca SMS. Validasi kode wajib dilakukan di server.
 
 Acuan:
 - WhatsApp Help Center, [Cara Mendaftarkan Nomor Telepon](https://faq.whatsapp.com/684051319521343/?cms_platform=android&locale=id_ID).
 - Google for Developers, [Automatic SMS Verification with the SMS Retriever API](https://developers.google.com/identity/sms-retriever/overview).
 - Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
 
-**Status keputusan:** kebijakan penerbitan challenge selama sesi terkunci telah diputuskan dan dijelaskan pada Bagian 12. Catatan ini bukan keputusan terbuka. Kebijakan OTP pada tingkat produk dianggap selesai; detail library, penyedia, konfigurasi, dan integrasi mengikuti pola teruji serta dokumentasi resmi saat implementasi.
+
 
 
 ## 12. Penerbitan challenge selama sesi terkunci
@@ -207,4 +207,4 @@ Aturan keamanan:
 - Setelah penguncian berakhir, sesi `pending` yang sama dapat digunakan kembali sesuai aturan reset penghitung kegagalan.
 - Penerbitan tetap tunduk pada rate limit lintas sesi dan instance; membuat sesi baru tidak boleh menghindari batas tersebut.
 
-Dengan demikian, pengguna tetap dapat memperoleh kode terbaru saat menunggu, tetapi tidak dapat menggunakannya untuk melewati penguncian verifikasi.
+Pengguna tetap dapat memperoleh kode terbaru saat menunggu, tetapi tidak dapat menggunakannya untuk melewati penguncian verifikasi.

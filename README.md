@@ -2,43 +2,46 @@
 
 **Temukan peluang. Bangun koneksi.**
 
-Platform bisnis dan jejaring investor untuk menemukan peluang dan membangun koneksi.
+Platform bisnis dan jejaring investor untuk menemukan peluang, membangun koneksi, dan mengembangkan kerja sama.
 
-> Status proyek: tahap fondasi. Kebijakan produk, arsitektur, keamanan, dan operasional telah didokumentasikan; implementasi fitur produk berjalan bertahap.
+## Status proyek
 
-## Status implementasi saat ini
+USahapintar menggunakan arsitektur modular monolith dengan frontend React + TypeScript, backend Rust + Axum, dan PostgreSQL melalui SQLx.
 
-- Frontend React + TypeScript masih berupa shell awal proyek.
-- Backend Rust + Axum menyediakan liveness `/api/v1/health` dan readiness `/api/v1/readyz`.
-- Pool PostgreSQL melalui SQLx diinisialisasi saat startup menggunakan principal aplikasi dari `APP_DATABASE_URL`.
-- Migration Identity Core 0001–0013 tersedia dan diuji melalui PostgreSQL CI. Migration mencakup akun, verifikasi, sesi, pemulihan, audit, penghapusan dukungan OAuth, operasi database verifikasi, pengikatan ID verifikasi, audit runtime verifikasi, profil dan penerimaan kebijakan, serta operasi login dan sesi. Server HTTP tidak menjalankan migration otomatis saat startup; penerapan ke database produksi merupakan proses terpisah.
-- Backend menyediakan hashing password, `VerificationService` untuk registrasi email/WhatsApp dengan OTP, serta router HTTP registrasi/verifikasi yang diuji tetapi belum dipasang pada aplikasi HTTP default. Kebijakan autentikasi menetapkan OTP wajib saat registrasi, sedangkan login dan login kembali setelah logout cukup menggunakan password. Endpoint login Owner/Investor berbasis password dan logout sudah dipasang pada runtime dengan cookie aman, sesi server-side, serta rate limit PostgreSQL. Middleware validasi sesi, pembaruan idle timeout, refresh/rotasi token, dan logout semua perangkat tersedia untuk endpoint identitas terproteksi. Integrasi middleware ke endpoint fitur, adapter provider OTP nyata, runtime recovery, dan fitur produk belum tersedia.
-- Dokumen kebijakan adalah baseline keputusan, bukan bukti bahwa seluruh fitur/kontrol sudah diimplementasikan atau tersertifikasi.
+Fondasi repository, standar engineering, kebijakan produk dan keamanan, serta Identity Core telah tersedia. Implementasi fitur produk masih bertahap.
 
-## Struktur proyek
+### Implementasi yang tersedia
 
-- `frontend/` — aplikasi web React + TypeScript; lihat [panduan frontend](frontend/README.md).
-- `backend/` — API Rust/Axum dan fondasi PostgreSQL/SQLx; lihat [panduan backend](backend/README.md).
+- Backend menyediakan liveness `GET /api/v1/health` dan readiness `GET /api/v1/readyz`.
+- PostgreSQL runtime menggunakan principal aplikasi melalui `APP_DATABASE_URL`. Migration dijalankan secara eksplisit oleh principal migrator dan tidak dijalankan saat HTTP server startup.
+- Lima belas migration Identity Core tersedia dan diuji melalui PostgreSQL CI.
+- Login Business Owner dan Investor menggunakan email/nomor telepon serta password. Login rutin tidak meminta OTP.
+- Registrasi menggunakan password dan verifikasi OTP melalui email atau WhatsApp. Service dan router HTTP tersedia, tetapi router registrasi belum dipasang pada server default.
+- Session validation, idle timeout, absolute expiry, token rotation, logout, dan logout seluruh perangkat tersedia pada endpoint identitas.
+- Account Recovery memiliki database operations, service core, dan router HTTP. Router belum dipasang pada server default; alur saat ini berhenti pada status `under_review`.
+- Provider OTP nyata, key provider produksi, persetujuan recovery, password reset, dan integrasi fitur produk belum tersedia.
+- Frontend masih berupa shell awal dan belum mengimplementasikan alur produk utama.
+
+Ketersediaan kode atau dokumen tidak dengan sendirinya membuktikan bahwa fitur telah diaktifkan di production atau seluruh kontrol telah memenuhi sertifikasi tertentu.
+
+## Struktur repository
+
+- `frontend/` — aplikasi web React, TypeScript, dan Vite.
+- `backend/` — API Rust/Axum, modul domain, PostgreSQL, dan SQLx migrations.
 - `docs/` — dokumentasi produk, arsitektur, keamanan, engineering, dan operasional.
+
+Panduan masing-masing aplikasi:
+- [Frontend](frontend/README.md)
+- [Backend](backend/README.md)
+- [Engineering standards](docs/engineering/standards.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Prinsip pengembangan
 
-- Menggunakan modular monolith; tidak memecah layanan menjadi microservices sebelum benar-benar diperlukan.
-- Modul frontend disusun berdasarkan fitur dan modul backend berdasarkan domain.
-- Setiap file dan tanggung jawab harus memiliki tempat yang jelas.
-- Perubahan dibuat dalam ukuran kecil, mudah ditinjau, dan disertai pengujian.
-- Tidak menyimpan rahasia di source control.
-- Otorisasi role dan akses sumber daya ditegakkan oleh backend.
-- Kebijakan dan prosedur operasional harus selaras dengan implementasi aktual serta bukti pengujian.
-
-## Memulai pengembangan
-
-Lihat [CONTRIBUTING.md](CONTRIBUTING.md) untuk alur kontribusi dan [Standar Engineering](docs/engineering/standards.md) untuk pedoman rekayasa.
-
-- [Kebijakan produk dan UX](docs/product/)
-- [Dokumentasi arsitektur](docs/architecture/)
-- [Kebijakan keamanan dan privasi](docs/security/README.md)
-- [Kesiapan operasional](docs/operations/README.md)
-- [Audit repository 21 November 2026](docs/engineering/repository-audit-2026-11-21.md)
-
-Petunjuk setup frontend dan backend tersedia pada README masing-masing direktori.
+- Pertahankan modular monolith sampai kebutuhan nyata membenarkan pemisahan layanan.
+- Kelompokkan kode berdasarkan fitur atau domain dan hindari abstraksi tanpa pengguna yang jelas.
+- Audit struktur, tanggung jawab, dan implementasi yang sudah ada sebelum menambahkan kode.
+- Setiap perubahan harus memiliki pengujian yang sesuai dan dapat ditinjau.
+- Simpan secret hanya pada lingkungan server atau secret manager.
+- Tegakkan autentikasi dan otorisasi pada backend, termasuk pemeriksaan kepemilikan resource.
+- Selaraskan dokumentasi dengan perilaku kode yang benar-benar tersedia.

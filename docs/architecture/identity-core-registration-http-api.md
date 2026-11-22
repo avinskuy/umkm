@@ -2,7 +2,7 @@
 
 - **Status:** implementasi router tersedia dan diuji secara unit; belum dipasang pada aplikasi runtime.
 - **Cakupan:** menerima registrasi, resend OTP, dan verifikasi OTP.
-- **Tidak termasuk:** login, sesi/cookie, pemulihan, provider nyata, KMS nyata, deployment, atau aktivasi endpoint publik.
+- **Tidak termasuk:** implementasi login dan sesi (disediakan oleh router autentikasi terpisah), pemulihan akun, provider nyata, KMS nyata, deployment, atau aktivasi endpoint publik.
 
 ## 1. Endpoint
 
@@ -60,7 +60,7 @@ Router tidak boleh dibuat dengan fake/allow-all guard, fake key provider, atau f
 - OTP salah/kedaluwarsa atau sesi tidak valid mengembalikan HTTP 400 generik.
 - Kegagalan internal/kriptografi/provider/database yang tidak dapat diproses mengembalikan HTTP 503 generik.
 
-Belum ada login endpoint atau cookie sesi. Setelah verifikasi, pengguna perlu menggunakan login yang akan dibuat pada tahap autentikasi berikutnya.
+Router registrasi ini tidak membuat sesi login atau cookie autentikasi. Login Owner/Investor dan session management disediakan oleh endpoint autentikasi terpisah. Keberhasilan verifikasi registrasi mengaktifkan akun, tetapi router registrasi belum dipasang pada server default.
 
 ## 6. Pengujian
 
@@ -68,8 +68,8 @@ Belum ada login endpoint atau cookie sesi. Setelah verifikasi, pengguna perlu me
 - Validasi kanal dan pasangan kontak sebelum hashing password.
 - Format verification ID acak dan label versi kebijakan.
 - Router default tidak memasang endpoint registrasi.
-- Integration test PostgreSQL mencakup registrasi email, pengiriman melalui fake provider, verifikasi/aktivasi, serta respons generik untuk identifier duplikat.
-- Tes tambahan untuk resend, rate-limit decision, invalid/expired OTP, marketing opt-in, dan kegagalan provider masih menjadi gerbang sebelum router dipasang pada runtime.
+- Pengujian unit dan runtime mencakup validasi input, respons generik untuk identifier duplikat, pengiriman dengan fake provider, serta verifikasi dan aktivasi melalui PostgreSQL.
+- Pengujian tambahan untuk kegagalan provider, abuse guard, dan seluruh kondisi batas harus tetap dipertahankan sebagai gerbang sebelum router diaktifkan.
 
 ## 7. Gerbang aktivasi
 
