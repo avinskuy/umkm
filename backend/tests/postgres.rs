@@ -1739,21 +1739,19 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     assert_eq!(reason, "logout");
 
     let second_token_hash = vec![43_u8; 32];
-    let second_session_id: String = sqlx::query_scalar(
-        "SELECT public.create_password_login_session($1::uuid, $2)::text",
-    )
-    .bind(&user_id)
-    .bind(&second_token_hash)
-    .fetch_one(pool)
-    .await
-    .expect("active user should be able to create another device session");
-    let revoked_count: i32 = sqlx::query_scalar(
-        "SELECT public.revoke_all_password_login_sessions($1::uuid)",
-    )
-    .bind(&user_id)
-    .fetch_one(pool)
-    .await
-    .expect("logout-all should revoke every active session for the account");
+    let second_session_id: String =
+        sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
+            .bind(&user_id)
+            .bind(&second_token_hash)
+            .fetch_one(pool)
+            .await
+            .expect("active user should be able to create another device session");
+    let revoked_count: i32 =
+        sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1::uuid)")
+            .bind(&user_id)
+            .fetch_one(pool)
+            .await
+            .expect("logout-all should revoke every active session for the account");
     assert_eq!(revoked_count, 1);
 
     let second_reason: String =
