@@ -171,7 +171,6 @@ Peristiwa notifikasi keamanan wajib mencakup login dari perangkat baru, perubaha
 
 ```mermaid
 erDiagram
-    USERS ||--o{ USER_IDENTITIES : links
     USERS ||--o{ SESSIONS : owns
     USERS o|--o{ VERIFICATION_SESSIONS : starts
     VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
@@ -218,7 +217,6 @@ Diagram ini merupakan gambaran konseptual. Kardinalitas yang tepat, relasi nulla
 Tambahkan indeks berdasarkan jalur akses yang sudah diketahui, bukan optimasi spekulatif. Kandidat indeks berikut harus divalidasi terhadap bentuk query yang sebenarnya:
 
 - `users(email_normalized)` dan `users(phone_e164)`: partial index unik ketika nilainya tidak NULL.
-- `user_identities(provider, provider_subject)`: unik.
 - `sessions(user_id, expires_at)` dan `sessions(token_hash)` yang unik.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
 - `recovery_contacts(user_id, status, created_at)` untuk daftar kontak per akun; unique constraint komposit `(user_id, channel, contact_hash)` untuk mencegah relasi kontak duplikat di akun yang sama; serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk pencarian lintas akun. Jangan menerapkan unique constraint global pada email atau nomor HP pemulihan.
