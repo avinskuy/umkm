@@ -47,7 +47,7 @@ impl AuthenticationRateLimitKey {
         Ok(Self(Arc::new(key)))
     }
 
-    fn fingerprint(&self, purpose: &[u8], value: &[u8]) -> [u8; 32] {
+    pub(crate) fn fingerprint(&self, purpose: &[u8], value: &[u8]) -> [u8; 32] {
         let key = hmac::Key::new(hmac::HMAC_SHA256, &self.0[..]);
         let mut input = Zeroizing::new(Vec::with_capacity(purpose.len() + value.len() + 1));
         input.extend_from_slice(purpose);
@@ -459,7 +459,7 @@ pub fn normalize_identifier(value: &str) -> Result<String, AuthenticationError> 
     Ok(compact)
 }
 
-fn ip_rate_limit_subject(ip: IpAddr) -> Vec<u8> {
+pub(crate) fn ip_rate_limit_subject(ip: IpAddr) -> Vec<u8> {
     match ip {
         IpAddr::V4(address) => {
             let mut value = vec![4_u8];
