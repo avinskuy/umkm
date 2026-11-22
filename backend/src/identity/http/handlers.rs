@@ -19,6 +19,10 @@ use super::super::{
     registration::{ClientRegistration, ClientRole, ContactChannel},
     verification::VerificationError,
 };
+use super::{
+    opaque_verification_id, valid_contact_input, AbuseDecision, RegistrationAction,
+    RegistrationApiState,
+};
 
 const MAX_REQUEST_BYTES: usize = 16 * 1024;
 const MAX_DISPLAY_NAME_CHARS: usize = 120;
@@ -153,7 +157,10 @@ async fn register(
     let password = Zeroizing::new(request.password);
     let confirmation = Zeroizing::new(request.password_confirmation);
     if password.is_empty() || password.as_str() != confirmation.as_str() {
-        return error(StatusCode::BAD_REQUEST, "Password tidak valid atau konfirmasi tidak cocok.");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "Password tidak valid atau konfirmasi tidak cocok.",
+        );
     }
     if request.marketing_consent && state.policy_versions.marketing_notice.is_none() {
         return error(
@@ -163,12 +170,14 @@ async fn register(
     }
 
     if !state.password_policy.accepts(password.as_str()) {
-        return error(StatusCode::BAD_REQUEST, "Password belum memenuhi ketentuan keamanan.");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "Password belum memenuhi ketentuan keamanan.",
+        );
     }
 
-    let password_hash = match tokio::task::spawn_blocking(move || hash_password(password.as_bytes()))
-        .await
-    {
+    let password_hash =
+        match tokio::task::spawn_blocking(move || hash_password(password.as_bytes())).await {
         Ok(Ok(hash)) => hash,
         _ => {
             return error(
