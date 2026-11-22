@@ -1841,12 +1841,13 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
     .await
     .expect("registration should persist a public profile and required policy acceptance");
 
-    let display_name: String =
-        sqlx::query_scalar("SELECT display_name FROM public.user_profiles WHERE user_id = $1::uuid")
-            .bind(&user_id)
-            .fetch_one(pool)
-            .await
-            .expect("profile display name should be stored");
+    let display_name: String = sqlx::query_scalar(
+        "SELECT display_name FROM public.user_profiles WHERE user_id = $1::uuid",
+    )
+    .bind(&user_id)
+    .fetch_one(pool)
+    .await
+    .expect("profile display name should be stored");
     assert_eq!(display_name, "Nama Tampilan");
 
     let policy_records: i64 = sqlx::query_scalar(
@@ -1876,13 +1877,12 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("explicit marketing opt-in should be recorded");
-    let marketing_action: String = sqlx::query_scalar(
-        "SELECT action FROM public.consent_events WHERE user_id = $1::uuid",
-    )
-    .bind(&marketing_user_id)
-    .fetch_one(pool)
-    .await
-    .expect("marketing opt-in event should be queryable");
+    let marketing_action: String =
+        sqlx::query_scalar("SELECT action FROM public.consent_events WHERE user_id = $1::uuid")
+            .bind(&marketing_user_id)
+            .fetch_one(pool)
+            .await
+            .expect("marketing opt-in event should be queryable");
     assert_eq!(marketing_action, "granted");
 
     assert!(
@@ -1916,18 +1916,22 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
         "consent history must reject TRUNCATE"
     );
     assert!(
-        sqlx::query("SELECT public.create_client_user_with_profile_and_policy(\
+        sqlx::query(
+            "SELECT public.create_client_user_with_profile_and_policy(\
             '   ', 'investor', 'email', 'invalid-display-name@example.test', NULL, \
-            'encoded-password-hash', 'terms-v1', 'privacy-v1', FALSE, NULL)")
+            'encoded-password-hash', 'terms-v1', 'privacy-v1', FALSE, NULL)"
+        )
             .execute(pool)
             .await
             .is_err(),
         "blank public display names must be rejected"
     );
     assert!(
-        sqlx::query("SELECT public.create_client_user_with_profile_and_policy(\
+        sqlx::query(
+            "SELECT public.create_client_user_with_profile_and_policy(\
             'No Policy', 'investor', 'email', 'missing-policy-version@example.test', NULL, \
-            'encoded-password-hash', NULL, 'privacy-v1', FALSE, NULL)")
+            'encoded-password-hash', NULL, 'privacy-v1', FALSE, NULL)"
+        )
             .execute(pool)
             .await
             .is_err(),
