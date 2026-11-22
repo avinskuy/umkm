@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 use zeroize::Zeroizing;
 
 use super::super::authentication::{
