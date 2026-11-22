@@ -1921,9 +1921,9 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
             '   ', 'investor', 'email', 'invalid-display-name@example.test', NULL, \
             'encoded-password-hash', 'terms-v1', 'privacy-v1', FALSE, NULL)"
         )
-            .execute(pool)
-            .await
-            .is_err(),
+        .execute(pool)
+        .await
+        .is_err(),
         "blank public display names must be rejected"
     );
     assert!(
@@ -1932,9 +1932,9 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
             'No Policy', 'investor', 'email', 'missing-policy-version@example.test', NULL, \
             'encoded-password-hash', NULL, 'privacy-v1', FALSE, NULL)"
         )
-            .execute(pool)
-            .await
-            .is_err(),
+        .execute(pool)
+        .await
+        .is_err(),
         "required policy versions must be supplied"
     );
 }
