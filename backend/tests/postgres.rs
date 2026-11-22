@@ -25,7 +25,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_user_constraints(&pool).await;
     assert_role_and_registration_provenance_are_immutable(&pool).await;
     assert_contact_reservations_and_release(&pool).await;
-    assert_provider_identity_invariants(&pool).await;
+    assert_password_only_authentication_invariants(&pool).await;
     assert_client_creation_function(&pool).await;
     assert_verification_schema_invariants(&pool).await;
     assert_authentication_session_invariants(&pool).await;
@@ -154,7 +154,7 @@ async fn assert_user_constraints(pool: &PgPool) {
         .execute(pool)
         .await
         .is_err(),
-        "client accounts without a password must have a Google identity in the same transaction"
+        "client accounts must have a local password hash"
     );
 
     assert!(
@@ -461,207 +461,73 @@ async fn assert_contact_reservations_and_release(pool: &PgPool) {
     );
 }
 
-async fn assert_provider_identity_invariants(pool: &PgPool) {
-    let google_user_id: String =
-        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
+async fn assert_password_only_authentication_invariants(pool: &PgPool) {
+    let user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
             .bind("business_owner")
             .bind("email")
-            .bind("google-owner@example.test")
-            .bind(Option::<String>::None)
-            .bind(Option::<String>::None)
-            .bind("google-subject-001")
-            .fetch_one(pool)
-            .await
-            .expect("Google-only registration should create user and provider identity atomically");
-
-    let local_user_id: String =
-        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
-            .bind("investor")
-            .bind("email")
-            .bind("local-investor@example.test")
+            .bind("password-only-owner@example.test")
             .bind(Option::<String>::None)
             .bind("encoded-password-hash")
-            .bind(Option::<String>::None)
             .fetch_one(pool)
             .await
-            .expect("local-password registration should create a pending client account");
+            .expect("password registration should create a pending client account");
 
-    assert!(
-        sqlx::query(
-            "INSERT INTO public.user_identities (user_id, provider, provider_subject) \
-             VALUES ($1::uuid, 'google', 'google-subject-001')"
-        )
-        .bind(&local_user_id)
-        .execute(pool)
-        .await
-        .is_err(),
-        "a Google provider subject cannot be linked to two accounts"
-    );
+    let account_state: (String, Option<String>) = sqlx::query_as(
+        "SELECT account_status, password_hash FROM public.users WHERE id = $1::uuid",
+    )
+    .bind(&user_id)
+    .fetch_one(pool)
+    .await
+    .expect("created account state should be queryable");
+    assert_eq!(account_state.0, "pending_verification");
+    assert_eq!(account_state.1.as_deref(), Some("encoded-password-hash"));
 
-    assert!(
-        sqlx::query(
-            "INSERT INTO public.user_identities (user_id, provider, provider_subject) \
-             VALUES ($1::uuid, 'unknown-provider', 'provider-subject-002')"
-        )
-        .bind(&local_user_id)
-        .execute(pool)
-        .await
-        .is_err(),
-        "unsupported providers must be rejected"
-    );
-
-    assert!(
-        sqlx::query(
-            "INSERT INTO public.user_identities (user_id, provider, provider_subject) \
-             VALUES ('00000000-0000-0000-0000-000000000000', 'google', 'provider-subject-003')"
-        )
-        .execute(pool)
-        .await
-        .is_err(),
-        "provider identities must reference an existing user"
-    );
-
-    assert!(
-        sqlx::query(
-            "UPDATE public.user_identities SET provider_subject = 'changed-subject' WHERE user_id = $1::uuid"
-        )
-        .bind(&google_user_id)
-        .execute(pool)
-        .await
-        .is_err(),
-        "provider identity binding must be immutable"
-    );
-
-    assert!(
-        sqlx::query("DELETE FROM public.user_identities WHERE user_id = $1::uuid")
-            .bind(&google_user_id)
-            .execute(pool)
+    let legacy_identity_table_exists: bool =
+        sqlx::query_scalar("SELECT pg_catalog.to_regclass('public.user_identities') IS NOT NULL")
+            .fetch_one(pool)
             .await
-            .is_err(),
-        "a Google-only client cannot unlink its last authentication method"
+            .expect("legacy provider identity table state should be queryable");
+    assert!(
+        !legacy_identity_table_exists,
+        "provider identity storage must be absent"
     );
 
-    let mut setup_tx = pool
-        .begin()
-        .await
-        .expect("transaction should start for deletion lifecycle fixture");
-
-    let terminal_user_id: String = sqlx::query_scalar(
-        "INSERT INTO public.users ( \
-             primary_role, account_status, email_normalized, initial_contact_channel, \
-             email_verified_at, initial_contact_verified_at, status_changed_at \
-         ) \
-         VALUES ( \
-             'business_owner', 'deletion_pending', 'terminal-google@example.test', 'email', \
-             now(), now(), now() - INTERVAL '31 days' \
-         ) \
-         RETURNING id::text",
-    )
-    .fetch_one(&mut *setup_tx)
-    .await
-    .expect("a deletion-pending account with a past waiting period should be created");
-
-    sqlx::query(
-        "INSERT INTO public.user_identities (user_id, provider, provider_subject) \
-         VALUES ($1::uuid, 'google', 'google-subject-terminal')",
-    )
-    .bind(&terminal_user_id)
-    .execute(&mut *setup_tx)
-    .await
-    .expect("terminal fixture should retain its Google identity before deletion completes");
-
-    setup_tx
-        .commit()
-        .await
-        .expect("deletion-pending Google-only account should satisfy auth method invariant");
-
-    let mut processing_tx = pool
-        .begin()
-        .await
-        .expect("transaction should start for deletion processing");
-
-    sqlx::query(
-        "UPDATE public.users SET account_status = 'deletion_processing' WHERE id = $1::uuid",
-    )
-    .bind(&terminal_user_id)
-    .execute(&mut *processing_tx)
-    .await
-    .expect("deletion may enter processing after the waiting period");
-
-    processing_tx
-        .commit()
-        .await
-        .expect("deletion processing transition should commit");
-
     assert!(
-        sqlx::query("UPDATE public.users SET account_status = 'active' WHERE id = $1::uuid")
-            .bind(&terminal_user_id)
-            .execute(pool)
-            .await
-            .is_err(),
-        "deletion processing cannot be cancelled after it starts"
-    );
-
-    let mut tx = pool
-        .begin()
-        .await
-        .expect("transaction should start for terminal account cleanup");
-
-    sqlx::query(
-        "UPDATE public.users \
-         SET account_status = 'closed', \
-             email_normalized = NULL, \
-             email_verified_at = NULL, \
-             phone_e164 = NULL, \
-             phone_verified_at = NULL, \
-             initial_contact_verified_at = NULL, \
-             password_hash = NULL, \
-             pending_expires_at = NULL \
-         WHERE id = $1::uuid",
-    )
-    .bind(&terminal_user_id)
-    .execute(&mut *tx)
-    .await
-    .expect("completed deletion may clear personal account fields");
-
-    sqlx::query("DELETE FROM public.user_identities WHERE user_id = $1::uuid")
-        .bind(&terminal_user_id)
-        .execute(&mut *tx)
-        .await
-        .expect("completed deletion may release provider identity");
-
-    tx.commit()
-        .await
-        .expect("terminal account must not retain an external identity");
-
-    assert!(
-        sqlx::query(
-            "UPDATE public.users \
-             SET account_status = 'pending_verification', \
-                 email_normalized = 'reopened-terminal@example.test', \
-                 password_hash = 'new-hash', \
-                 pending_expires_at = now() + INTERVAL '30 minutes' \
-             WHERE id = $1::uuid"
+        sqlx::query_scalar::<_, String>(
+            "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
         )
-        .bind(&terminal_user_id)
-        .execute(pool)
+        .bind("investor")
+        .bind("email")
+        .bind("passwordless-owner@example.test")
+        .bind(Option::<String>::None)
+        .bind(Option::<String>::None)
+        .fetch_one(pool)
         .await
         .is_err(),
-        "closed accounts cannot be reopened"
+        "public registration must reject accounts without a local password hash"
     );
+
+    let signatures: (bool, bool) = sqlx::query_as(
+        "SELECT pg_catalog.to_regprocedure('public.create_client_user(text,text,text,text,text)') IS NOT NULL, \
+                pg_catalog.to_regprocedure('public.create_client_user(text,text,text,text,text,text)') IS NOT NULL",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("registration function signatures should be queryable");
+    assert_eq!(signatures, (true, false));
 }
 
 async fn assert_client_creation_function(pool: &PgPool) {
     assert!(
         sqlx::query_scalar::<_, String>(
-            "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
+            "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
         )
         .bind("admin")
         .bind("email")
         .bind("not-allowed-admin@example.test")
         .bind(Option::<String>::None)
         .bind("encoded-password-hash")
-        .bind(Option::<String>::None)
         .fetch_one(pool)
         .await
         .is_err(),
@@ -670,34 +536,32 @@ async fn assert_client_creation_function(pool: &PgPool) {
 
     assert!(
         sqlx::query_scalar::<_, String>(
-            "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
+            "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
         )
         .bind("business_owner")
         .bind("email")
-        .bind("missing-auth-method@example.test")
-        .bind(Option::<String>::None)
+        .bind("missing-password@example.test")
         .bind(Option::<String>::None)
         .bind(Option::<String>::None)
         .fetch_one(pool)
         .await
         .is_err(),
-        "client account creation requires exactly one initial authentication method"
+        "client account creation requires a local password hash"
     );
 
     assert!(
         sqlx::query_scalar::<_, String>(
-            "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
+            "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
         )
         .bind("business_owner")
         .bind("email")
-        .bind("both-auth-methods@example.test")
+        .bind("empty-password-hash@example.test")
         .bind(Option::<String>::None)
-        .bind("encoded-password-hash")
-        .bind("google-subject-both-methods")
+        .bind("   ")
         .fetch_one(pool)
         .await
         .is_err(),
-        "client account creation cannot silently mix initial authentication methods"
+        "client account creation must reject an empty password hash"
     );
 }
 
@@ -1790,7 +1654,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         "SELECT EXISTS ( \
              SELECT 1 \
                FROM unnest(ARRAY[ \
-                   'user_identities', 'verification_sessions', 'verification_challenges', \
+                   'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens' \
                ]::TEXT[]) AS t(table_name) \
@@ -1833,7 +1697,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
 
     let function_access: (bool, bool, bool) = sqlx::query_as(
         "SELECT has_function_privilege(current_user, \
-                    'public.create_client_user(text,text,text,text,text,text)', 'EXECUTE'), \
+                    'public.create_client_user(text,text,text,text,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
                     'public.is_safe_identity_audit_metadata(jsonb)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
@@ -1845,13 +1709,12 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     assert_eq!(function_access, (true, true, false));
 
     let created_user_id: String =
-        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text")
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
             .bind("business_owner")
             .bind("email")
             .bind("principal-bootstrap@example.test")
             .bind(Option::<String>::None)
             .bind("test-only-encoded-password-hash")
-            .bind(Option::<String>::None)
             .fetch_one(&app_pool)
             .await
             .expect("application may create a pending account through the guarded function");

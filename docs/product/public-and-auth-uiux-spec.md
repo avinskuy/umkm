@@ -158,10 +158,9 @@ Konten:
 1. Brand dan tautan singkat untuk kembali ke situs publik.
 2. Judul: **Masuk sebagai Pemilik Usaha**
 3. Teks pendukung: **Kelola profil usaha, bagikan peluang, dan kembangkan koneksi.**
-4. Formulir autentikasi menggunakan identifier/metode login yang telah disetujui.
-5. Tindakan login Google untuk identitas yang sudah terhubung dan pendaftaran baru yang terikat role.
-6. Tautan pendaftaran untuk Owner baru.
-7. Tautan privasi/ketentuan dan bantuan.
+4. Formulir autentikasi menggunakan email/nomor telepon dan password.
+5. Tautan pendaftaran untuk Owner baru.
+6. Tautan privasi/ketentuan dan bantuan.
 
 ### Field formulir dan perilaku
 
@@ -220,7 +219,6 @@ Pertahankan tata letak visual yang konsisten agar kedua halaman terasa sebagai s
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
 - Pendaftaran email/WhatsApp menggunakan kontak yang dipilih, kata sandi, dan konfirmasi.
 - Setelah data akun divalidasi, backend mengirim OTP melalui email atau WhatsApp sesuai kanal pilihan. Akun berstatus pending sampai OTP valid.
-- Pendaftaran Google tidak meminta kata sandi lokal atau OTP tambahan.
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
@@ -287,21 +285,18 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 - CTA menuju dashboard Investor dan penemuan peluang.
 - Preferensi dapat diubah kemudian.
 
-## 9. Perilaku Google OAuth
+## 9. Metode autentikasi
 
-- Google OAuth tetap tersedia untuk login dan pendaftaran.
-- Sebelum memulai pendaftaran Google, pengguna harus memilih Owner atau Investor secara eksplisit; pilihan tersebut diikat ke state OAuth di server. Pendaftaran Google tidak meminta kata sandi lokal terpisah.
-- Untuk pendaftaran Google baru, role Owner/Investor wajib dipilih sebelum OAuth dan diikat ke state server. Tidak diperlukan OTP tambahan jika identitas Google tervalidasi dan klaim email menyatakan `email_verified=true`. Identitas Google menggunakan stable subject; klaim email hanya ditandai terverifikasi bila token tervalidasi menyatakan `email_verified=true`.
-- Identitas Google yang sudah terhubung hanya dapat masuk ke akun yang sudah ada. Role utama akun tetap dan menentukan portal yang benar.
-- Jangan menghubungkan identitas secara otomatis hanya karena email cocok. Pengaitan memerlukan bukti kendali terbaru atas kedua identitas.
-- Pendaftaran Admin tidak pernah tersedia melalui Google OAuth publik.
-- Validasi state, nonce, issuer, audience, signature, expiry, redirect URI, dan perlindungan replay.
+- Registrasi publik menggunakan email + password dengan OTP email, atau nomor telepon/WhatsApp + password dengan OTP WhatsApp.
+- Akun tetap pending_verification sampai OTP valid; jangan mengaktifkan akun hanya karena formulir berhasil dikirim.
+- Login rutin menggunakan email atau nomor telepon + password tanpa OTP.
+- Login sosial/OAuth tidak tersedia dalam cakupan autentikasi saat ini.
 
 ## 10. Pemulihan kata sandi
 
 ### Halaman permintaan — `/lupa-kata-sandi`
 
-- Hanya terima kanal pemulihan yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset. Akun Google-only menggunakan pemulihan Google; akun telepon-only belum dapat dipulihkan melalui nomor sampai verifikasi telepon tersedia. Jangan merilis reset password sebelum kanal pengiriman token yang aman tersedia.
+- Hanya terima kanal pemulihan yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset. Akun telepon-only hanya dapat dipulihkan melalui nomor setelah verifikasi kanal tersebut tersedia. Jangan merilis reset password sebelum kanal pengiriman token yang aman tersedia.
 - Gunakan pesan konfirmasi netral, baik akun ada maupun tidak.
 - Terapkan rate limit dan pemantauan penyalahgunaan.
 - Jangan mengungkap keberadaan akun.
@@ -378,13 +373,12 @@ Jangan mengirim kata sandi, nilai OTP, nomor telepon/email mentah, token, atau i
 - [ ] Perilaku formulir bersama tetap konsisten.
 - [ ] Ketidaksesuaian role ditangani backend dan memberikan langkah berikutnya yang aman.
 - [ ] Kontrol kata sandi, lupa kata sandi, loading, error, dan rate limit dirancang.
-- [ ] Google OAuth mempertahankan pemilihan role wajib sebelum pendaftaran baru, tanpa OTP tambahan, tanpa kewajiban kata sandi lokal terpisah, dan pengaitan identitas yang aman.
 
 ### Pendaftaran dan verifikasi
 
 - [ ] Hanya Owner dan Investor yang dapat mendaftar secara publik.
 - [ ] Pembuatan akun dipisahkan dari onboarding yang lebih panjang.
-- [ ] Pilihan pendaftaran Email ATAU Telepon terlihat jelas; akun dapat dibuat tanpa OTP dan kontak belum terverifikasi tidak diperlakukan sebagai bukti kepemilikan.
+- [ ] Pilihan pendaftaran Email ATAU Telepon terlihat jelas; akun tetap pending sampai OTP pada kanal pilihan berhasil diverifikasi.
 - [ ] Consent opsional tidak dicentang secara default.
 - [ ] Progres dan perilaku pemulihan alur sudah ditetapkan.
 

@@ -3,7 +3,7 @@
 > Status: skema Identity Core migration 0001–0005 tersedia; skema domain produk lainnya masih berupa rancangan  
 > Cakupan: model relasional, constraint integritas, batas privasi, dan urutan migration  
 > Baseline runtime: PostgreSQL 16 + SQLx 0.8
-> Keputusan autentikasi terbaru: OTP wajib untuk registrasi email/WhatsApp + password; Google OAuth tanpa OTP tambahan; login rutin tanpa OTP.
+> Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
 Dokumen ini menerjemahkan kebijakan produk dan autentikasi USahapintar ke dalam model relasional. Migration Identity Core 0001–0005 sudah tersedia sebagai SQLx migration dan diuji di CI. Skema untuk domain produk lainnya masih berupa rancangan. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi atau alur registrasi dan autentikasi sudah aktif.
 
@@ -50,8 +50,7 @@ Label produk yang lebih singkat, “Owner” dan “Investor”, merupakan istil
 
 | Tabel | Tanggung jawab | Constraint penting |
 | --- | --- | --- |
-| `users` | Identitas akun, role utama yang tetap, siklus hidup, nilai kontak ternormalisasi, status verifikasi kontak, dan hash kata sandi opsional | Reservasi email/telepon unik; autentikasi awal password atau Google; status verifikasi kontak dipisahkan dari status aktif akun; role immutable; transisi lifecycle terlindungi |
-| `user_identities` | Identitas dari penyedia eksternal, untuk tahap awal Google | Kombinasi (`provider`, `provider_subject`) unik; FK ke pengguna; hanya menggunakan subject stabil; jangan mengaitkan otomatis berdasarkan kecocokan email |
+| `users` | Identitas akun, role utama yang tetap, siklus hidup, nilai kontak ternormalisasi, status verifikasi kontak, dan hash kata sandi lokal | Reservasi email/telepon unik; registrasi klien selalu memakai password; status verifikasi kontak dipisahkan dari status aktif akun; role immutable; transisi lifecycle terlindungi |
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
 | `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
@@ -65,14 +64,13 @@ Label produk yang lebih singkat, “Owner” dan “Investor”, merupakan istil
 - `users.primary_role` ditetapkan saat akun dibuat dan tidak dapat diubah. Migration 0001 menegakkannya melalui database trigger; fungsi pembuatan akun hanya menerima `business_owner` atau `investor` dan tidak dapat dijalankan oleh `PUBLIC`.
 - Pengguna yang ingin memakai role klien lainnya harus membuat akun terpisah menggunakan identitas yang belum terhubung ke akun lain.
 - Indeks unik untuk kolom email/telepon yang nullable harus berupa partial index; normalisasi wajib dilakukan sebelum insert.
-- Identitas penyedia menggunakan subject stabil dari penyedia sebagai key, bukan teks email.
 - Nilai siklus hidup `account_status` adalah `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`. Suspensi/batas fitur merupakan record moderasi/penegakan, bukan status siklus hidup.
 - Penutupan akun, pelepasan identitas, dan pemindahan identitas memerlukan kebijakan retensi serta verifikasi yang terpisah; jangan menerapkan penggunaan ulang identitas secara otomatis.
 - Challenge verifikasi harus mendukung rate limit, batas percobaan, masa berlaku singkat, jeda kirim ulang, dan pembatalan challenge yang telah digantikan. Hash OTP harus menggunakan konstruksi keyed yang sesuai untuk kode angka pendek.
 - Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
-- Registrasi email/WhatsApp + password membuat akun pending dan hanya aktif setelah OTP valid; lifecycle pending 30 menit berlaku. Google OAuth yang tervalidasi tidak memerlukan OTP tambahan dan harus mengikuti jalur aktivasi yang konsisten dengan invariant database.
+- Registrasi email/WhatsApp + password membuat akun pending dan hanya aktif setelah OTP valid; lifecycle pending 30 menit berlaku. Login rutin menggunakan password tanpa OTP.
 - Data sesi harus mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut, fitur “Ingat perangkat ini” tanpa melewati kedua batas, pencabutan sesi individual, dan logout dari semua perangkat.
-- Kontak pemulihan bersifat opsional dan harus dibuktikan kepemilikannya sebelum dipakai. Karena OTP ditunda, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; desain kanal pembuktian/pemulihan harus diselesaikan sebelum fitur reset dirilis.
+- Kontak pemulihan bersifat opsional dan harus dibuktikan kepemilikannya sebelum dipakai. Sampai runtime OTP dan kanal pengiriman aman tersedia, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; fitur reset belum boleh dirilis.
 - Rancangan status akun harus membedakan penonaktifan sementara dan penghapusan permanen. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus ditetapkan berdasarkan kategori data.
 
 ### B. Profil dan informasi usaha
@@ -173,7 +171,6 @@ Peristiwa notifikasi keamanan wajib mencakup login dari perangkat baru, perubaha
 
 ```mermaid
 erDiagram
-    USERS ||--o{ USER_IDENTITIES : links
     USERS ||--o{ SESSIONS : owns
     USERS o|--o{ VERIFICATION_SESSIONS : starts
     VERIFICATION_SESSIONS ||--o{ VERIFICATION_CHALLENGES : contains
@@ -220,7 +217,6 @@ Diagram ini merupakan gambaran konseptual. Kardinalitas yang tepat, relasi nulla
 Tambahkan indeks berdasarkan jalur akses yang sudah diketahui, bukan optimasi spekulatif. Kandidat indeks berikut harus divalidasi terhadap bentuk query yang sebenarnya:
 
 - `users(email_normalized)` dan `users(phone_e164)`: partial index unik ketika nilainya tidak NULL.
-- `user_identities(provider, provider_subject)`: unik.
 - `sessions(user_id, expires_at)` dan `sessions(token_hash)` yang unik.
 - `verification_challenges(verification_session_id, created_at)`; indeks tambahan untuk pencarian challenge aktif/kedaluwarsa dan hash tujuan sesuai rancangan alur verifikasi.
 - `recovery_contacts(user_id, status, created_at)` untuk daftar kontak per akun; unique constraint komposit `(user_id, channel, contact_hash)` untuk mencegah relasi kontak duplikat di akun yang sama; serta indeks non-unik berdasarkan kanal dan keyed hash kontak untuk pencarian lintas akun. Jangan menerapkan unique constraint global pada email atau nomor HP pemulihan.
@@ -283,7 +279,7 @@ Migrasi Identity Core pertama harus mewakili kebijakan yang telah disetujui beri
 
 - Role kanonis yang tidak dapat diubah: `business_owner`, `investor`, dan `admin` yang dibuat melalui proses internal.
 - Satu kontak dipilih saat pendaftaran awal (email atau nomor HP/WhatsApp); kontak lainnya dapat ditambahkan dan diverifikasi secara terpisah setelah akun aktif.
-- Pendaftaran email/nomor HP wajib memiliki password lokal; pendaftaran Google tidak memerlukan password lokal. Untuk akun Google baru, role Owner/Investor wajib dipilih sebelum OAuth dan disimpan dalam state server. OTP tidak menjadi syarat registrasi/login; kontak yang belum dibuktikan tetap berstatus belum terverifikasi.
+- Pendaftaran email/nomor HP wajib memiliki password lokal dan OTP pada kanal yang dipilih sebelum akun aktif. Login rutin menggunakan password tanpa OTP.
 - Registrasi tahap pertama tidak memakai status pending verifikasi 30 menit; akun dibuat aktif setelah validasi dan pemeriksaan anti-penyalahgunaan. Migration lanjutan harus menyesuaikan constraint lifecycle tanpa mengedit migration lama.
 - Baseline OTP (tahap berikutnya): kode sekali pakai, keyed hash, masa berlaku, batas percobaan, lock, resend cooldown, dan rate limit lintas sesi/instance tetap dirancang dalam migration 0002, tetapi tidak digunakan untuk registrasi/login tahap pertama.
 - Beberapa sesi aktif diperbolehkan. Batas awal tanpa aktivitas adalah tujuh hari dan batas absolut adalah 30 hari. Sesi persisten melalui fitur Ingat perangkat tidak boleh melewati kedua batas atau pencabutan dari server. Sistem wajib menyediakan daftar sesi aktif, pencabutan individual, dan logout dari semua perangkat.
@@ -300,7 +296,7 @@ Tetapkan hal-hal berikut saat peninjauan migrasi; jangan mengarang keputusan lan
 - Struktur metadata bukti pemulihan, penugasan pemeriksaan manual, cakupan kewenangan petugas khusus, dan kebutuhan persetujuan tambahan untuk tindakan berisiko tinggi.
 - Konfigurasi penyedia layanan dan model antrean/outbox serta percobaan pengiriman email dan WhatsApp, termasuk idempotensi dan penanganan kegagalan.
 - Penyimpanan pembatasan permintaan terdistribusi serta cara mempertahankan penghitung setelah aplikasi dimulai ulang dan saat berjalan di beberapa instance.
-- Benchmark dan batas operasional Argon2id sebelum autentikasi publik, jadwal retensi numerik, MFA/pemulihan Admin, serta pengaturan kata sandi lokal untuk akun yang hanya menggunakan Google jika kelak disediakan.
+- Benchmark dan batas operasional Argon2id sebelum autentikasi publik, jadwal retensi numerik, MFA/pemulihan Admin, serta pengaturan password dan pemulihan akun yang mengikuti kebijakan OTP.
 
 ### Keputusan di luar cakupan Identity Core yang ditunda
 
