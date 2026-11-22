@@ -1,13 +1,11 @@
 # Keputusan Teknis Identity Core
 
-> Status: baseline teknis yang direkomendasikan untuk implementasi bertahap
-> Tanggal: 22 November 2026
-> Cakupan: keputusan teknis lintas migration Identity Core
-> Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
+> Cakupan: baseline teknis lintas migration Identity Core.
+> Registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
-Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak menjalankan migration otomatis pada HTTP startup. Migration 0001–0005 telah dibuat, diuji, dan di-merge. Runtime HTTP kini menginisialisasi pool PostgreSQL menggunakan principal aplikasi; operasi Identity Core yang tersedia masih terbatas pada pembuatan akun pending dan penambahan audit event.
+Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0011 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP dan router registrasi yang belum dipasang pada aplikasi HTTP default. Login/logout, sesi HTTP, provider nyata, key produksi, dan recovery runtime belum tersedia. HTTP startup tidak menjalankan migration otomatis.
 
-> **Keputusan terbaru 22 November 2026:** registrasi email/WhatsApp + password wajib OTP; login rutin tidak memakai OTP. Migration 0001–0002 menyediakan lifecycle pending dan struktur challenge. Migration 0006 menghapus dukungan identitas provider yang tidak digunakan dan membatasi fungsi pembuatan akun pada password lokal. Provider demonstrasi yang dievaluasi: Resend untuk email dan FlowKirim untuk WhatsApp. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0006 menghapus dukungan Google OAuth dari skema aktif. Resend dan FlowKirim menjadi target adapter pengiriman; integrasi nyata belum tersedia. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Perlindungan tujuan pengiriman OTP — tahap berikutnya
 
@@ -100,12 +98,12 @@ Gunakan `account_status` hanya untuk siklus hidup akun. Pembatasan akses oleh Ad
 
 | Status | Arti dan aturan |
 | --- | --- |
-| `pending_verification` | Status pada migration saat ini untuk registrasi lama yang menunggu verifikasi; tidak digunakan oleh alur registrasi tahap pertama yang membuat akun aktif tanpa OTP. |
+| `pending_verification` | Status akun baru selama proses registrasi menunggu verifikasi OTP. Akun belum dapat login atau menggunakan fitur akun aktif sampai verifikasi berhasil. |
 | `active` | Akun aktif dan dapat memakai fitur sesuai role/entitlement. |
 | `deactivated` | Penonaktifan sementara oleh pengguna; profil disembunyikan, data dipertahankan, kontak tetap direservasi. |
 | `deletion_pending` | Permintaan penghapusan dalam masa tunggu pembatalan 30 hari; akun dibatasi dan kontak tetap direservasi. |
 | `deletion_processing` | Masa tunggu selesai dan proses penghapusan sedang berlangsung; kontak tetap direservasi sampai penghapusan benar-benar selesai. |
-| `pending_expired` | Status terminal untuk registrasi pending lama yang tidak selesai; tidak menjadi lifecycle normal registrasi tahap pertama. |
+| `pending_expired` | Status terminal ketika registrasi tidak menyelesaikan verifikasi OTP dalam batas waktu yang ditetapkan. |
 | `closed` | Penghapusan telah selesai sesuai proses retensi; kontak utama telah dilepas dan data personal telah dihapus atau dianonimkan sesuai kebijakan. |
 
 Status suspend/limit fitur, lock verifikasi, lock keamanan sementara, dan status OTP tidak boleh dimasukkan ke `account_status`. Enforcement aktif dapat membatasi akses meskipun lifecycle akun tetap `active` atau `deletion_pending`. Status moderasi konten juga bukan status lifecycle akun.
@@ -118,7 +116,7 @@ Kontak dilepas hanya dalam dua kondisi:
 - Registrasi pending telah kedaluwarsa dan transisi ke `pending_expired` selesai secara atomik.
 - Penghapusan permanen benar-benar selesai dan transisi ke `closed` dilakukan setelah kewajiban retensi yang berlaku ditangani.
 
-Aturan cleanup pending di atas hanya berlaku untuk record yang masih menggunakan lifecycle pending lama. Registrasi tahap pertama harus dibuat aktif tanpa OTP setelah validasi input, role, persetujuan, dan kontrol anti-penyalahgunaan. Saat deletion processing, jangan melepas kontak hanya karena 30 hari telah berlalu.
+Registrasi tahap pertama membuat akun berstatus `pending_verification`. Akun hanya berubah menjadi `active` setelah OTP valid untuk kontak awal diverifikasi dan aktivasi diselesaikan secara atomik. Proses cleanup mengubah registrasi yang melewati batas waktu menjadi `pending_expired`; jangan melepas kontak sebelum transisi tersebut selesai. Saat deletion processing, jangan melepas kontak hanya karena 30 hari telah berlalu.
 
 Transisi status harus dilakukan oleh operasi backend yang tervalidasi dan tercatat. CHECK constraint menjaga nilai lifecycle yang sah; active moderation/enforcement records mengatur pembatasan akses; partial unique index menjaga reservasi; tes transaksi membuktikan tidak ada race antara aktivasi, cleanup, pembatalan penghapusan, dan registrasi baru.
 

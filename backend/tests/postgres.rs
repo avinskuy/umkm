@@ -80,6 +80,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_profile_and_policy_records(&pool).await;
     assert_verification_schema_invariants(&pool).await;
     assert_verification_database_operations(&pool).await;
+    assert_otp_resend_during_verification_lock(&pool).await;
     assert_authentication_session_invariants(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
@@ -1215,6 +1216,110 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .await
     .expect("failed attempt counter should be queryable");
     assert_eq!(failed_attempt_count, 1);
+}
+
+async fn assert_otp_resend_during_verification_lock(pool: &PgPool) {
+    let user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
+            .bind("business_owner")
+            .bind("email")
+            .bind("otp-lock-resend-owner@example.test")
+            .bind(Option::<String>::None)
+            .bind("encoded-password-hash")
+            .fetch_one(pool)
+            .await
+            .expect("pending account should be created for lock/resend test");
+
+    let session_id: String = sqlx::query_scalar(
+        "SELECT public.create_registration_verification_session(\
+            $1::uuid, $2::uuid, 'email', $3, $4, 'enc-v1', $5, 'hmac-v1', \
+            clock_timestamp() + INTERVAL '9 minutes')::text",
+    )
+    .bind("66666666-6666-4666-8666-666666666666")
+    .bind(&user_id)
+    .bind(vec![1_u8])
+    .bind(vec![2_u8])
+    .bind(vec![10_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("verification session should be created for lock/resend test");
+
+    let initial_challenge_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_challenges (\
+            id, verification_session_id, code_hash, hash_key_version, expires_at\
+         ) VALUES (\
+            '77777777-7777-4777-8777-777777777777'::uuid, $1::uuid, $2, 'otp-hmac-v1', \
+            clock_timestamp() + INTERVAL '8 minutes'\
+         ) RETURNING id::text",
+    )
+    .bind(&session_id)
+    .bind(vec![11_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("initial pending challenge should be created");
+
+    for _ in 0..5 {
+        let accepted: bool = sqlx::query_scalar(
+            "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, FALSE, $3)",
+        )
+        .bind(&session_id)
+        .bind(&initial_challenge_id)
+        .bind(vec![vec![10_u8; 32]])
+        .fetch_one(pool)
+        .await
+        .expect("failed OTP attempt should be recorded until the fifth attempt");
+        assert!(!accepted);
+    }
+
+    let lock_state: (i16, bool) = sqlx::query_as(
+        "SELECT failed_attempt_count, locked_until > clock_timestamp() \
+         FROM public.verification_sessions WHERE id = $1::uuid",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("verification lock state should be queryable");
+    assert_eq!(lock_state, (5, true));
+
+    let resent_challenge_id = "88888888-8888-4888-8888-888888888888";
+    let reserved: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, delivery_event_id::text \
+         FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",
+    )
+    .bind(&session_id)
+    .bind(resent_challenge_id)
+    .bind(vec![12_u8; 32])
+    .bind(vec![vec![10_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("OTP resend must remain available while verification is locked");
+    assert_eq!(reserved.0, resent_challenge_id);
+
+    assert!(
+        sqlx::query_scalar::<_, bool>(
+            "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
+        )
+        .bind(&session_id)
+        .bind(resent_challenge_id)
+        .bind(vec![vec![10_u8; 32]])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "a newly issued OTP must not bypass the active verification lock"
+    );
+
+    let final_state: (i16, bool, String) = sqlx::query_as(
+        "SELECT s.failed_attempt_count, s.locked_until > clock_timestamp(), c.status \
+         FROM public.verification_sessions AS s \
+         JOIN public.verification_challenges AS c ON c.verification_session_id = s.id \
+         WHERE s.id = $1::uuid AND c.id = $2::uuid",
+    )
+    .bind(&session_id)
+    .bind(resent_challenge_id)
+    .fetch_one(pool)
+    .await
+    .expect("resend challenge and lock state should remain queryable");
+    assert_eq!(final_state, (5, true, "pending".to_owned()));
 }
 
 async fn assert_authentication_session_invariants(pool: &PgPool) {

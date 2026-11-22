@@ -1,4 +1,4 @@
--- Jalankan setelah migration Identity Core 0001–0010 selesai.
+-- Jalankan setelah migration Identity Core 0001–0011 selesai.
 -- Fail closed jika SECURITY DEFINER registration function bukan milik migrator non-superuser.
 
 DO $ownership_guard$

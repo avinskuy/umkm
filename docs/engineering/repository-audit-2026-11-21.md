@@ -1,8 +1,8 @@
-# Audit Repository — 21 November 2026
+# Audit Repository — Snapshot Historis
 
-- **Jenis:** Audit dokumentasi, struktur, konfigurasi, dan status implementasi.
-- **Baseline commit:** `777e01e2aadc0876ee2df8d401b1c485818abf49` (setelah Tahap 5).
-- **Status:** Audit snapshot; bukan sertifikasi keamanan atau bukti kesiapan production.
+- **Jenis:** Audit dokumentasi, struktur, konfigurasi, dan status implementasi pada snapshot historis.
+- **Baseline commit:** `777e01e2aadc0876ee2df8d401b1c485818abf49`.
+- **Status:** Catatan historis; bukan gambaran kondisi repository saat ini, sertifikasi keamanan, atau bukti kesiapan produksi.
 
 ## 1. Ruang lingkup pemeriksaan
 
@@ -75,10 +75,10 @@ Kesenjangan berikut bukan kesalahan dokumentasi; ini adalah pekerjaan implementa
 
 ### Produk dan Identity Core
 
-- Implementasi registrasi, verifikasi email/WhatsApp, login, OAuth, sesi, recovery, dan Admin MFA.
-- Pemilihan penyedia email/WhatsApp, konfigurasi pengiriman, monitoring, retry, serta pembatasan biaya.
-- Implementasi rate limit OTP lintas sesi/instance dan state machine secara atomik.
-- Migrasi database Identity Core dan integration tests untuk constraint, concurrency, expiry, recovery, dan role immutability.
+- Implementasi login/logout, sesi HTTP, runtime recovery, dan Admin MFA. Registrasi serta orkestrasi verifikasi OTP telah memiliki fondasi runtime, tetapi provider nyata belum terintegrasi.
+- Integrasi dan konfigurasi provider email/WhatsApp, monitoring, retry, serta pembatasan biaya.
+- Validasi operasional rate limit OTP lintas sesi/instance, observability, dan pengujian beban terhadap state machine.
+- Penerapan migration Identity Core pada lingkungan target melalui prosedur terpisah; pengujian integrasi skema dan orchestration sudah tersedia di CI, sedangkan recovery runtime dan concurrency lintas instance masih perlu dilengkapi.
 - Implementasi profil, bisnis, posting, discovery, koneksi, messaging, membership, moderasi, dan Admin workflows.
 
 ### Privasi dan tata kelola
@@ -111,4 +111,4 @@ Kesenjangan berikut bukan kesalahan dokumentasi; ini adalah pekerjaan implementa
 
 Beberapa dokumen teknis/produk lama masih menggunakan Bahasa Inggris, termasuk rancangan skema database, desain arsitektur autentikasi, membership, sitemap, dan spesifikasi UI/UX. Dokumen tersebut diperbarui pada bagian yang terdampak keputusan terbaru, tetapi tidak diterjemahkan massal dalam audit ini agar perubahan bahasa tidak menggeser makna kontrak teknis. Lokalisasi dapat dilakukan bertahap pada review berikutnya.
 
-Audit ini merupakan snapshot kondisi repository pada 21 November 2026. Perubahan kode, dependency, workflow, arsitektur, atau kebijakan setelah tanggal/commit baseline harus memicu pembaruan audit yang relevan.
+Audit ini merupakan snapshot historis pada commit baseline yang disebutkan di atas. Jangan gunakan status implementasi dalam dokumen ini sebagai status terkini; verifikasi repository dan hasil CI sebelum mengambil keputusan.

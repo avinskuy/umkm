@@ -1,11 +1,11 @@
 # Kebijakan Keamanan, Privasi & Perlindungan Data
 
-Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelola data USahapintar yang telah disetujui pada 21 November 2026. Kebijakan mengadopsi praktik dari standar dan panduan industri yang relevan, lalu menerapkannya secara proporsional terhadap tahap proyek, arsitektur modular monolith, risiko, dan kapasitas operasional.
+Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelola data USahapintar. Kebijakan mengadopsi praktik dari standar dan panduan industri yang relevan, lalu menerapkannya secara proporsional terhadap arsitektur modular monolith, risiko, dan kapasitas operasional.
 
 ## Status dan cara membaca
 
-- **Disetujui** berarti kebijakan menjadi acuan desain dan implementasi.
-- Persetujuan kebijakan **tidak berarti kontrol sudah diterapkan, diuji, atau tersertifikasi**.
+- Kebijakan menjadi acuan desain dan implementasi.
+- Keberadaan kebijakan **tidak berarti kontrol sudah diterapkan, diuji, atau tersertifikasi**.
 - Dokumen arsitektur, keputusan produk, dan kebijakan terkait harus dibaca bersama jika membahas alur yang sama.
 - Detail seperti vendor, algoritma, konfigurasi, batas numerik, jadwal, dan tooling ditetapkan saat implementasi atau peninjauan risiko; jangan mengarang nilai yang belum diputuskan.
 - Jika ada konflik, jangan menyelesaikannya dengan asumsi. Catat konflik dan lakukan peninjauan keputusan terkait.
