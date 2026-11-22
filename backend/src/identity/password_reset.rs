@@ -253,8 +253,8 @@ pub(crate) fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
-        encoded.push(HEX[(byte >> 4) as usize] as char);
-        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+        encoded.push(HEX[(*byte >> 4) as usize] as char);
+        encoded.push(HEX[(*byte & 0x0f) as usize] as char);
     }
     encoded
 }
@@ -265,8 +265,11 @@ mod tests {
 
     #[test]
     fn reset_url_base_requires_https_and_no_existing_fragment_or_query() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://user:pass@localhost/db")
+            .expect("lazy pool configuration should be valid");
         assert!(PasswordResetIssuanceService::new(
-            &PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap(),
+            &pool,
             &UnavailableKeys,
             &UnavailableDelivery,
             "http://app.example.test/reset-password".to_owned(),
