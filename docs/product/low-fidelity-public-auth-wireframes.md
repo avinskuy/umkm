@@ -260,7 +260,7 @@ GANGGUAN JARINGAN
   Pertahankan field yang tidak sensitif dan sediakan opsi coba lagi.
 
 KONTAK BELUM DIVERIFIKASI
-  Arahkan ke kelanjutan verifikasi yang sesuai tanpa mengungkap detail akun.
+  Akun tetap dapat masuk sesuai kebijakan, tetapi kontak tidak dapat dipakai untuk pemulihan atau tindakan sensitif.
 ```
 
 ## 5. Pendaftaran Owner
@@ -290,24 +290,24 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Langkah 2 — Verifikasi
+### Langkah 2 — Akun dibuat
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar]                               Langkah 2 dari 4 │
+│ [USahapintar]                               Langkah 2 dari 3 │
 │                                                              │
-│ Verifikasi kontak                                            │
-│ Kode dikirim melalui satu kanal yang kamu pilih: email atau WhatsApp.                 │
+│ Akun berhasil dibuat                                         │
+│ Kamu dapat masuk menggunakan kontak dan kata sandi.          │
 │                                                              │
-│ Tujuan: kontak terpilih yang ditampilkan secara tersamarkan            │
-│ [Kode verifikasi _____________________________]              │
-│ [Verifikasi kontak] [Kirim ulang] (jeda kirim ulang)          │
+│ Status kontak: Belum diverifikasi                             │
+│ Kontak perlu dibuktikan sebelum dipakai untuk pemulihan atau  │
+│ tindakan sensitif.                                           │
 │                                                              │
-│ (Ubah metode atau kontak)                                                 │
+│ [Lanjutkan ke profil]                                        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Kontrol OTP boleh ditampilkan sebagai beberapa kotak, tetapi input dasarnya harus tetap mendukung paste, navigasi keyboard, dan teknologi bantu. Baseline yang disetujui: masa berlaku kode 10 menit, jeda kirim ulang 60 detik, maksimal lima pengiriman per tujuan per jam, dan penguncian sesi verifikasi selama satu jam setelah lima percobaan gagal. Pengiriman ulang boleh menerbitkan kode baru, tetapi tidak boleh menghapus atau memperpendek penguncian yang masih aktif. Jangan tampilkan OTP dalam log atau analytics.
+OTP tidak diminta pada registrasi maupun login tahap pertama. Verifikasi kontak dan OTP ditunda ke tahap berikutnya; UI tidak boleh memberi kesan bahwa kontak yang baru dimasukkan sudah terverifikasi.
 
 ### Langkah 3 — Tahap usaha
 
@@ -351,7 +351,7 @@ Jika tahap usaha masih berupa ide, beri label nama usaha sebagai nama ide/proyek
 
 ### Langkah 1 dan 2
 
-Gunakan kembali tata letak akun dan verifikasi kontak dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
+Gunakan kembali tata letak akun dan konfirmasi pembuatan akun dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
 
 ### Langkah 3 — Preferensi Investor
 
@@ -444,7 +444,7 @@ Tidak ada pendaftaran Admin publik atau pemilih role Admin. MFA Admin wajib dite
 | Berhasil | Konfirmasi inline atau halaman berikutnya | Jelaskan tindakan selanjutnya |
 | Gangguan jaringan | Pemberitahuan di formulir | Coba lagi tanpa menghapus input yang aman |
 | Batas percobaan | Pemberitahuan di formulir | Jelaskan waktu tunggu jika diketahui |
-| Verifikasi kedaluwarsa | Panel verifikasi | Sediakan kirim ulang atau mulai ulang dengan aman |
+| Kontak belum diverifikasi | Status akun/kontak | Jelaskan batas pemakaian kontak tanpa menghalangi login normal |
 | OAuth dibatalkan | Pemberitahuan inline | Izinkan pengguna mencoba lagi atau memakai metode lain |
 
 Jangan gunakan warna sebagai satu-satunya penanda status. Buat pesan error singkat dan menjelaskan tindakan yang dapat dilakukan.
@@ -460,7 +460,7 @@ Jangan gunakan warna sebagai satu-satunya penanda status. Buat pesan error singk
 | TextField | Input teks berlabel | Normal, fokus, error, nonaktif |
 | PasswordField | Input kata sandi dengan kontrol tampil/sembunyi | Tersembunyi, terlihat, error |
 | PhoneField | Input nomor telepon internasional | Normal, tidak valid |
-| OtpCodeInput | Kode verifikasi kontak | Kosong, sebagian, lengkap, kedaluwarsa |
+| ContactVerificationNotice | Status verifikasi kontak | Belum diverifikasi, terverifikasi, perlu tindakan |
 | StepIndicator | Progres multi-langkah | Saat ini, selesai, berikutnya |
 | FormNotice | Pesan status formulir | Info, error, berhasil |
 | LoadingButton | Tombol kirim asinkron | Diam, memuat, nonaktif |
@@ -474,7 +474,7 @@ Tempatkan style komponen dekat fitur terkait atau dalam CSS Modules. Jangan memu
 - [ ] Admin terpisah dengan jelas dari alur pengguna publik.
 - [ ] Tidak ada pemilih role pada profil pengguna yang sudah login seolah-olah role dapat diganti kapan saja.
 - [ ] Semua formulir memiliki label yang terlihat, validasi inline, dan status error dari server.
-- [ ] OTP mendukung paste, keyboard, dan teknologi bantu.
+- [ ] Registrasi dan login tahap pertama tidak meminta OTP; kontak belum terverifikasi diberi batas penggunaan yang jelas.
 - [ ] Google OAuth mempertahankan konteks role serta menangani status dibatalkan/error.
 - [ ] Tata letak mobile tidak overflow secara horizontal dan tetap nyaman digunakan saat keyboard layar terbuka.
 - [ ] Keanggotaan copy preserves free approved-connection chat.
