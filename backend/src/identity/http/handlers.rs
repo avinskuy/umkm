@@ -114,6 +114,14 @@ async fn register(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Json(request): Json<RegistrationRequest>,
 ) -> Response {
+    let decision = state
+        .abuse_guard
+        .check(RegistrationAction::Create, peer.ip(), None)
+        .await;
+    if let Some(response) = rate_limit_response(decision) {
+        return response;
+    }
+
     if !request.terms_accepted || !request.privacy_accepted {
         return error(
             StatusCode::BAD_REQUEST,
@@ -152,14 +160,6 @@ async fn register(
             StatusCode::SERVICE_UNAVAILABLE,
             "Pilihan marketing belum dapat diproses.",
         );
-    }
-
-    let decision = state
-        .abuse_guard
-        .check(RegistrationAction::Create, peer.ip(), None)
-        .await;
-    if let Some(response) = rate_limit_response(decision) {
-        return response;
     }
 
     if !state.password_policy.accepts(password.as_str()) {
