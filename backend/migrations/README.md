@@ -9,7 +9,8 @@ Direktori ini berisi migration SQLx berversi. Migration Identity Core yang terse
 - `20261122130000_create_identity_audit_events.sql` — membuat `identity_audit_events` append-only dengan actor/subject, action/outcome/reason code, korelasi request, metadata JSONB terbatas, serta perlindungan terhadap UPDATE, DELETE, dan TRUNCATE.
 - `20261122160000_add_verification_database_operations.sql` — menambahkan fungsi terkontrol untuk pembuatan/pembacaan sesi, reservasi challenge, pencatatan hasil dispatch, dan verifikasi OTP registrasi dengan rate limit lintas sesi.
 - `20261122170000_bind_verification_ids_from_runtime.sql` — mengubah fungsi pembuatan sesi dan reservasi challenge agar UUID dibuat runtime sebelum AEAD/AAD dan keyed OTP digest dihitung.
-- `20261122180000_audit_verification_runtime_events.sql` — menambahkan audit event untuk permintaan/hasil dispatch OTP dan percobaan verifikasi gagal, serta mengikat event registrasi/aktivasi ke akun terkait.\n- `20261122190000_add_public_profile_and_policy_acceptance.sql` — menambahkan profil publik satu-ke-satu, nama tampilan publik, catatan penerimaan Terms of Service dan Privacy Policy per versi, serta event consent marketing opsional yang append-only. Fungsi registrasi terkontrol menyimpan akun, profil, penerimaan kebijakan, dan pilihan marketing secara atomik.
+- `20261122180000_audit_verification_runtime_events.sql` — menambahkan audit event untuk permintaan/hasil dispatch OTP dan percobaan verifikasi gagal, serta mengikat event registrasi/aktivasi ke akun terkait.
+- `20261122190000_add_public_profile_and_policy_acceptance.sql` — menambahkan profil publik satu-ke-satu, nama tampilan publik, catatan penerimaan Terms of Service dan Privacy Policy per versi, serta event consent marketing opsional yang append-only. Fungsi registrasi terkontrol menyimpan akun, profil, penerimaan kebijakan, dan pilihan marketing secara atomik.
 
 ## Status runtime
 
