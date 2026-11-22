@@ -358,7 +358,7 @@ DECLARE
 BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
         'public.record_account_recovery_session_signal(uuid,bytea)',
-        'public.review_account_recovery_case(uuid,uuid,text,text)'
+        'public.review_account_recovery_case(uuid,uuid,bytea,text,text)'
     ] LOOP
         SELECT pg_catalog.pg_get_userbyid(p.proowner),
                p.prosecdef,
@@ -380,5 +380,5 @@ $account_recovery_review_ownership_guard$;
 
 GRANT EXECUTE ON FUNCTION public.record_account_recovery_session_signal(UUID, BYTEA)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.review_account_recovery_case(UUID, UUID, TEXT, TEXT)
+GRANT EXECUTE ON FUNCTION public.review_account_recovery_case(UUID, UUID, BYTEA, TEXT, TEXT)
     TO usahapintar_app;
