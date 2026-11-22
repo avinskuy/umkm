@@ -182,7 +182,7 @@
 └─────────────────────────────┘
 ```
 
-Interaksi: pemilihan role mengarahkan pengguna ke jalur pendaftaran khusus role tersebut. Role bersifat tetap untuk akun dan tidak dapat diubah melalui pengaturan profil, bantuan, tindakan Admin, migrasi akun, atau OAuth. Pengguna yang ingin memakai role klien lainnya harus mendaftar akun terpisah dengan identitas yang memenuhi syarat dan belum terhubung ke akun lain.
+Interaksi: pemilihan role mengarahkan pengguna ke jalur pendaftaran khusus role tersebut. Role bersifat tetap untuk akun dan tidak dapat diubah melalui pengaturan profil, bantuan, tindakan Admin, atau migrasi akun. Pengguna yang ingin memakai role klien lainnya harus mendaftar akun terpisah dengan identitas yang memenuhi syarat dan belum terhubung ke akun lain.
 
 ## 4. Login Owner dan Investor
 
@@ -203,9 +203,7 @@ Kedua halaman login menggunakan tata letak yang sama. Perbedaannya hanya pada ju
 │   │                               │    │ [Kata sandi             (eye)]  │  │
 │   │                               │    │ (Lupa kata sandi?)             │  │
 │   │                               │    │ [Masuk]                        │  │
-│   │                               │    │ ───────── atau ─────────        │  │
-│   │                               │    │ [Lanjutkan dengan Google]      │  │
-│   │                               │    │ Belum punya akun? [Daftar]     │  │
+│   │                               │   │                               │    │ Belum punya akun? [Daftar]     │  │
 │   └───────────────────────────────┘    └────────────────────────────────┘  │
 │                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -229,8 +227,6 @@ Kedua halaman login menggunakan tata letak yang sama. Perbedaannya hanya pada ju
 │                             │
 │ [Masuk]                     │
 │                             │
-│ ───────── atau ─────────    │
-│ [Lanjutkan dengan Google]   │
 │                             │
 │ Belum punya akun? [Daftar]  │
 │                             │
@@ -448,7 +444,7 @@ Tidak ada pendaftaran Admin publik atau pemilih role Admin. MFA Admin wajib dite
 | Gangguan jaringan | Pemberitahuan di formulir | Coba lagi tanpa menghapus input yang aman |
 | Batas percobaan | Pemberitahuan di formulir | Jelaskan waktu tunggu jika diketahui |
 | Kontak belum diverifikasi | Status akun/kontak | Jelaskan batas pemakaian kontak tanpa menghalangi login normal |
-| OAuth dibatalkan | Pemberitahuan inline | Izinkan pengguna mencoba lagi atau memakai metode lain |
+| Permintaan autentikasi gagal | Pemberitahuan inline | Izinkan pengguna mencoba lagi setelah memeriksa koneksi |
 
 Jangan gunakan warna sebagai satu-satunya penanda status. Buat pesan error singkat dan menjelaskan tindakan yang dapat dilakukan.
 
@@ -478,7 +474,6 @@ Tempatkan style komponen dekat fitur terkait atau dalam CSS Modules. Jangan memu
 - [ ] Tidak ada pemilih role pada profil pengguna yang sudah login seolah-olah role dapat diganti kapan saja.
 - [ ] Semua formulir memiliki label yang terlihat, validasi inline, dan status error dari server.
 - [ ] Registrasi dan login tahap pertama tidak meminta OTP; kontak belum terverifikasi diberi batas penggunaan yang jelas.
-- [ ] Google OAuth mempertahankan pemilihan role wajib untuk akun baru, konteks role pada state server, dan menangani status dibatalkan/error.
 - [ ] Tata letak mobile tidak overflow secara horizontal dan tetap nyaman digunakan saat keyboard layar terbuka.
 - [ ] Keanggotaan copy preserves free approved-connection chat.
 - [ ] Tidak ada UI yang menyiratkan jaminan pendanaan, hasil investasi, atau metrik terverifikasi tanpa bukti.
@@ -491,7 +486,7 @@ Setelah wireframe disetujui:
 1. Tetapkan teks final, field wajib/opsional, dan perilaku ketika role Owner/Investor tidak sesuai.
 2. Commit lockfile frontend dan stabilkan instalasi dependency.
 3. Tetapkan kontrak API autentikasi dan migration database.
-4. Tinjau model ancaman autentikasi (penyalahgunaan OTP, session fixation, state/nonce OAuth, reset kata sandi, pengaitan akun, enumerasi akun, CSRF/CORS, dan rate limit).
+4. Tinjau model ancaman autentikasi (penyalahgunaan OTP, session fixation, reset kata sandi, enumerasi akun, CSRF/CORS, dan rate limit).
 5. Implementasikan komponen dasar formulir bersama serta kerangka situs publik/autentikasi.
 6. Tambahkan pengujian komponen, integrasi, dan browser yang terarah sebelum menghubungkan penyedia autentikasi nyata.
 
