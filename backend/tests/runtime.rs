@@ -317,6 +317,103 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         .expect("verification route should respond");
     assert_eq!(verified.status(), axum::http::StatusCode::OK);
 
+    use usahapintar_api::identity::{
+        authentication::{hash_session_token, AuthenticationRateLimitKey},
+        http::{authentication_router, AuthenticationApiState},
+    };
+
+    let authentication = authentication_router(AuthenticationApiState::new(
+        pool.clone(),
+        AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
+            .expect("test HMAC key should be valid"),
+    ));
+
+    let wrong_role = authentication
+        .clone()
+        .oneshot(make_request(
+            "/api/v1/identity/login/investor".to_owned(),
+            serde_json::json!({
+                "identifier": email,
+                "password": "test-password-with-enough-length"
+            }),
+        ))
+        .await
+        .expect("wrong-role login should respond");
+    assert_eq!(wrong_role.status(), axum::http::StatusCode::UNAUTHORIZED);
+
+    let logged_in = authentication
+        .clone()
+        .oneshot(make_request(
+            "/api/v1/identity/login/owner".to_owned(),
+            serde_json::json!({
+                "identifier": email,
+                "password": "test-password-with-enough-length"
+            }),
+        ))
+        .await
+        .expect("owner login should respond");
+    assert_eq!(logged_in.status(), axum::http::StatusCode::OK);
+    let set_cookie = logged_in
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("successful login should set a session cookie")
+        .to_str()
+        .expect("session cookie should be valid header text")
+        .to_owned();
+    assert!(set_cookie.starts_with("__Host-usahapintar_session="));
+    assert!(set_cookie.contains("HttpOnly"));
+    assert!(set_cookie.contains("Secure"));
+    assert!(set_cookie.contains("SameSite=Lax"));
+    let token = set_cookie
+        .split(';')
+        .next()
+        .and_then(|cookie| cookie.split_once('='))
+        .map(|(_, value)| value.to_owned())
+        .expect("session cookie should contain the opaque token");
+    assert_eq!(token.len(), 64);
+
+    let mut logout_request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/identity/logout")
+        .header(header::COOKIE, format!("__Host-usahapintar_session={token}"))
+        .body(Body::empty())
+        .expect("logout request should be valid");
+    logout_request.extensions_mut().insert(ConnectInfo(
+        "127.0.0.1:40000"
+            .parse::<SocketAddr>()
+            .expect("test socket address should be valid"),
+    ));
+    let logged_out = authentication
+        .oneshot(logout_request)
+        .await
+        .expect("logout route should respond");
+    assert_eq!(logged_out.status(), axum::http::StatusCode::NO_CONTENT);
+    let cleared_cookie = logged_out
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("logout should clear the session cookie")
+        .to_str()
+        .expect("clearing cookie should be valid header text");
+    assert!(cleared_cookie.contains("Max-Age=0"));
+
+    let token_hash = hash_session_token(&token);
+    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL")
+        .expect("CI must provide the disposable DBA connection");
+    let admin_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&admin_url)
+        .await
+        .expect("disposable DBA connection should succeed");
+    let revoked_reason: String = sqlx::query_scalar(
+        "SELECT revocation_reason FROM public.sessions WHERE token_hash = $1",
+    )
+    .bind(token_hash.to_vec())
+    .fetch_one(&admin_pool)
+    .await
+    .expect("logged-out session should remain as a revoked audit record");
+    assert_eq!(revoked_reason, "logout");
+    admin_pool.close().await;
+
     let duplicate = router
         .oneshot(make_request(
             "/api/v1/identity/registrations".to_owned(),
