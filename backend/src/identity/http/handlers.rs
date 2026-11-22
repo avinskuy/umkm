@@ -1,8 +1,8 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
@@ -76,6 +76,19 @@ fn error(status: StatusCode, value: &'static str) -> Response {
     (status, Json(ErrorResponse { error: value })).into_response()
 }
 
+fn resolved_client_ip(headers: &HeaderMap, peer_ip: IpAddr) -> IpAddr {
+    if !peer_ip.is_loopback() {
+        return peer_ip;
+    }
+
+    headers
+        .get("x-real-ip")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<IpAddr>().ok())
+        .filter(|value| !value.is_unspecified())
+        .unwrap_or(peer_ip)
+}
+
 fn rate_limit_response(decision: AbuseDecision) -> Option<Response> {
     match decision {
         AbuseDecision::Allowed => None,
@@ -112,11 +125,16 @@ pub fn registration_router(state: RegistrationApiState) -> Router {
 async fn register(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<RegistrationRequest>,
 ) -> Response {
     let decision = state
         .abuse_guard
-        .check(RegistrationAction::Create, peer.ip(), None)
+        .check(
+            RegistrationAction::Create,
+            resolved_client_ip(&headers, peer.ip()),
+            None,
+        )
         .await;
     if let Some(response) = rate_limit_response(decision) {
         return response;
@@ -240,13 +258,14 @@ async fn register(
 async fn resend(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Path(verification_id): Path<String>,
 ) -> Response {
     let decision = state
         .abuse_guard
         .check(
             RegistrationAction::Resend,
-            peer.ip(),
+            resolved_client_ip(&headers, peer.ip()),
             Some(&verification_id),
         )
         .await;
@@ -271,6 +290,7 @@ async fn resend(
 async fn verify(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Path(verification_id): Path<String>,
     Json(request): Json<VerifyRequest>,
 ) -> Response {
