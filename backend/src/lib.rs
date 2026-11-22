@@ -5,7 +5,7 @@ pub mod identity;
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
-use identity::http::{authentication_router, AuthenticationApiState};
+use crate::identity::http::{authentication_router, AuthenticationApiState};
 
 #[derive(Serialize)]
 struct HealthResponse {
