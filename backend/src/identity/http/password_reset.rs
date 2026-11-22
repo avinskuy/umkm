@@ -3,6 +3,7 @@ use axum::{
     http::{HeaderMap, Response, StatusCode},
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 use zeroize::Zeroizing;
 
 use crate::identity::{
@@ -28,7 +29,7 @@ struct PasswordResetRequest {
 
 pub(super) async fn complete(
     State(state): State<RecoveryApiState>,
-    ConnectInfo(connect_info): ConnectInfo<std::net::SocketAddr>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     payload: Result<Json<PasswordResetRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response<axum::body::Body> {
@@ -78,12 +79,12 @@ pub(super) async fn complete(
     };
 
     let token_fingerprint = encode_hex(&token_hash);
-    let client_ip = resolved_client_ip(&headers, &connect_info.0);
+    let client_ip = resolved_client_ip(&headers, peer.ip());
     let decision = state
         .abuse_guard
         .check(
             RegistrationAction::RecoveryPasswordResetComplete,
-            &client_ip,
+            client_ip,
             Some(&token_fingerprint),
         )
         .await;
@@ -113,22 +114,25 @@ pub(super) async fn complete(
             StatusCode::BAD_REQUEST,
             "Token reset tidak valid atau kedaluwarsa.",
         ),
-        Err(PasswordResetError::Database(error))
-            if database_error_code(&error, "P0001") =>
-        {
-            secure_error(
-                StatusCode::TOO_MANY_REQUESTS,
-                "Terlalu banyak permintaan. Coba lagi nanti.",
-            )
-        }
-        Err(PasswordResetError::Database(error))
-            if database_error_code(&error, "P0002")
-                || matches!(error, sqlx::Error::RowNotFound) =>
-        {
-            secure_error(
-                StatusCode::BAD_REQUEST,
-                "Token reset tidak valid atau kedaluwarsa.",
-            )
+        Err(PasswordResetError::Database(error)) => {
+            if database_error_code(&error, "P0001") {
+                secure_error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "Terlalu banyak permintaan. Coba lagi nanti.",
+                )
+            } else if database_error_code(&error, "P0002")
+                || matches!(&error, sqlx::Error::RowNotFound)
+            {
+                secure_error(
+                    StatusCode::BAD_REQUEST,
+                    "Token reset tidak valid atau kedaluwarsa.",
+                )
+            } else {
+                secure_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Reset password belum dapat diproses.",
+                )
+            }
         }
         Err(_) => secure_error(
             StatusCode::SERVICE_UNAVAILABLE,
