@@ -712,7 +712,8 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .connect(&admin_url)
         .await
         .expect("disposable DBA connection should succeed");
-    let fingerprint = contact_fingerprint(&keys, "email", &email)
+    let recovery_email = format!("recovery-{email}");
+    let fingerprint = contact_fingerprint(&keys, "email", &recovery_email)
         .expect("recovery contact fingerprint should be generated");
     let contact_session_id: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions ( \
@@ -758,7 +759,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let started = recovery
         .start(
             ContactChannel::Email,
-            Some(&email),
+            Some(&recovery_email),
             None,
             RecoveryAction::PasswordReset,
         )
