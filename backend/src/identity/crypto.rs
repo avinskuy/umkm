@@ -458,7 +458,10 @@ mod tests {
         let aliases = contact_fingerprint_aliases(&provider, "email", "user@example.test").unwrap();
 
         assert_eq!(
-            aliases.iter().map(|alias| alias.key_version).collect::<Vec<_>>(),
+            aliases
+                .iter()
+                .map(|alias| alias.key_version)
+                .collect::<Vec<_>>(),
             vec![KeyVersion(6), KeyVersion(7)]
         );
         assert_ne!(aliases[0].digest, aliases[1].digest);
