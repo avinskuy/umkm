@@ -30,6 +30,7 @@ Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelol
 | [Admin Enforcement](admin-enforcement-policy.md) | Kewenangan Admin, peringatan, pembatasan fitur, suspensi, dan pemulihan |
 | [Moderation & Appeals](moderation-appeals-policy.md) | Peninjauan konten/laporan, banding, hasil, dan pencatatan keputusan |
 | [Account Activity History](account-activity-history.md) | Riwayat tindakan moderasi yang dapat dilihat pemilik akun |
+| [Usulan Kebijakan Password Pengguna](password-authentication-policy-proposal.md) | Usulan minimum/maksimum password, blocklist, dan aturan rotasi; belum disetujui |
 
 ## Hubungan dengan dokumen lain
 

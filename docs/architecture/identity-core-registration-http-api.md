@@ -32,7 +32,7 @@ Versi Terms, Privacy, dan pemberitahuan marketing tidak boleh dikirim oleh brows
 - `KeyProvider` untuk enkripsi tujuan, fingerprint kontak, dan keyed hash OTP. Implementasi produksi belum tersedia.
 - `OtpDeliveryProvider` untuk pengiriman email/WhatsApp. Adapter Resend/FlowKirim nyata belum tersedia.
 - `RegistrationAbuseGuard` untuk rate limit berbasis IP dan konteks request. Interface tersedia, implementasi terdistribusi/produksi belum tersedia.
-- `RegistrationPasswordPolicy` untuk aturan password yang disetujui. Nilai minimum/panjang maksimum dan pemeriksaan password umum/bocor belum diputuskan.
+- `RegistrationPasswordPolicy` untuk aturan password yang disetujui. Lihat [Usulan Kebijakan Password Pengguna](../security/password-authentication-policy-proposal.md); nilainya belum disetujui dan belum ada validator produksi.
 - `RegistrationPolicyVersions` dari konfigurasi server-side yang telah disetujui. Registry saat ini belum memiliki versi aktif.
 
 Router tidak boleh dibuat dengan fake/allow-all guard, fake key provider, atau fake delivery provider pada lingkungan publik.
