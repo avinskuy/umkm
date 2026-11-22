@@ -1825,6 +1825,17 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .await
     .expect("active Admin reviewer should be created");
 
+    let unrelated_session_hash = vec![62_u8; 32];
+    sqlx::query(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
+    )
+    .bind(&second_user_id)
+    .bind(&unrelated_session_hash)
+    .execute(pool)
+    .await
+    .expect("a session for a different account should be created");
+
     let reviewer_session_hash = vec![61_u8; 32];
     let reviewer_session_id: String = sqlx::query_scalar(
         "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
@@ -2043,6 +2054,16 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         .is_err(),
         "selected recovery account cannot be changed"
     );
+
+    let unrelated_session_match: bool = sqlx::query_scalar(
+        "SELECT public.record_account_recovery_session_signal($1::uuid, $2)",
+    )
+    .bind(&recovery_case_id)
+    .bind(&unrelated_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("session signal check should safely reject a different account session");
+    assert!(!unrelated_session_match);
 
     assert!(
         sqlx::query_scalar::<_, bool>(
