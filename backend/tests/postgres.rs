@@ -2799,12 +2799,11 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .expect("shared recovery contact owners should be queryable");
     assert_eq!(shared_contact_owners, 2);
 
-    let (recovery_session_id, recovery_case_id): (String, String) = sqlx::query_as(
-        "SELECT gen_random_uuid()::text, gen_random_uuid()::text",
-    )
-    .fetch_one(migrator_pool)
-    .await
-    .expect("recovery identifiers should be generated");
+    let (recovery_session_id, recovery_case_id): (String, String) =
+        sqlx::query_as("SELECT gen_random_uuid()::text, gen_random_uuid()::text")
+            .fetch_one(migrator_pool)
+            .await
+            .expect("recovery identifiers should be generated");
     let (created_session_id, created_case_id): (String, String) = sqlx::query_as(
         "SELECT session_id::text, case_id::text \
            FROM public.create_account_recovery_verification_session( \
@@ -2829,20 +2828,22 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .fetch_one(app_pool)
     .await
     .expect("application may load an eligible account recovery destination");
-    assert_eq!(recovery_destination, ("email".to_owned(), shared_contact_hmac.clone()));
+    assert_eq!(
+        recovery_destination,
+        ("email".to_owned(), shared_contact_hmac.clone())
+    );
 
-    let (recovery_challenge_id, recovery_delivery_event_id): (String, String) =
-        sqlx::query_as(
-            "SELECT challenge_id::text, delivery_event_id::text \
-               FROM public.reserve_otp_challenge( \
-                   $1::uuid, gen_random_uuid(), $2, 'otp-v1', $3)",
-        )
-        .bind(&recovery_session_id)
-        .bind(vec![0x33u8; 32])
-        .bind(vec![shared_contact_hmac.clone()])
-        .fetch_one(app_pool)
-        .await
-        .expect("shared OTP reservation must support account recovery purpose");
+    let (recovery_challenge_id, recovery_delivery_event_id): (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, delivery_event_id::text \
+                FROM public.reserve_otp_challenge( \
+                    $1::uuid, gen_random_uuid(), $2, 'otp-v1', $3)",
+    )
+    .bind(&recovery_session_id)
+    .bind(vec![0x33u8; 32])
+    .bind(vec![shared_contact_hmac.clone()])
+    .fetch_one(app_pool)
+    .await
+    .expect("shared OTP reservation must support account recovery purpose");
 
     let pending_recovery_challenge: i64 = sqlx::query_scalar(
         "SELECT count(*)::bigint FROM public.get_pending_otp_challenge($1::uuid)",
@@ -2869,20 +2870,18 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .expect("valid recovery OTP should advance the recovery case");
     assert!(recovery_verified);
 
-    let recovery_case_status: String = sqlx::query_scalar(
-        "SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid",
-    )
-    .bind(&recovery_case_id)
-    .fetch_one(migrator_pool)
-    .await
-    .expect("migrator should inspect recovery case state");
-    assert_eq!(recovery_case_status, "account_selection_required");
-
-    let unrelated_user_id: String =
-        sqlx::query_scalar("SELECT gen_random_uuid()::text")
+    let recovery_case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&recovery_case_id)
             .fetch_one(migrator_pool)
             .await
-            .expect("unrelated user id should be generated");
+            .expect("migrator should inspect recovery case state");
+    assert_eq!(recovery_case_status, "account_selection_required");
+
+    let unrelated_user_id: String = sqlx::query_scalar("SELECT gen_random_uuid()::text")
+        .fetch_one(migrator_pool)
+        .await
+        .expect("unrelated user id should be generated");
     let unrelated_selection = sqlx::query_scalar::<_, String>(
         "SELECT public.bind_account_recovery_session_to_account($1::uuid, $2::uuid, $3)::text",
     )
@@ -2915,5 +2914,8 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .fetch_one(migrator_pool)
     .await
     .expect("migrator should inspect selected recovery account");
-    assert_eq!(selected_case, ("under_review".to_owned(), started.user_id.clone()));
+    assert_eq!(
+        selected_case,
+        ("under_review".to_owned(), started.user_id.clone())
+    );
 }
