@@ -215,7 +215,7 @@ Pertahankan tata letak visual yang konsisten agar kedua halaman terasa sebagai s
 
 **Langkah 1 — Akun**
 
-- Nama lengkap.
+- Nama lengkap; nilai ini menjadi nama tampilan publik setelah akun aktif, bukan bukti identitas legal.
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
 - Pendaftaran email/WhatsApp menggunakan kontak yang dipilih, kata sandi, dan konfirmasi.
 - Setelah data akun divalidasi, backend mengirim OTP melalui email atau WhatsApp sesuai kanal pilihan. Akun berstatus pending sampai OTP valid.
@@ -258,7 +258,7 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 **Langkah 1 — Akun**
 
-- Nama lengkap.
+- Nama lengkap; nilai ini menjadi nama tampilan publik setelah akun aktif, bukan bukti identitas legal.
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
 - Pendaftaran email/WhatsApp wajib memakai kata sandi dan field konfirmasi.
 - OTP wajib diverifikasi sebelum akun aktif; kanal mengikuti kontak awal yang dipilih.
