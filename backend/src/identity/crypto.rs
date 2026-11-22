@@ -561,18 +561,18 @@ mod tests {
         let encoded = "01".repeat(KEY_LEN);
         let key = parse_environment_key(&encoded).unwrap();
         assert_eq!(&key[..], &[1_u8; KEY_LEN]);
-        assert_eq!(
+        assert!(matches!(
             parse_environment_key(&"00".repeat(KEY_LEN)),
             Err(CryptoError::InvalidKey)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             parse_environment_key(&"0g".repeat(KEY_LEN)),
             Err(CryptoError::InvalidKey)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             parse_environment_key("abcd"),
             Err(CryptoError::InvalidKey)
-        );
+        ));
     }
 
     #[test]
