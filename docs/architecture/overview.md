@@ -34,7 +34,7 @@ Identity Core menyediakan fondasi akun Business Owner dan Investor, password aut
 - Password menggunakan Argon2id.
 - Sesi menggunakan token opaque yang disimpan sebagai hash, cookie aman, idle timeout tujuh hari, dan absolute expiry 30 hari.
 - Session validation, refresh/rotation, logout, dan logout semua perangkat tersedia pada endpoint identitas.
-- Recovery database operations, service core, dan HTTP router tersedia. Router recovery belum dipasang pada server default dan proses berakhir pada status `under_review`.
+- Recovery database operations, service core, HTTP router, active-session continuity signal, dan service review Admin tersedia. Router recovery belum dipasang pada server default; password reset dan notifikasi keamanan belum tersedia.
 - Router registrasi juga belum dipasang pada server default.
 - Adapter OTP nyata, production key provider, approval recovery, password reset, dan integrasi middleware sesi ke endpoint fitur belum tersedia.
 
