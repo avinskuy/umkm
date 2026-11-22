@@ -35,6 +35,6 @@ pub use recovery::{
 };
 
 pub use password_reset::{
-    PasswordResetCompletion, PasswordResetError, PasswordResetIssueResult,
-    PasswordResetIssuanceService, PasswordResetService,
+    PasswordResetCompletion, PasswordResetError, PasswordResetIssuanceService,
+    PasswordResetIssueResult, PasswordResetService,
 };
