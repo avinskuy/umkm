@@ -52,7 +52,7 @@ BEGIN
     VALUES (
         p_session_id, p_user_id, 'registration', p_channel, p_destination_ciphertext, p_destination_nonce,
         p_encryption_key_version, p_destination_hmac, p_hmac_key_version, p_expires_at
-    )
+    );
 
     INSERT INTO public.identity_audit_events (actor_type, action_code, outcome)
     VALUES ('system', 'identity.registration.requested', 'success');
