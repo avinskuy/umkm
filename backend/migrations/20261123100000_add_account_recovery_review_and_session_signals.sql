@@ -103,6 +103,7 @@ AS $$
 DECLARE
     v_target_user_id UUID;
     v_case_created_at TIMESTAMPTZ;
+    v_target_status TEXT;
     v_session_id UUID;
     v_inserted_rows INTEGER;
 BEGIN
@@ -126,18 +127,26 @@ BEGIN
             USING ERRCODE = 'P0002';
     END IF;
 
-    SELECT s.id
+    SELECT account_status
+      INTO v_target_status
+      FROM public.users
+     WHERE id = v_target_user_id
+     FOR SHARE;
+
+    IF NOT FOUND OR v_target_status <> 'active' THEN
+        RETURN FALSE;
+    END IF;
+
+    SELECT id
       INTO v_session_id
-      FROM public.sessions AS s
-      JOIN public.users AS u ON u.id = s.user_id
-     WHERE s.token_hash = p_session_token_hash
-       AND s.user_id = v_target_user_id
-       AND s.created_at <= v_case_created_at
-       AND s.revoked_at IS NULL
-       AND s.expires_at > clock_timestamp()
-       AND s.last_seen_at > clock_timestamp() - INTERVAL '7 days'
-       AND u.account_status = 'active'
-     FOR SHARE OF s, u;
+      FROM public.sessions
+     WHERE token_hash = p_session_token_hash
+       AND user_id = v_target_user_id
+       AND created_at <= v_case_created_at
+       AND revoked_at IS NULL
+       AND expires_at > clock_timestamp()
+       AND last_seen_at > clock_timestamp() - INTERVAL '7 days'
+     FOR SHARE;
 
     IF NOT FOUND THEN
         RETURN FALSE;
@@ -190,6 +199,8 @@ DECLARE
     v_target_user_id UUID;
     v_requested_action TEXT;
     v_case_status TEXT;
+    v_reviewer_role TEXT;
+    v_reviewer_status TEXT;
     v_reviewer_session_id UUID;
     v_target_status TEXT;
     v_action_code TEXT;
@@ -227,22 +238,32 @@ BEGIN
             USING ERRCODE = 'P0002';
     END IF;
 
-    SELECT s.id
+    SELECT primary_role, account_status
+      INTO v_reviewer_role, v_reviewer_status
+      FROM public.users
+     WHERE id = p_reviewer_user_id
+     FOR SHARE;
+
+    IF NOT FOUND
+       OR v_reviewer_role <> 'admin'
+       OR v_reviewer_status <> 'active'
+       OR p_reviewer_user_id = v_target_user_id THEN
+        RAISE EXCEPTION 'recovery reviewer is not authorized'
+            USING ERRCODE = '42501';
+    END IF;
+
+    SELECT id
       INTO v_reviewer_session_id
-      FROM public.sessions AS s
-      JOIN public.users AS u ON u.id = s.user_id
-     WHERE s.token_hash = p_reviewer_session_token_hash
-       AND s.user_id = p_reviewer_user_id
-       AND s.revoked_at IS NULL
-       AND s.expires_at > clock_timestamp()
-       AND s.last_seen_at > clock_timestamp() - INTERVAL '7 days'
-       AND u.primary_role = 'admin'
-       AND u.account_status = 'active'
-       AND p_reviewer_user_id <> v_target_user_id
-     FOR SHARE OF s, u;
+      FROM public.sessions
+     WHERE token_hash = p_reviewer_session_token_hash
+       AND user_id = p_reviewer_user_id
+       AND revoked_at IS NULL
+       AND expires_at > clock_timestamp()
+       AND last_seen_at > clock_timestamp() - INTERVAL '7 days'
+     FOR SHARE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'recovery reviewer is not authorized'
+        RAISE EXCEPTION 'recovery reviewer session is not active'
             USING ERRCODE = '42501';
     END IF;
 
