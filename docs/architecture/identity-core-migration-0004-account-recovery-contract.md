@@ -4,7 +4,7 @@
 > Tanggal: 22 November 2026
 > Cakupan: kontak pemulihan bersama, kasus pemulihan akun, dan token reset kata sandi
 
-Dokumen ini menerjemahkan kebijakan pemulihan akun yang telah disetujui ke dalam kontrak PostgreSQL. Migration ini tidak mengaktifkan endpoint, provider, runtime kriptografi, atau pemulihan akun di aplikasi.
+Dokumen ini menjelaskan kontrak PostgreSQL untuk kontak pemulihan, kasus pemulihan, dan token reset. Migration ini tidak mengaktifkan endpoint publik, provider, atau konfigurasi produksi.
 
 ## 1. Batas implementasi
 
@@ -88,7 +88,7 @@ Runtime harus mengonsumsi token, mengganti password hash, menyelesaikan kasus, m
 - Normalisasi email/nomor HP, AEAD, HMAC, key provider, rotasi key, dan akses dekripsi terbatas.
 - Pembuktian bahwa kontak yang diverifikasi cocok dengan akun target, account-selection UX yang tidak melakukan enumeration, serta respons generik sebelum verifikasi.
 - Rate limit lintas sesi/kanal/instance, kontrol abuse, expiry cleanup, dan transaksi atomik untuk verifikasi/resend/recovery.
-- Pemeriksaan risiko, perangkat tepercaya, manual review, notifikasi keamanan, dan audit event.
+- Penilaian risiko tambahan dan notifikasi keamanan. Sinyal sesi aktif sebelumnya dan keputusan manual Admin telah tersedia melalui service internal; endpoint Admin belum tersedia.
 - Endpoint lupa password/lupa email, penerbitan/pengiriman token, konsumsi token, hashing password, pencabutan sesi, dan UX.
 - Grant database least-privilege untuk principal aplikasi, migration, backup, monitoring, dan Admin.
 
