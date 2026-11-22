@@ -86,6 +86,7 @@ AS $$
 BEGIN
     RAISE EXCEPTION 'policy acceptance and consent history is append-only'
         USING ERRCODE = '23514';
+    RETURN NULL;
 END;
 $$;
 
@@ -130,8 +131,7 @@ DECLARE
     v_user_id UUID;
 BEGIN
     IF p_display_name IS NULL
-       OR length(btrim(p_display_name)) NOT BETWEEN 1 AND 120
-       OR p_display_name <> btrim(p_display_name) THEN
+       OR length(btrim(p_display_name)) NOT BETWEEN 1 AND 120 THEN
         RAISE EXCEPTION 'public display name is invalid'
             USING ERRCODE = '22023';
     END IF;
@@ -166,7 +166,7 @@ BEGIN
     );
 
     INSERT INTO public.user_profiles (user_id, display_name)
-    VALUES (v_user_id, p_display_name);
+    VALUES (v_user_id, btrim(p_display_name));
 
     INSERT INTO public.policy_acceptance_records (user_id, policy_code, policy_version)
     VALUES
