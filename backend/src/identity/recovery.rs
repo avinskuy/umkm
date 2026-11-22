@@ -245,7 +245,6 @@ impl<'a> RecoveryService<'a> {
     }
 }
 
-
 /// Keputusan manual oleh Admin yang sudah diautentikasi pada lapisan pemanggil.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecoveryReviewDecision {
@@ -305,8 +304,8 @@ impl<'a> RecoveryReviewService<'a> {
     ) -> Result<(), VerificationError> {
         validate_uuid(case_id)?;
         validate_uuid(reviewer_user_id)?;
-        let reviewer_session_hash =
-            session_token_hash(reviewer_session_token).map_err(|_| VerificationError::InvalidInput)?;
+        let reviewer_session_hash = session_token_hash(reviewer_session_token)
+            .map_err(|_| VerificationError::InvalidInput)?;
 
         sqlx::query_scalar::<_, bool>(
             "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, $4, $5)",
