@@ -2756,32 +2756,46 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     // The same verified recovery contact may belong to multiple active accounts.
     // Selection must be explicit and must prove ownership inside PostgreSQL.
     let shared_contact_hmac = vec![0x5au8; 32];
+    let recovery_contact_session_ids: Vec<String> = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions ( \
+             id, user_id, purpose, channel, destination_ciphertext, destination_nonce, \
+             encryption_key_version, destination_hmac, hmac_key_version, expires_at \
+         ) VALUES \
+             (gen_random_uuid(), $1::uuid, 'recovery_contact_add', 'email', decode('01','hex'), decode('02','hex'), 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '10 minutes'), \
+             (gen_random_uuid(), $2::uuid, 'recovery_contact_add', 'email', decode('01','hex'), decode('02','hex'), 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '10 minutes') \
+         RETURNING id::text",
+    )
+    .bind(&started.user_id)
+    .bind(&phone_started.user_id)
+    .bind(&shared_contact_hmac)
+    .fetch_all(migrator_pool)
+    .await
+    .expect("recovery contact verification sessions should be created");
+    assert_eq!(recovery_contact_session_ids.len(), 2);
+
     sqlx::query(
-        "WITH created AS ( \
-             INSERT INTO public.verification_sessions ( \
-                 id, user_id, purpose, channel, destination_ciphertext, destination_nonce, \
-                 encryption_key_version, destination_hmac, hmac_key_version, expires_at \
-             ) VALUES \
-                 (gen_random_uuid(), $1::uuid, 'recovery_contact_add', 'email', decode('01','hex'), decode('02','hex'), 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '10 minutes'), \
-                 (gen_random_uuid(), $2::uuid, 'recovery_contact_add', 'email', decode('01','hex'), decode('02','hex'), 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '10 minutes') \
-             RETURNING * \
-         ), verified AS ( \
-             UPDATE public.verification_sessions AS s \
-                SET status = 'verified', verified_at = clock_timestamp() \
-               FROM created AS c WHERE s.id = c.id \
-             RETURNING s.* \
-         ) \
-         INSERT INTO public.recovery_contacts ( \
+        "UPDATE public.verification_sessions \
+            SET status = 'verified', verified_at = clock_timestamp() \
+          WHERE id IN ($1::uuid, $2::uuid)",
+    )
+    .bind(&recovery_contact_session_ids[0])
+    .bind(&recovery_contact_session_ids[1])
+    .execute(migrator_pool)
+    .await
+    .expect("recovery contact verification sessions should be verified");
+
+    sqlx::query(
+        "INSERT INTO public.recovery_contacts ( \
              id, user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, \
              contact_hmac, hmac_key_version, verification_session_id, verified_at \
          ) \
          SELECT gen_random_uuid(), user_id, channel, destination_ciphertext, destination_nonce, \
                 encryption_key_version, destination_hmac, hmac_key_version, id, verified_at \
-           FROM verified",
+           FROM public.verification_sessions \
+          WHERE id IN ($1::uuid, $2::uuid) AND status = 'verified'",
     )
-    .bind(&started.user_id)
-    .bind(&phone_started.user_id)
-    .bind(&shared_contact_hmac)
+    .bind(&recovery_contact_session_ids[0])
+    .bind(&recovery_contact_session_ids[1])
     .execute(migrator_pool)
     .await
     .expect("two active accounts may share one verified recovery contact");
