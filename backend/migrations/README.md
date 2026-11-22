@@ -20,7 +20,9 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 | 0012 | `20261122210000_add_password_authentication_runtime.sql` | Operasi login password, session creation/revocation, dan rate limit login. |
 | 0013 | `20261122220000_add_session_runtime_operations.sql` | Validasi sesi, pembaruan aktivitas, rotasi token, dan logout semua sesi. |
 | 0014 | `20261122230000_add_account_recovery_database_operations.sql` | Pembuatan sesi recovery dan pengaitan akun secara atomik. |
-| 0015 | `20261122240000_add_account_recovery_account_candidates.sql` | Daftar kandidat akun setelah OTP diverifikasi dan pencocokan kontak pemulihan. |\n| 0016 | `20261123100000_add_account_recovery_review_and_session_signals.sql` | Sinyal sesi aktif sebelumnya, keputusan review Admin append-only, dan audit event review. |
+| 0015 | `20261122240000_add_account_recovery_account_candidates.sql` | Daftar kandidat akun setelah OTP diverifikasi dan pencocokan kontak pemulihan. |
+| 0016 | `20261123100000_add_account_recovery_review_and_session_signals.sql` | Sinyal sesi aktif sebelumnya, keputusan review Admin append-only, dan audit event review. |
+| 0017 | `20261123110000_add_password_reset_runtime.sql` | Penerbitan dan pencabutan token reset, konsumsi satu kali, penggantian hash password atomik, pencabutan seluruh sesi, penyelesaian kasus, dan audit event. |
 
 ## Batas runtime
 
@@ -33,9 +35,9 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 
 ## Status integrasi
 
-Migration 0001–0016 tersedia pada repository dan diuji melalui PostgreSQL CI. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan sebagian alur account recovery.
+Migration 0001–0017 tersedia pada repository. Pengujian PostgreSQL CI mencakup invariant token reset, privilege function, serta operasi reset dan pencabutan sesi. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan account recovery.
 
-Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal. Router belum dipasang pada server default; password reset, pencabutan sesi setelah reset, dan notifikasi keamanan belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
+Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal. Password reset memiliki service penerbitan token setelah approval dan endpoint konsumsi token pada recovery router. Token berlaku 15 menit, disimpan sebagai hash, hanya dapat digunakan sekali, dan kegagalan pengiriman mencabut token. Konsumsi token memperbarui hash password, mencabut seluruh sesi aktif, menyelesaikan kasus recovery, dan menulis audit event dalam satu operasi PostgreSQL. Orkestrasi penerbitan token dari keputusan review Admin, endpoint review Admin, notifikasi keamanan pasca-reset, dan UI frontend reset password belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
 
 ## Pengujian
 
