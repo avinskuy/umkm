@@ -70,7 +70,7 @@ Penerbitan challenge dan kuota pengiriman direservasi atomik sebelum memanggil p
 7. Commit, lalu panggil adapter provider di luar transaksi.
 8. Catat hasil dispatch sebagai `accepted`, `failed`, atau `unknown`.
 
-Timeout provider yang hasilnya tidak diketahui diperlakukan sebagai `unknown`; kuota tidak dikembalikan otomatis. Retry harus punya identitas operasi/idempotency yang jelas dan tidak membuat challenge aktif ganda. Provider demonstrasi yang dipilih untuk dievaluasi adalah Resend (email) dan FlowKirim (WhatsApp). Adapter provider harus tetap dapat diganti. Biaya/free-tier, sender, template, retry policy, dan batas provider harus diverifikasi sebelum demo; CI memakai mock provider dan tidak mengirim pesan nyata. Fake provider hanya untuk tes; jangan mengirim OTP nyata sebelum provider resmi dikonfigurasi.
+Timeout provider yang hasilnya tidak diketahui diperlakukan sebagai `unknown`; kuota tidak dikembalikan otomatis. Retry harus punya identitas operasi/idempotency yang jelas dan tidak membuat challenge aktif ganda. Adapter delivery harus tetap provider-agnostic dan dapat diganti. Vendor, kanal, sender, template, retry policy, batas layanan, dan persetujuan operasional harus ditinjau oleh pengelola organisasi yang berwenang sebelum pengiriman nyata diaktifkan. CI memakai fake provider dan tidak mengirim pesan nyata.
 
 ### 2.5 Verifikasi dan aktivasi
 
@@ -129,7 +129,7 @@ Gunakan primitive standar dan library terawat. Jangan merancang cipher, KDF, gen
 Runtime bergantung pada abstraksi key provider yang menyediakan key berdasarkan purpose dan version.
 
 - Local development dan CI boleh memakai key sementara yang dibuat untuk tes.
-- Production key berasal dari secret manager/KMS yang disetujui; provider produksi belum dipilih.
+- Key ring environment berversi tersedia dan dimuat sekali saat startup dari secret manager/environment server. Integrasi KMS belum tersedia; adapter delivery produksi belum dipilih atau dikonfigurasi.
 - Key memiliki versi, rotasi, prosedur rollback, akses minimum, dan audit akses.
 - Startup gagal tertutup bila key wajib tidak tersedia atau versi key tidak dikenal.
 - Tidak ada fallback ke key hardcoded, default, atau kosong.
@@ -189,7 +189,7 @@ Provider tidak menerima password, session token, atau metadata yang tidak diperl
 
 ## 7. Kontrak API dan UX
 
-Router menyediakan `POST /api/v1/identity/registrations`, `POST /api/v1/identity/registrations/{verification_id}/resend`, dan `POST /api/v1/identity/registrations/{verification_id}/verify`. Router belum dipasang pada `app()` atau `main.rs`, sehingga endpoint tersebut belum dapat diakses melalui aplikasi HTTP default. Sebelum pemasangan, lengkapi key provider produksi, adapter provider, abuse guard, password policy, versi kebijakan server-side, serta pemeriksaan keamanan.
+Router menyediakan `POST /api/v1/identity/registrations`, `POST /api/v1/identity/registrations/{verification_id}/resend`, dan `POST /api/v1/identity/registrations/{verification_id}/verify`. Router belum dipasang pada `app()` atau `main.rs`, sehingga endpoint tersebut belum dapat diakses melalui aplikasi HTTP default. Sebelum pemasangan, lengkapi adapter delivery produksi yang dikelola pihak berwenang, kebijakan password registrasi yang disetujui, versi kebijakan server-side, dan pemeriksaan keamanan. Key ring environment serta guard abuse PostgreSQL sudah tersedia.
 
 UX minimum:
 - Tampilkan tujuan yang dimasking, expiry/countdown, dan waktu tunggu resend.
@@ -254,14 +254,14 @@ Status tahapan implementasi:
 2. **Verification orchestration — tersedia:** `VerificationService` menangani registrasi pending, enkripsi tujuan, issue/resend, dispatch result, dan verifikasi. CI memakai fake provider.
 3. **OTP lifecycle — inti tersedia:** expiry, cooldown, rate limit lintas sesi, lock, konsumsi satu kali, dan aktivasi atomik dikelola PostgreSQL bersama runtime.
 4. **HTTP API — router tersedia, belum dipasang:** handler registrasi, resend, dan verifikasi tersedia serta memiliki pengujian runtime; `app()`/`main.rs` belum memasangnya.
-5. **Operational readiness — belum lengkap:** key provider produksi, adapter Resend/FlowKirim nyata, abuse guard produksi, versi kebijakan aktif, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review masih diperlukan.
+5. **Operational readiness — belum lengkap:** adapter delivery produksi, kebijakan password registrasi, versi kebijakan aktif, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review masih diperlukan. Key ring environment dan abuse guard PostgreSQL tersedia.
 
 Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi merge. Migration produksi, provisioning credential produksi, dan deployment memerlukan persetujuan terpisah.
 
 ## 11. Batas yang belum diselesaikan
 
 Hal berikut tetap terbuka dan tidak boleh ditebak:
-- Provider email/WhatsApp dan sender resmi.
+- Adapter delivery email/WhatsApp, pengelola provider, dan sender yang disetujui.
 - Production KMS/secret manager dan prosedur rotasi/pemulihan key.
 - Review operasional implementasi AES-256-GCM dan key provider produksi.
 - Format pesan dan kebijakan template provider.
@@ -292,9 +292,9 @@ Tahap orchestration kini menyediakan `identity::VerificationService` dengan oper
 
 UUID sesi dan challenge dibuat oleh runtime sebelum AEAD/AAD atau keyed OTP digest dihitung. Tujuan pengiriman didekripsi hanya saat dibutuhkan, sedangkan nilai tujuan dan kode dibersihkan dari memori melalui `Zeroizing`. Tidak ada kontak, kode, password, ciphertext, atau key material yang ditulis ke log.
 
-Kontrak provider berada di `identity::delivery`. Provider mengembalikan `accepted`, `failed`, atau `unknown`; hasil dicatat setelah dispatch. Timeout/hasil tidak pasti tidak memicu pengembalian kuota atau retry otomatis. CI menggunakan fake provider dan tidak mengirim pesan nyata. Adapter Resend/FlowKirim dan endpoint HTTP belum diaktifkan.
+Kontrak provider berada di `identity::delivery`. Provider mengembalikan `accepted`, `failed`, atau `unknown`; hasil dicatat setelah dispatch. Timeout/hasil tidak pasti tidak memicu pengembalian kuota atau retry otomatis. CI menggunakan fake provider dan tidak mengirim pesan nyata. Adapter delivery produksi dan endpoint HTTP registrasi belum diaktifkan.
 
-Format label versi key yang disimpan pada kolom TEXT adalah `vN`; parsing dilakukan ketat dan versi yang tidak dikenal ditolak. `KeyProvider::key_versions` harus mengembalikan seluruh versi HMAC fingerprint yang masih diperlukan selama jendela rate-limit. Implementasi default hanya mengembalikan key aktif dan tidak cukup untuk rotasi produksi. Provider produksi wajib mengimplementasikan riwayat versi secara eksplisit.
+Format label versi key yang disimpan pada kolom TEXT adalah `vN`; parsing dilakukan ketat dan versi yang tidak dikenal ditolak. `KeyProvider::key_versions` harus mengembalikan seluruh versi HMAC fingerprint yang masih diperlukan selama jendela rate-limit. Implementasi default trait hanya mengembalikan daftar kosong; `EnvironmentKeyProvider` mengembalikan seluruh versi yang dikonfigurasi. Versi lama harus tetap dimuat selama data terenkripsi, fingerprint alias, atau challenge lama masih memerlukannya.
 
 Kebijakan awal OTP untuk orchestration ini menggunakan enam digit numerik dari CSPRNG dengan rejection sampling. Nilai ini berlaku untuk implementasi internal; endpoint publik tetap belum tersedia dan provider produksi belum dikonfigurasi.
 
