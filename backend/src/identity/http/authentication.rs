@@ -269,6 +269,7 @@ async fn logout_all(
                 .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             response
         }
+        Err(AuthenticationError::InvalidSession) => unauthorized_session(),
         Err(_) => error(
             StatusCode::SERVICE_UNAVAILABLE,
             "Sesi belum dapat dicabut. Silakan coba kembali.",
