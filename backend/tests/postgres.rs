@@ -2134,6 +2134,15 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .expect("test migrator should inspect the activated account");
     assert_eq!(account_status, "active");
 
+    let email_audit_counts: (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT             count(*) FILTER (WHERE action_code = 'identity.registration.requested'),             count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'),             count(*) FILTER (WHERE action_code = 'identity.verification.attempt_failed'),             count(*) FILTER (WHERE action_code = 'identity.registration.verified')          FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
+    )
+    .bind(&started.user_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect verification audit events");
+    assert_eq!(email_audit_counts, (1, 1, 1, 1));
+
     let phone_registration = ClientRegistration {
         role: ClientRole::Investor,
         initial_contact_channel: ContactChannel::Phone,
@@ -2173,5 +2182,22 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
             .await
             .expect("test migrator should inspect the activated phone account");
     assert_eq!(phone_account_status, "active");
+
+    let phone_audit_counts: (i64, i64, i64) = sqlx::query_as(
+        "SELECT             count(*) FILTER (WHERE action_code = 'identity.registration.requested'),             count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'),             count(*) FILTER (WHERE action_code = 'identity.registration.verified')          FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
+    )
+    .bind(&phone_started.user_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect WhatsApp verification audit events");
+    assert_eq!(phone_audit_counts, (1, 1, 1));
+
+    let accepted_delivery_audits: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events          WHERE action_code = 'identity.verification.delivery_result'            AND metadata ->> 'result_code' = 'accepted'",
+    )
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect delivery result audit events");
+    assert!(accepted_delivery_audits >= 3);
 }
 
