@@ -2,12 +2,12 @@
 
 > Status: migration 0001–0005 dan bootstrap principal/privilege tersedia di `main` serta diuji melalui CI; runtime Identity Core masih terbatas
 > Tanggal: 22 November 2026
-> Keputusan autentikasi terbaru: OTP wajib untuk registrasi email/WhatsApp + password; Google OAuth tanpa OTP tambahan; login rutin tanpa OTP.
+> Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin tanpa OTP.
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
 Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration 0001–0005 serta skrip bootstrap principal dan grant tersedia di `main` dan diuji melalui CI. Seluruh migration dan bootstrap tetap belum dijalankan pada database produksi. HTTP runtime menginisialisasi pool PostgreSQL menggunakan principal aplikasi, tetapi tidak menjalankan migration otomatis.
 
-> **Amendemen keputusan 22 November 2026:** pendaftaran email/WhatsApp + password kembali mewajibkan OTP. Google OAuth tidak memerlukan OTP tambahan setelah validasi provider dan email_verified=true; login rutin tidak memakai OTP. Migration 0001 sudah menyediakan akun pending dan aktivasi setelah verifikasi, sedangkan migration 0002 menyediakan sesi/challenge email dan WhatsApp. Tetap audit fungsi, trigger, operasi aktivasi, dan tes PostgreSQL sebelum runtime dibuat. Lihat [Keputusan Autentikasi Identity Core — Registrasi OTP dan Google OAuth](identity-core-authentication-stage-one-decision.md).
+> **Keputusan terbaru 22 November 2026:** registrasi email/WhatsApp + password wajib OTP dan login rutin menggunakan password tanpa OTP. Migration 0006 menghapus tabel identitas provider yang sebelumnya disiapkan sebagai ekstensi serta mempersempit fungsi pembuatan akun menjadi password-only. Migration 0001–0005 tetap menjadi riwayat skema yang immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Hasil pemeriksaan repository
 
@@ -38,7 +38,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 
 | Urutan | Cakupan | Isi utama |
 | --- | --- | --- |
-| 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, identitas provider, dan perlindungan role immutable |
+| 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, dan perlindungan role immutable |
 | 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; skema tersedia dan diuji di CI, runtime OTP tetap belum diimplementasikan |
 | 0003 | Sesi autentikasi | `sessions`, hash token SHA-256 unik, idle timeout 7 hari, absolute expiry 30 hari, rotasi token, dan pencabutan server-side; skema dan tes invariant tersedia di `main`, runtime sesi belum tersedia |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
@@ -57,10 +57,10 @@ Kolom konseptual yang diperlukan:
 - `id`: UUID primary key.
 - `primary_role`: constrained value `business_owner`, `investor`, `admin`.
 - `account_status`: constrained lifecycle value `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`. Suspend/limit fitur dicatat terpisah melalui moderation/enforcement records.
-- `email_normalized` dan `phone_e164`: nullable secara individual; akun klien memilih satu identifier awal. Kontak dari registrasi password baru diverifikasi setelah OTP email/WhatsApp valid. Google OAuth tidak memerlukan OTP tambahan bila email_verified=true.
+- `email_normalized` dan `phone_e164`: nullable secara individual; akun klien memilih satu identifier awal. Kontak awal baru dianggap terverifikasi setelah OTP email/WhatsApp valid.
 - `initial_contact_channel`: mencatat identifier awal (email atau phone) yang dipilih saat pendaftaran; pada skema tahap pertama yang diperbarui, nilainya tidak mensyaratkan verifikasi sebelum akun aktif.
 - `email_verified_at` dan `phone_verified_at`: waktu verifikasi yang sesuai; jangan menyimpulkan kontak kedua telah diverifikasi.
-- `password_hash`: nullable hanya untuk akun yang mendaftar melalui Google OAuth tanpa kata sandi lokal. Pendaftaran email/nomor HP wajib memiliki password hash.
+- `password_hash`: wajib untuk akun klien aktif maupun pending; akun terminal yang telah ditutup atau kedaluwarsa mengikuti aturan pembersihan kredensial.
 - `pending_expires_at`: masih bagian dari migration saat ini untuk lifecycle pending lama; tidak digunakan sebagai syarat registrasi tahap pertama dan perlu ditinjau pada migration lanjutan.
 - `created_at`, `updated_at`, dan timestamp lifecycle yang memang diperlukan.
 
@@ -68,18 +68,16 @@ Invariant database:
 
 - Unique partial index pada kontak utama ternormalisasi yang tidak null, selama kontak masih direservasi.
 - Role dibatasi oleh CHECK constraint dan tidak dapat diubah setelah INSERT. Terapkan perlindungan database yang sempit dan teruji, bukan memberi hak UPDATE role secara luas kepada akun aplikasi.
-- Akun klien baru harus memiliki tepat satu metode autentikasi awal yang sah: password lokal atau identitas Google. Akun Admin dibuat melalui provisioning internal dan mengikuti aturan kontak/MFA Admin tersendiri.
+- Akun klien wajib memiliki password lokal. Akun Admin dibuat melalui provisioning internal dan mengikuti aturan kontak/MFA Admin tersendiri.
 - Status akun tidak boleh menjadi jalan pintas untuk melepas kontak. Kontak utama tetap direservasi selama masa tunggu penghapusan dan baru dilepas setelah penghapusan benar-benar selesai sesuai kebijakan retensi.
 - Cleanup untuk status pending lama tetap diperlukan bila masih ada record yang memakai lifecycle tersebut; jangan menerapkan kedaluwarsa 30 menit pada registrasi tahap pertama yang langsung aktif.
 - Jika baris pending dipertahankan untuk audit setelah kedaluwarsa, kontak yang dilepas harus dihapus dari kolom identitas aktif atau dipindahkan ke representasi audit yang tidak dapat digunakan untuk login. Jangan membiarkan baris expired tetap memblokir registrasi tanpa batas.
 
-### 4.2 `user_identities`
+### 4.2 Autentikasi lokal
 
-- Simpan identitas eksternal berdasarkan `provider` dan stable `provider_subject`, bukan berdasarkan kecocokan teks email.
-- Terapkan unique constraint pada (`provider`, `provider_subject`).
-- Setiap identitas terhubung ke tepat satu user.
-- Linking memerlukan sesi akun yang ada dan bukti kontrol identitas provider; tidak ada auto-merge atau perubahan role.
-- `password_hash` boleh null untuk akun Google-only, tetapi kontak pendaftaran yang dipilih tetap harus diverifikasi.
+- Registrasi publik hanya menggunakan email atau nomor telepon/WhatsApp bersama password lokal.
+- Tidak ada tabel identitas OAuth atau provider eksternal pada skema aktif.
+- Password hash dibuat di backend dengan Argon2id; password plaintext tidak pernah dikirim ke fungsi database.
 
 ### 4.3 `verification_sessions`
 
