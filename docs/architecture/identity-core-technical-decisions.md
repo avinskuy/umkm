@@ -3,7 +3,7 @@
 > Cakupan: baseline teknis lintas migration Identity Core.
 > Registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
-Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0010 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP dan router registrasi yang belum dipasang pada aplikasi HTTP default. Login/logout, sesi HTTP, provider nyata, key produksi, dan recovery runtime belum tersedia. HTTP startup tidak menjalankan migration otomatis.
+Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0011 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP dan router registrasi yang belum dipasang pada aplikasi HTTP default. Login/logout, sesi HTTP, provider nyata, key produksi, dan recovery runtime belum tersedia. HTTP startup tidak menjalankan migration otomatis.
 
 Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0006 menghapus dukungan Google OAuth dari skema aktif. Resend dan FlowKirim menjadi target adapter pengiriman; integrasi nyata belum tersedia. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
