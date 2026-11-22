@@ -1763,15 +1763,13 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
             .expect("invalid session token should return a safe no-op result");
     assert_eq!(invalid_revoke_count, 0);
 
-    let first_revoke = sqlx::query_scalar::<_, i32>(
-        "SELECT public.revoke_all_password_login_sessions($1)",
-    )
-    .bind(&second_token_hash)
+    let first_revoke =
+        sqlx::query_scalar::<_, i32>("SELECT public.revoke_all_password_login_sessions($1)")
+            .bind(&second_token_hash)
     .fetch_one(pool);
-    let second_revoke = sqlx::query_scalar::<_, i32>(
-        "SELECT public.revoke_all_password_login_sessions($1)",
-    )
-    .bind(&third_token_hash)
+    let second_revoke =
+        sqlx::query_scalar::<_, i32>("SELECT public.revoke_all_password_login_sessions($1)")
+            .bind(&third_token_hash)
     .fetch_one(pool);
     let (first_revoke, second_revoke) = tokio::join!(first_revoke, second_revoke);
     let revoked_counts = [
