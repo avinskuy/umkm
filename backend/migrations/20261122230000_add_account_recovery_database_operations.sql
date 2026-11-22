@@ -2,6 +2,10 @@
 -- Account recovery verification and account-selection database operations.
 -- OTP throttling and challenge mechanics reuse the existing verification tables/functions.
 
+CREATE INDEX verification_sessions_recovery_contact_created_idx
+    ON public.verification_sessions (channel, destination_hmac, created_at DESC)
+    WHERE purpose = 'account_recovery';
+
 CREATE FUNCTION public.create_account_recovery_verification_session(
     p_session_id UUID,
     p_case_id UUID,
@@ -21,6 +25,7 @@ SET search_path = pg_catalog
 AS $$
 DECLARE
     v_now TIMESTAMPTZ := clock_timestamp();
+    v_recent_requests BIGINT;
 BEGIN
     IF p_session_id IS NULL OR p_case_id IS NULL
        OR p_requested_action NOT IN ('password_reset', 'forgot_email', 'account_access')
@@ -34,6 +39,25 @@ BEGIN
        OR p_hmac_key_version IS NULL OR length(btrim(p_hmac_key_version)) = 0 THEN
         RAISE EXCEPTION 'account recovery verification input is invalid'
             USING ERRCODE = '22023';
+    END IF;
+
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended(
+            pg_catalog.encode(p_destination_hmac, 'hex') || ':' || p_channel,
+            0
+        )
+    );
+
+    SELECT count(*) INTO v_recent_requests
+      FROM public.verification_sessions
+     WHERE purpose = 'account_recovery'
+       AND channel = p_channel
+       AND destination_hmac = p_destination_hmac
+       AND created_at >= v_now - INTERVAL '60 minutes';
+
+    IF v_recent_requests >= 5 THEN
+        RAISE EXCEPTION 'account recovery request rate limit exceeded'
+            USING ERRCODE = 'P0001';
     END IF;
 
     INSERT INTO public.verification_sessions (
@@ -523,6 +547,6 @@ REVOKE ALL ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEA
 REVOKE ALL ON FUNCTION public.bind_account_recovery_session_to_account(UUID, UUID, BYTEA[]) FROM PUBLIC;
 
 COMMENT ON FUNCTION public.create_account_recovery_verification_session(UUID, UUID, TEXT, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) IS
-    'Creates an unbound account-recovery verification session and its pending case.';
+    'Creates an unbound account-recovery verification session and pending case, limited to five requests per contact per hour.';
 COMMENT ON FUNCTION public.bind_account_recovery_session_to_account(UUID, UUID, BYTEA[]) IS
     'Atomically binds a verified recovery session only to an active account owning a matching verified recovery contact.';
