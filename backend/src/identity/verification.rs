@@ -15,7 +15,7 @@ const OTP_DIGITS: u32 = 6;
 const OTP_RANGE: u64 = 1_000_000;
 const UUID_LEN: usize = 16;
 
-type SessionRow = (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String);
+pub(crate) type SessionRow = (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String);
 type ChallengeRow = (String, Vec<u8>, String);
 type NormalizedContact = (&'static str, String, Option<String>, Option<String>);
 
