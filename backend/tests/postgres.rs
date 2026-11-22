@@ -2107,7 +2107,10 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
             .lock()
             .expect("fake delivery message lock should be available");
         assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].channel, usahapintar_api::identity::DeliveryChannel::Email);
+        assert_eq!(
+            messages[0].channel,
+            usahapintar_api::identity::DeliveryChannel::Email
+        );
         messages[0].code.as_str().to_owned()
     };
 
@@ -2118,12 +2121,10 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
             .await
             .expect("incorrect OTP should be recorded as a failed attempt")
     );
-    assert!(
-        service
-            .verify(&started.session_id, &code)
-            .await
-            .expect("correct OTP should verify and activate the pending account")
-    );
+    assert!(service
+        .verify(&started.session_id, &code)
+        .await
+        .expect("correct OTP should verify and activate the pending account"));
 
     let account_status: String = sqlx::query_scalar(
         "SELECT account_status FROM public.users WHERE id = $1::uuid",
@@ -2135,7 +2136,12 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     assert_eq!(account_status, "active");
 
     let email_audit_counts: (i64, i64, i64, i64) = sqlx::query_as(
-        "SELECT             count(*) FILTER (WHERE action_code = 'identity.registration.requested'),             count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'),             count(*) FILTER (WHERE action_code = 'identity.verification.attempt_failed'),             count(*) FILTER (WHERE action_code = 'identity.registration.verified')          FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
+        "SELECT \
+            count(*) FILTER (WHERE action_code = 'identity.registration.requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.verification.attempt_failed'), \
+            count(*) FILTER (WHERE action_code = 'identity.registration.verified') \
+         FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
     )
     .bind(&started.user_id)
     .fetch_one(migrator_pool)
@@ -2168,12 +2174,10 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         );
         messages[1].code.as_str().to_owned()
     };
-    assert!(
-        service
-            .verify(&phone_started.session_id, &phone_code)
-            .await
-            .expect("WhatsApp OTP should verify and activate the pending account")
-    );
+    assert!(service
+        .verify(&phone_started.session_id, &phone_code)
+        .await
+        .expect("WhatsApp OTP should verify and activate the pending account"));
 
     let phone_account_status: String =
         sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
@@ -2184,7 +2188,11 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     assert_eq!(phone_account_status, "active");
 
     let phone_audit_counts: (i64, i64, i64) = sqlx::query_as(
-        "SELECT             count(*) FILTER (WHERE action_code = 'identity.registration.requested'),             count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'),             count(*) FILTER (WHERE action_code = 'identity.registration.verified')          FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
+        "SELECT \
+            count(*) FILTER (WHERE action_code = 'identity.registration.requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.registration.verified') \
+         FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
     )
     .bind(&phone_started.user_id)
     .fetch_one(migrator_pool)
@@ -2193,7 +2201,9 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     assert_eq!(phone_audit_counts, (1, 1, 1));
 
     let accepted_delivery_audits: i64 = sqlx::query_scalar(
-        "SELECT count(*)::bigint FROM public.identity_audit_events          WHERE action_code = 'identity.verification.delivery_result'            AND metadata ->> 'result_code' = 'accepted'",
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+         WHERE action_code = 'identity.verification.delivery_result' \
+           AND metadata ->> 'result_code' = 'accepted'",
     )
     .fetch_one(migrator_pool)
     .await
