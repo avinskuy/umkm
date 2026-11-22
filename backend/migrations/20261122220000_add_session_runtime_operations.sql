@@ -137,10 +137,30 @@ BEGIN
      WHERE token_hash = p_current_token_hash
        AND revoked_at IS NULL
        AND expires_at > clock_timestamp()
-       AND last_seen_at > clock_timestamp() - INTERVAL '7 days'
-     FOR UPDATE;
+       AND last_seen_at > clock_timestamp() - INTERVAL '7 days';
 
     IF NOT FOUND THEN
+        RETURN 0;
+    END IF;
+
+    -- Lock every active session in a stable order to avoid deadlocks when
+    -- two devices request logout-all concurrently.
+    PERFORM s.id
+      FROM public.sessions AS s
+     WHERE s.user_id = v_user_id
+       AND s.revoked_at IS NULL
+     ORDER BY s.id
+     FOR UPDATE;
+
+    IF NOT EXISTS (
+        SELECT 1
+          FROM public.sessions
+         WHERE token_hash = p_current_token_hash
+           AND user_id = v_user_id
+           AND revoked_at IS NULL
+           AND expires_at > clock_timestamp()
+           AND last_seen_at > clock_timestamp() - INTERVAL '7 days'
+    ) THEN
         RETURN 0;
     END IF;
 
