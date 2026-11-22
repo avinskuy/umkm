@@ -451,6 +451,10 @@ mod tests {
             email_normalized: Some("user@example.test"),
             phone_e164: Some("+628123456789"),
             password_hash: "encoded-hash",
+            terms_of_service_version: "terms-v1",
+            privacy_policy_version: "privacy-v1",
+            marketing_consent: false,
+            marketing_notice_version: None,
         };
         assert!(matches!(
             normalized_registration_contact(&registration),
