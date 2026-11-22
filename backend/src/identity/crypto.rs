@@ -294,8 +294,11 @@ fn contact_fingerprint_with_key(
 }
 
 /// Representasi versi key yang disimpan pada kolom TEXT database.
-pub fn key_version_label(version: KeyVersion) -> String {
-    format!("v{}", version.0)
+pub fn key_version_label(version: KeyVersion) -> Result<String, CryptoError> {
+    if version.0 == 0 {
+        return Err(CryptoError::InvalidInput);
+    }
+    Ok(format!("v{}", version.0))
 }
 
 /// Membaca versi key secara ketat; tidak ada fallback untuk label yang tidak dikenal.
@@ -476,7 +479,8 @@ mod tests {
 
     #[test]
     fn key_version_labels_are_strict_and_round_trip() {
-        assert_eq!(key_version_label(KeyVersion(7)), "v7");
+        assert_eq!(key_version_label(KeyVersion(7)), Ok("v7".to_owned()));
+        assert_eq!(key_version_label(KeyVersion(0)), Err(CryptoError::InvalidInput));
         assert_eq!(parse_key_version("v7"), Ok(KeyVersion(7)));
         assert_eq!(parse_key_version("7"), Err(CryptoError::InvalidInput));
         assert_eq!(parse_key_version("v0"), Err(CryptoError::InvalidInput));
