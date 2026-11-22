@@ -653,6 +653,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         reset_url: Arc<Mutex<Option<String>>>,
         destination: Arc<Mutex<Option<String>>>,
         expires_at_unix: Arc<Mutex<Option<i64>>>,
+        status: DispatchStatus,
     }
 
     impl PasswordResetDeliveryProvider for CapturingPasswordResetDelivery {
@@ -676,7 +677,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
                     .lock()
                     .expect("reset expiry capture lock should be available") =
                     Some(message.expires_at_unix);
-                DispatchStatus::Accepted
+                self.status
             })
         }
     }
@@ -1135,10 +1136,42 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let reset_url_capture = Arc::new(Mutex::new(None));
     let reset_destination_capture = Arc::new(Mutex::new(None));
     let reset_expiry_capture = Arc::new(Mutex::new(None));
+    {
+        let failed_delivery = CapturingPasswordResetDelivery {
+            reset_url: reset_url_capture.clone(),
+            destination: reset_destination_capture.clone(),
+            expires_at_unix: reset_expiry_capture.clone(),
+            status: DispatchStatus::Failed,
+        };
+        let failed_issuer = PasswordResetIssuanceService::new(
+            &pool,
+            keys.as_ref(),
+            &failed_delivery,
+            "https://app.example.test/reset-password".to_owned(),
+        )
+        .expect("valid HTTPS password reset URL should be accepted");
+        let failed_result = failed_issuer
+            .issue_for_approved_case(&recovery_case_id)
+            .await
+            .expect("failed delivery should still be recorded");
+        assert_eq!(failed_result.dispatch_status, DispatchStatus::Failed);
+    }
+
+    let failed_delivery_token_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.password_reset_tokens \
+          WHERE recovery_case_id = $1::uuid AND revocation_reason = 'delivery_failed'",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("failed delivery token should be revoked");
+    assert_eq!(failed_delivery_token_count, 1);
+
     let reset_delivery = CapturingPasswordResetDelivery {
         reset_url: reset_url_capture.clone(),
         destination: reset_destination_capture.clone(),
         expires_at_unix: reset_expiry_capture.clone(),
+        status: DispatchStatus::Accepted,
     };
     let reset_issuer = PasswordResetIssuanceService::new(
         &pool,
@@ -1152,6 +1185,13 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .await
         .expect("approved recovery case should issue a reset token");
     assert_eq!(issue_result.dispatch_status, DispatchStatus::Accepted);
+    assert!(
+        reset_issuer
+            .issue_for_approved_case(&recovery_case_id)
+            .await
+            .is_err(),
+        "an active token must prevent duplicate reset delivery"
+    );
 
     let delivered_url = reset_url_capture
         .lock()
