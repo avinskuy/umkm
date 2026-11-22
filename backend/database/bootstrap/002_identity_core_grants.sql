@@ -193,7 +193,7 @@ DECLARE
 BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
         'public.find_active_password_login(text,text)',
-        'public.create_password_login_session(uuid,bytea)',
+        'public.create_password_login_session(uuid,bytea,boolean,text,bytea,text)',
         'public.revoke_password_login_session(bytea)',
         'public.reserve_password_login_attempt(bytea,bytea)',
         'public.clear_password_login_identifier_limit(bytea)'
@@ -227,7 +227,7 @@ $password_authentication_ownership_guard$;
 REVOKE ALL ON TABLE public.password_login_rate_limits FROM usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.find_active_password_login(TEXT, TEXT)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.create_password_login_session(UUID, BYTEA)
+GRANT EXECUTE ON FUNCTION public.create_password_login_session(UUID, BYTEA, BOOLEAN, TEXT, BYTEA, TEXT)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.revoke_password_login_session(BYTEA)
     TO usahapintar_app;
