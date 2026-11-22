@@ -192,8 +192,8 @@ impl<'a> PasswordResetIssuanceService<'a> {
         if dispatch_status == DispatchStatus::Failed {
             let _: bool = sqlx::query_scalar("SELECT public.revoke_password_reset_token($1)")
                 .bind(token_hash.to_vec())
-            .fetch_one(self.pool)
-            .await?;
+                .fetch_one(self.pool)
+                .await?;
         }
 
         Ok(PasswordResetIssueResult {
@@ -299,7 +299,8 @@ mod tests {
         fn dispatch<'a>(
             &'a self,
             _message: PasswordResetDeliveryMessage,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = DispatchStatus> + Send + 'a>> {
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = DispatchStatus> + Send + 'a>>
+        {
             Box::pin(async { DispatchStatus::Failed })
         }
     }
