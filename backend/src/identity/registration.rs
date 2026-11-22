@@ -49,14 +49,12 @@ pub async fn create_client_user(
     connection: &mut PgConnection,
     registration: &ClientRegistration<'_>,
 ) -> Result<String, sqlx::Error> {
-    sqlx::query_scalar::<_, String>(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
-    )
-    .bind(registration.role.as_db_value())
-    .bind(registration.initial_contact_channel.as_db_value())
-    .bind(registration.email_normalized)
-    .bind(registration.phone_e164)
-    .bind(registration.password_hash)
-    .fetch_one(connection)
-    .await
+    sqlx::query_scalar::<_, String>("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
+        .bind(registration.role.as_db_value())
+        .bind(registration.initial_contact_channel.as_db_value())
+        .bind(registration.email_normalized)
+        .bind(registration.phone_e164)
+        .bind(registration.password_hash)
+        .fetch_one(connection)
+        .await
 }
