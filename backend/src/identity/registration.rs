@@ -41,8 +41,7 @@ pub struct ClientRegistration<'a> {
     pub initial_contact_channel: ContactChannel,
     pub email_normalized: Option<&'a str>,
     pub phone_e164: Option<&'a str>,
-    pub password_hash: Option<&'a str>,
-    pub google_subject: Option<&'a str>,
+    pub password_hash: &'a str,
 }
 
 /// Membuat akun klien pending tanpa memberi aplikasi hak INSERT langsung ke tabel.
@@ -51,14 +50,13 @@ pub async fn create_client_user(
     registration: &ClientRegistration<'_>,
 ) -> Result<String, sqlx::Error> {
     sqlx::query_scalar::<_, String>(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5, $6)::text",
+        "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
     )
     .bind(registration.role.as_db_value())
     .bind(registration.initial_contact_channel.as_db_value())
     .bind(registration.email_normalized)
     .bind(registration.phone_e164)
     .bind(registration.password_hash)
-    .bind(registration.google_subject)
     .fetch_one(connection)
     .await
 }
