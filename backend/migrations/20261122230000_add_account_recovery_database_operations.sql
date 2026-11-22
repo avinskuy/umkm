@@ -186,7 +186,6 @@ BEGIN
        OR v_session.status <> 'pending'
        OR v_session.expires_at <= v_now
        OR v_session.purpose NOT IN ('registration', 'account_recovery')
-       OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now)
        OR p_code_hash IS NULL OR octet_length(p_code_hash) = 0
        OR p_hash_key_version IS NULL OR length(btrim(p_hash_key_version)) = 0
        OR p_destination_hmac_aliases IS NULL
