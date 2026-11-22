@@ -1645,8 +1645,8 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     assert!(allowed_after_clear);
 
     let ip_only_hash = vec![61_u8; 32];
-    let identifier_only_hash = vec![62_u8; 32];
     for attempt in 1..=30 {
+        let identifier_only_hash = vec![attempt as u8; 32];
         let allowed: bool =
             sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
                 .bind(&identifier_only_hash)
@@ -1661,7 +1661,7 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     }
     let ip_blocked: bool =
         sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
-            .bind(vec![63_u8; 32])
+            .bind(vec![99_u8; 32])
             .bind(&ip_only_hash)
             .fetch_one(pool)
             .await
