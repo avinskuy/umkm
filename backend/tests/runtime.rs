@@ -62,8 +62,7 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
         initial_contact_channel: ContactChannel::Email,
         email_normalized: Some(&email),
         phone_e164: None,
-        password_hash: Some("$argon2id$test-only-placeholder"),
-        google_subject: None,
+        password_hash: "$argon2id$test-only-placeholder",
     };
 
     let mut transaction = pool
