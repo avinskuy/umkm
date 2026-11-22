@@ -17,7 +17,7 @@ BEGIN
       INTO v_function_owner, v_is_security_definer, v_has_safe_search_path
       FROM pg_catalog.pg_proc AS p
      WHERE p.oid = pg_catalog.to_regprocedure(
-         'public.create_client_user(text,text,text,text,text,text)'
+         'public.create_client_user(text,text,text,text,text)'
      );
 
     IF v_function_owner IS DISTINCT FROM 'usahapintar_migrator'
