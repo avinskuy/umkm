@@ -60,6 +60,12 @@ pub trait KeyProvider: Send + Sync {
 
     /// Mengambil key versi tertentu untuk dekripsi/verifikasi data lama.
     fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError>;
+
+    /// Versi key yang masih dapat dipakai untuk membaca event dalam jendela rotasi.
+    fn key_versions(&self, purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
+        let active = self.active_key(purpose)?;
+        Ok(vec![active.version])
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -200,24 +206,111 @@ pub fn contact_fingerprint(
     channel: &str,
     canonical_contact: &str,
 ) -> Result<KeyedDigest, CryptoError> {
+    validate_contact_fingerprint_input(channel, canonical_contact)?;
+    let versioned_key = provider.active_key(KeyPurpose::ContactFingerprint)?;
+    contact_fingerprint_with_key(
+        versioned_key.version,
+        &versioned_key.key,
+        channel,
+        canonical_contact,
+    )
+}
+
+/// Fingerprint untuk satu versi key, termasuk versi lama selama jendela rotasi.
+pub fn contact_fingerprint_for_version(
+    provider: &dyn KeyProvider,
+    version: KeyVersion,
+    channel: &str,
+    canonical_contact: &str,
+) -> Result<KeyedDigest, CryptoError> {
+    validate_contact_fingerprint_input(channel, canonical_contact)?;
+    let key = provider.key(KeyPurpose::ContactFingerprint, version)?;
+    contact_fingerprint_with_key(version, &key, channel, canonical_contact)
+}
+
+/// Menghasilkan seluruh alias fingerprint yang masih didukung provider.
+pub fn contact_fingerprint_aliases(
+    provider: &dyn KeyProvider,
+    channel: &str,
+    canonical_contact: &str,
+) -> Result<Vec<KeyedDigest>, CryptoError> {
+    validate_contact_fingerprint_input(channel, canonical_contact)?;
+    let active = provider.active_key(KeyPurpose::ContactFingerprint)?;
+    let mut versions = provider.key_versions(KeyPurpose::ContactFingerprint)?;
+    versions.push(active.version);
+    versions.sort_by_key(|version| version.0);
+    versions.dedup();
+
+    versions
+        .into_iter()
+        .map(|version| {
+            if version == active.version {
+                contact_fingerprint_with_key(
+                    version,
+                    &active.key,
+                    channel,
+                    canonical_contact,
+                )
+            } else {
+                contact_fingerprint_for_version(
+                    provider,
+                    version,
+                    channel,
+                    canonical_contact,
+                )
+            }
+        })
+        .collect()
+}
+
+fn validate_contact_fingerprint_input(
+    channel: &str,
+    canonical_contact: &str,
+) -> Result<(), CryptoError> {
     if channel.is_empty() || canonical_contact.is_empty() {
         return Err(CryptoError::InvalidInput);
     }
+    Ok(())
+}
 
+fn contact_fingerprint_with_key(
+    version: KeyVersion,
+    key_material: &SecretKey,
+    channel: &str,
+    canonical_contact: &str,
+) -> Result<KeyedDigest, CryptoError> {
     let mut input = Zeroizing::new(CONTACT_DOMAIN.to_vec());
     append_field(&mut input, channel.as_bytes())?;
     append_field(&mut input, canonical_contact.as_bytes())?;
 
-    let versioned_key = provider.active_key(KeyPurpose::ContactFingerprint)?;
-    let key = hmac::Key::new(hmac::HMAC_SHA256, versioned_key.key.expose());
+    let key = hmac::Key::new(hmac::HMAC_SHA256, key_material.expose());
     let tag = hmac::sign(&key, &input);
     let mut digest = [0_u8; DIGEST_LEN];
     digest.copy_from_slice(tag.as_ref());
 
     Ok(KeyedDigest {
-        key_version: versioned_key.version,
+        key_version: version,
         digest,
     })
+}
+
+/// Representasi versi key yang disimpan pada kolom TEXT database.
+pub fn key_version_label(version: KeyVersion) -> String {
+    format!("v{}", version.0)
+}
+
+/// Membaca versi key secara ketat; tidak ada fallback untuk label yang tidak dikenal.
+pub fn parse_key_version(label: &str) -> Result<KeyVersion, CryptoError> {
+    let value = label
+        .strip_prefix('v')
+        .ok_or(CryptoError::InvalidInput)?;
+    let version = value
+        .parse::<u32>()
+        .map_err(|_| CryptoError::InvalidInput)?;
+    if version == 0 {
+        return Err(CryptoError::InvalidInput);
+    }
+    Ok(KeyVersion(version))
 }
 
 /// Menghasilkan keyed digest OTP yang terikat pada challenge dan sesi.
@@ -337,6 +430,14 @@ mod tests {
 
         assert_ne!(email.digest, phone.digest);
         assert_eq!(email.key_version, KeyVersion(7));
+    }
+
+    #[test]
+    fn key_version_labels_are_strict_and_round_trip() {
+        assert_eq!(key_version_label(KeyVersion(7)), "v7");
+        assert_eq!(parse_key_version("v7"), Ok(KeyVersion(7)));
+        assert_eq!(parse_key_version("7"), Err(CryptoError::InvalidInput));
+        assert_eq!(parse_key_version("v0"), Err(CryptoError::InvalidInput));
     }
 
     #[test]
