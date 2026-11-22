@@ -104,7 +104,7 @@ pub fn registration_router(state: RegistrationApiState) -> Router {
         .with_state(state)
 }
 
-async async fn register(
+async fn register(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Json(request): Json<RegistrationRequest>,
@@ -227,7 +227,7 @@ async async fn register(
     }
 }
 
-async async fn resend(
+async fn resend(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Path(verification_id): Path<String>,
@@ -258,7 +258,7 @@ async async fn resend(
     }
 }
 
-async async fn verify(
+async fn verify(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Path(verification_id): Path<String>,
