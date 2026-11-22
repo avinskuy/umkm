@@ -2232,9 +2232,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .await
     .expect("second recovery session should be verified");
 
-    sqlx::query(
-        "UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid",
-    )
+    sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
     .bind(&rejected_session_id)
     .bind(&second_user_id)
     .execute(pool)
