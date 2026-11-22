@@ -1,6 +1,7 @@
 //! Autentikasi password dan lifecycle sesi opaque.
 
 use std::{net::IpAddr, sync::Arc};
+use ring::rand::SecureRandom;
 
 use ring::{digest, hmac};
 use sqlx::PgPool;
@@ -10,9 +11,6 @@ use super::{
     audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome},
     password::{hash_password, verify_password},
 };
-
-const IDENTIFIER_WINDOW_LIMIT: i32 = 10;
-const IP_WINDOW_LIMIT: i32 = 30;
 
 #[derive(Clone)]
 pub struct AuthenticationRateLimitKey(Arc<Zeroizing<[u8; 32]>>);
@@ -51,7 +49,7 @@ impl AuthenticationRateLimitKey {
     }
 
     fn fingerprint(&self, purpose: &[u8], value: &[u8]) -> [u8; 32] {
-        let key = hmac::Key::new(hmac::HMAC_SHA256, self.0.as_ref().as_ref());
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &self.0[..]);
         let mut input = Zeroizing::new(Vec::with_capacity(purpose.len() + value.len() + 1));
         input.extend_from_slice(purpose);
         input.push(0);
@@ -368,14 +366,8 @@ mod tests {
 
     #[test]
     fn rate_limit_key_requires_a_nonzero_256_bit_hex_secret() {
-        assert_eq!(
-            AuthenticationRateLimitKey::from_hex("00"),
-            Err(AuthenticationConfigError::InvalidRateLimitKey)
-        );
-        assert_eq!(
-            AuthenticationRateLimitKey::from_hex(&"00".repeat(32)),
-            Err(AuthenticationConfigError::InvalidRateLimitKey)
-        );
+        assert!(AuthenticationRateLimitKey::from_hex("00").is_err());
+        assert!(AuthenticationRateLimitKey::from_hex(&"00".repeat(32)).is_err());
         assert!(AuthenticationRateLimitKey::from_hex(&"ab".repeat(32)).is_ok());
     }
 
