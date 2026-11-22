@@ -108,9 +108,9 @@ impl<'a> VerificationService<'a> {
         .bind(verification_channel)
         .bind(encrypted.ciphertext)
         .bind(encrypted.nonce.to_vec())
-        .bind(key_version_label(encrypted.key_version))
+        .bind(key_version_label(encrypted.key_version)?)
         .bind(fingerprint.digest.to_vec())
-        .bind(key_version_label(fingerprint.key_version))
+        .bind(key_version_label(fingerprint.key_version)?)
         .fetch_one(&mut *transaction)
         .await?;
         if persisted_session_id != session_id {
@@ -220,7 +220,7 @@ impl<'a> VerificationService<'a> {
         .bind(session_id)
         .bind(&challenge_id)
         .bind(digest.digest.to_vec())
-        .bind(key_version_label(digest.key_version))
+        .bind(key_version_label(digest.key_version)?)
         .bind(alias_bytes)
         .fetch_one(&mut *transaction)
         .await?;
