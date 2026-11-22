@@ -1,4 +1,4 @@
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use zeroize::Zeroizing;
 
 use super::{
@@ -87,7 +87,7 @@ impl<'a> VerificationService<'a> {
         let session_id = new_uuid()?;
         let aad = destination_associated_data(&session_id, verification_channel);
         let encrypted = encrypt(self.keys, contact.as_bytes(), &aad)?;
-        let fingerprint = contact_fingerprint(self.keys, verification_channel, contact)?;
+        let fingerprint = contact_fingerprint(self.keys, verification_channel, &contact)?;
 
         let normalized_registration = ClientRegistration {
             role: registration.role,
@@ -98,7 +98,7 @@ impl<'a> VerificationService<'a> {
         };
 
         let mut transaction = self.pool.begin().await?;
-        let user_id = create_client_user(&mut transaction, &normalized_registration).await?;
+        let user_id = create_client_user(&mut *transaction, &normalized_registration).await?;
 
         sqlx::query_scalar::<_, String>(
             "SELECT public.create_registration_verification_session(                $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8,                 clock_timestamp() + INTERVAL '10 minutes')::text",
