@@ -88,13 +88,13 @@ impl From<RecoveryCandidate> for RecoveryCandidateItem {
     }
 }
 
-fn message(status: StatusCode, value: &'static str) -> Response {
+pub(super) fn message(status: StatusCode, value: &'static str) -> Response {
     let mut response = (status, Json(MessageResponse { message: value })).into_response();
     no_store(&mut response);
     response
 }
 
-fn error(status: StatusCode, value: &'static str) -> Response {
+pub(super) fn error(status: StatusCode, value: &'static str) -> Response {
     let mut response = (status, Json(ErrorResponse { error: value })).into_response();
     no_store(&mut response);
     response
