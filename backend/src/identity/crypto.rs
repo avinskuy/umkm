@@ -537,6 +537,61 @@ mod tests {
     }
 
     #[test]
+    fn environment_key_versions_are_strict_and_sorted() {
+        assert_eq!(
+            parse_key_versions("v2,v1").unwrap(),
+            vec![KeyVersion(1), KeyVersion(2)]
+        );
+        assert_eq!(
+            parse_key_versions("v1,v1"),
+            Err(EnvironmentKeyProviderError::InvalidVersionList)
+        );
+        assert_eq!(
+            parse_key_versions("v1, v2"),
+            Err(EnvironmentKeyProviderError::InvalidVersionList)
+        );
+        assert_eq!(
+            parse_key_versions(""),
+            Err(EnvironmentKeyProviderError::InvalidVersionList)
+        );
+    }
+
+    #[test]
+    fn environment_keys_require_exactly_32_non_zero_bytes() {
+        let encoded = "01".repeat(KEY_LEN);
+        let key = parse_environment_key(&encoded).unwrap();
+        assert_eq!(&key[..], &[1_u8; KEY_LEN]);
+        assert_eq!(
+            parse_environment_key(&"00".repeat(KEY_LEN)),
+            Err(CryptoError::InvalidKey)
+        );
+        assert_eq!(
+            parse_environment_key(&"0g".repeat(KEY_LEN)),
+            Err(CryptoError::InvalidKey)
+        );
+        assert_eq!(
+            parse_environment_key("abcd"),
+            Err(CryptoError::InvalidKey)
+        );
+    }
+
+    #[test]
+    fn environment_key_names_are_purpose_and_version_scoped() {
+        assert_eq!(
+            key_environment_variable(KeyPurpose::DataEncryption, KeyVersion(3)),
+            "IDENTITY_DATA_ENCRYPTION_KEY_V3"
+        );
+        assert_eq!(
+            key_environment_variable(KeyPurpose::ContactFingerprint, KeyVersion(2)),
+            "IDENTITY_CONTACT_FINGERPRINT_KEY_V2"
+        );
+        assert_eq!(
+            key_environment_variable(KeyPurpose::OtpVerification, KeyVersion(1)),
+            "IDENTITY_OTP_VERIFICATION_KEY_V1"
+        );
+    }
+
+    #[test]
     fn authenticated_encryption_round_trips() {
         let provider = TestKeyProvider;
         let encrypted = encrypt(&provider, b"private destination", b"session:123")
