@@ -253,12 +253,12 @@ CI menjalankan format, Clippy, unit tests, PostgreSQL integration tests dengan p
 
 ## 10. Tahapan implementasi
 
-Tahapan pada dokumen ini dimulai setelah fondasi registrasi password dan verifikasi OTP disetujui untuk implementasi runtime. Urutan tahap verifikasi berikutnya:
-1. **Database operations:** migration dan operasi terkontrol untuk sesi/challenge/rate limit serta bootstrap privilege sempit.
-2. **Verification orchestration:** sesi verifikasi, fake delivery provider, audit, dan transaksi atomik.
-3. **OTP lifecycle:** issue/resend, dispatch result, verify, lock, dan cross-session limits.
-4. **HTTP API:** endpoint verifikasi/resend dengan validasi, rate limit, error contract, dan tests.
-5. **Operational readiness:** key provider produksi, provider OTP nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
+Status tahapan implementasi:
+1. **Database operations — selesai:** migration 0007 dan 0008 menyediakan fungsi terkontrol untuk sesi, challenge, delivery, attempt, dan aktivasi.
+2. **Verification orchestration — implementasi inti:** `VerificationService` menangani registrasi pending, enkripsi tujuan, issue/resend, dispatch result, dan verifikasi. CI memakai fake provider.
+3. **OTP lifecycle — inti tersedia:** expiry, cooldown, rate limit lintas sesi, lock, konsumsi satu kali, dan aktivasi atomik dikelola PostgreSQL bersama runtime.
+4. **HTTP API — belum dimulai:** endpoint publik, validasi request/response, rate limit HTTP, dan kontrak frontend belum dibuat.
+5. **Operational readiness — belum dimulai:** key provider produksi, adapter provider nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
 
 Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi merge. Migration produksi, provisioning credential produksi, dan deployment memerlukan persetujuan terpisah.
 
@@ -266,9 +266,9 @@ Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi 
 
 Hal berikut tetap terbuka dan tidak boleh ditebak:
 - Provider email/WhatsApp dan sender resmi.
-- Production KMS/secret manager.
-- Library AEAD final dan prosedur rotasi key.
-- Jumlah digit OTP dan format pesan.
+- Production KMS/secret manager dan prosedur rotasi/pemulihan key.
+- Review operasional implementasi AES-256-GCM dan key provider produksi.
+- Format pesan dan kebijakan template provider.
 - Batas password minimum/maksimum dan benchmark Argon2id pada runtime sasaran.
 - Idempotency strategy provider dan retry/outbox operasional.
 - Jadwal cleanup dan retensi event.
@@ -285,3 +285,24 @@ Migration `20261122170000_bind_verification_ids_from_runtime.sql` memperbarui du
 - `reserve_otp_challenge` menerima `p_challenge_id` dari backend dan menyimpan UUID tersebut sebagai primary key challenge.
 
 Runtime wajib membuat UUID sebelum menghitung associated data AEAD atau keyed OTP digest. Database tetap memvalidasi akun pending, purpose, kanal, expiry, rate limit, dan binding sesi/challenge. Signature lama dihapus agar tidak ada jalur fungsi lama yang masih dapat dipanggil. Bootstrap 002 memverifikasi dan memberikan EXECUTE hanya pada signature baru; akses langsung ke tabel tetap ditolak.
+
+## Implementasi orchestration Rust
+
+Tahap orchestration kini menyediakan `identity::VerificationService` dengan operasi:
+
+- `register`: normalisasi kontak awal, membuat akun pending dan sesi verifikasi dalam satu transaksi, lalu melakukan dispatch setelah commit.
+- `resend`: membuat challenge baru hanya setelah reservasi database menyetujui cooldown dan kuota.
+- `verify`: membaca challenge pending melalui fungsi terkontrol, memverifikasi keyed digest dengan constant-time comparison, lalu menyerahkan hasil ke operasi database yang mengelola percobaan dan aktivasi atomik.
+
+UUID sesi dan challenge dibuat oleh runtime sebelum AEAD/AAD atau keyed OTP digest dihitung. Tujuan pengiriman didekripsi hanya saat dibutuhkan, sedangkan nilai tujuan dan kode dibersihkan dari memori melalui `Zeroizing`. Tidak ada kontak, kode, password, ciphertext, atau key material yang ditulis ke log.
+
+Kontrak provider berada di `identity::delivery`. Provider mengembalikan `accepted`, `failed`, atau `unknown`; hasil dicatat setelah dispatch. Timeout/hasil tidak pasti tidak memicu pengembalian kuota atau retry otomatis. CI menggunakan fake provider dan tidak mengirim pesan nyata. Adapter Resend/FlowKirim dan endpoint HTTP belum diaktifkan.
+
+Format label versi key yang disimpan pada kolom TEXT adalah `vN`; parsing dilakukan ketat dan versi yang tidak dikenal ditolak. `KeyProvider::key_versions` harus mengembalikan seluruh versi HMAC fingerprint yang masih diperlukan selama jendela rate-limit. Implementasi default hanya mengembalikan key aktif dan tidak cukup untuk rotasi produksi. Provider produksi wajib mengimplementasikan riwayat versi secara eksplisit.
+
+Kebijakan awal OTP untuk orchestration ini menggunakan enam digit numerik dari CSPRNG dengan rejection sampling. Nilai ini berlaku untuk implementasi internal; endpoint publik tetap belum tersedia dan provider produksi belum dikonfigurasi.
+
+
+### Migration 0009 — audit siklus verifikasi
+
+Migration `20261122180000_audit_verification_runtime_events.sql` mencatat permintaan delivery, hasil dispatch (`accepted`, `failed`, `unknown`), dan percobaan OTP yang gagal ke `identity_audit_events`. Event registrasi diminta dan berhasil juga diikat ke `subject_user_id` serta metadata aman berupa kanal, purpose, session ID, dan challenge ID. Audit ditulis di transaksi fungsi database yang melakukan perubahan terkait; metadata tidak memuat kontak plaintext, kode OTP, ciphertext, atau key.

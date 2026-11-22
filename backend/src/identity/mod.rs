@@ -6,8 +6,13 @@
 
 mod audit;
 pub mod crypto;
+pub mod delivery;
 pub mod password;
 mod registration;
+pub mod verification;
 
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
+pub use delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider};
 pub use registration::{create_client_user, ClientRegistration, ClientRole, ContactChannel};
+
+pub use verification::{RegistrationStart, VerificationError, VerificationService};

@@ -1,5 +1,55 @@
+use std::{future::Future, pin::Pin, sync::Mutex};
+
 use sqlx::{postgres::PgPoolOptions, raw_sql, PgPool};
-use usahapintar_api::database::{connect, migrations::run, DatabaseConfig};
+use usahapintar_api::{
+    database::{connect, migrations::run, DatabaseConfig},
+    identity::{
+        crypto::{CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey, VersionedKey},
+        ClientRegistration, ClientRole, ContactChannel, DispatchStatus, OtpDeliveryMessage,
+        OtpDeliveryProvider, VerificationService,
+    },
+};
+
+struct VerificationTestKeys;
+
+impl KeyProvider for VerificationTestKeys {
+    fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+        self.key(purpose, KeyVersion(1))
+            .map(|key| VersionedKey::new(KeyVersion(1), key))
+    }
+
+    fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+        if version != KeyVersion(1) {
+            return Err(CryptoError::KeyUnavailable);
+        }
+        let marker = match purpose {
+            KeyPurpose::DataEncryption => 0x11,
+            KeyPurpose::ContactFingerprint => 0x22,
+            KeyPurpose::OtpVerification => 0x33,
+        };
+        Ok(SecretKey::from_bytes([marker; 32]))
+    }
+}
+
+struct FakeOtpDelivery {
+    messages: Mutex<Vec<OtpDeliveryMessage>>,
+    status: DispatchStatus,
+}
+
+impl OtpDeliveryProvider for FakeOtpDelivery {
+    fn dispatch<'a>(
+        &'a self,
+        message: OtpDeliveryMessage,
+    ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>> {
+        Box::pin(async move {
+            self.messages
+                .lock()
+                .expect("fake delivery message lock should be available")
+                .push(message);
+            self.status
+        })
+    }
+}
 
 #[tokio::test]
 #[ignore = "requires a disposable PostgreSQL database; enabled explicitly in CI"]
@@ -2024,6 +2074,136 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit reader privileges should be queryable");
     assert_eq!(audit_reader_access, (true, false));
 
+    assert_verification_orchestration(&app_pool, pool).await;
+
     app_pool.close().await;
     admin_pool.close().await;
+}
+
+async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &PgPool) {
+    let keys = VerificationTestKeys;
+    let delivery = FakeOtpDelivery {
+        messages: Mutex::new(Vec::new()),
+        status: DispatchStatus::Accepted,
+    };
+    let service = VerificationService::new(app_pool, &keys, &delivery);
+    let registration = ClientRegistration {
+        role: ClientRole::BusinessOwner,
+        initial_contact_channel: ContactChannel::Email,
+        email_normalized: Some("orchestration@example.test"),
+        phone_e164: None,
+        password_hash: "test-only-encoded-password-hash",
+    };
+
+    let started = service
+        .register(&registration)
+        .await
+        .expect("registration orchestration should create a pending account and dispatch OTP");
+    assert_eq!(started.dispatch_status, DispatchStatus::Accepted);
+
+    let code = {
+        let messages = delivery
+            .messages
+            .lock()
+            .expect("fake delivery message lock should be available");
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            messages[0].channel,
+            usahapintar_api::identity::DeliveryChannel::Email
+        );
+        messages[0].code.as_str().to_owned()
+    };
+
+    let incorrect_code = if code == "000000" { "000001" } else { "000000" };
+    assert!(!service
+        .verify(&started.session_id, incorrect_code)
+        .await
+        .expect("incorrect OTP should be recorded as a failed attempt"));
+    assert!(service
+        .verify(&started.session_id, &code)
+        .await
+        .expect("correct OTP should verify and activate the pending account"));
+
+    let account_status: String =
+        sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
+            .bind(&started.user_id)
+            .fetch_one(migrator_pool)
+            .await
+            .expect("test migrator should inspect the activated account");
+    assert_eq!(account_status, "active");
+
+    let email_audit_counts: (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT \
+            count(*) FILTER (WHERE action_code = 'identity.registration.requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.verification.attempt_failed'), \
+            count(*) FILTER (WHERE action_code = 'identity.registration.verified') \
+         FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
+    )
+    .bind(&started.user_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect verification audit events");
+    assert_eq!(email_audit_counts, (1, 1, 1, 1));
+
+    let phone_registration = ClientRegistration {
+        role: ClientRole::Investor,
+        initial_contact_channel: ContactChannel::Phone,
+        email_normalized: None,
+        phone_e164: Some("+6281234567892"),
+        password_hash: "test-only-encoded-password-hash",
+    };
+    let phone_started = service
+        .register(&phone_registration)
+        .await
+        .expect("WhatsApp registration should create a pending account and dispatch OTP");
+    assert_eq!(phone_started.dispatch_status, DispatchStatus::Accepted);
+
+    let phone_code = {
+        let messages = delivery
+            .messages
+            .lock()
+            .expect("fake delivery message lock should be available");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(
+            messages[1].channel,
+            usahapintar_api::identity::DeliveryChannel::WhatsApp
+        );
+        messages[1].code.as_str().to_owned()
+    };
+    assert!(service
+        .verify(&phone_started.session_id, &phone_code)
+        .await
+        .expect("WhatsApp OTP should verify and activate the pending account"));
+
+    let phone_account_status: String =
+        sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
+            .bind(&phone_started.user_id)
+            .fetch_one(migrator_pool)
+            .await
+            .expect("test migrator should inspect the activated phone account");
+    assert_eq!(phone_account_status, "active");
+
+    let phone_audit_counts: (i64, i64, i64) = sqlx::query_as(
+        "SELECT \
+            count(*) FILTER (WHERE action_code = 'identity.registration.requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.verification.delivery_requested'), \
+            count(*) FILTER (WHERE action_code = 'identity.registration.verified') \
+         FROM public.identity_audit_events WHERE subject_user_id = $1::uuid",
+    )
+    .bind(&phone_started.user_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect WhatsApp verification audit events");
+    assert_eq!(phone_audit_counts, (1, 1, 1));
+
+    let accepted_delivery_audits: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+         WHERE action_code = 'identity.verification.delivery_result' \
+           AND metadata ->> 'result_code' = 'accepted'",
+    )
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect delivery result audit events");
+    assert!(accepted_delivery_audits >= 3);
 }
