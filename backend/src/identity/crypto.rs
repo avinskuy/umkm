@@ -432,6 +432,50 @@ mod tests {
         assert_eq!(email.key_version, KeyVersion(7));
     }
 
+    struct RotatingTestKeyProvider;
+
+    impl KeyProvider for RotatingTestKeyProvider {
+        fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+            self.key(purpose, KeyVersion(7))
+                .map(|key| VersionedKey::new(KeyVersion(7), key))
+        }
+
+        fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+            if !matches!(version, KeyVersion(6 | 7)) {
+                return Err(CryptoError::KeyUnavailable);
+            }
+            let marker = match (purpose, version) {
+                (KeyPurpose::ContactFingerprint, KeyVersion(6)) => 0x66,
+                (KeyPurpose::ContactFingerprint, KeyVersion(7)) => 0x77,
+                (KeyPurpose::DataEncryption, _) => 0x11,
+                (KeyPurpose::OtpVerification, _) => 0x33,
+                _ => return Err(CryptoError::KeyUnavailable),
+            };
+            Ok(SecretKey::from_bytes([marker; KEY_LEN]))
+        }
+
+        fn key_versions(&self, purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
+            if purpose == KeyPurpose::ContactFingerprint {
+                Ok(vec![KeyVersion(6), KeyVersion(7)])
+            } else {
+                Ok(vec![KeyVersion(7)])
+            }
+        }
+    }
+
+    #[test]
+    fn contact_fingerprint_aliases_cover_active_and_previous_versions() {
+        let provider = RotatingTestKeyProvider;
+        let aliases =
+            contact_fingerprint_aliases(&provider, "email", "user@example.test").unwrap();
+
+        assert_eq!(
+            aliases.iter().map(|alias| alias.key_version).collect::<Vec<_>>(),
+            vec![KeyVersion(6), KeyVersion(7)]
+        );
+        assert_ne!(aliases[0].digest, aliases[1].digest);
+    }
+
     #[test]
     fn key_version_labels_are_strict_and_round_trip() {
         assert_eq!(key_version_label(KeyVersion(7)), "v7");
