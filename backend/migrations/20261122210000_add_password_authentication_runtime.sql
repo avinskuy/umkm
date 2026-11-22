@@ -102,9 +102,7 @@ BEGIN
        SET revoked_at = clock_timestamp(),
            revocation_reason = 'logout'
      WHERE token_hash = p_token_hash
-       AND revoked_at IS NULL
-       AND expires_at > clock_timestamp()
-       AND last_seen_at > clock_timestamp() - INTERVAL '7 days';
+       AND revoked_at IS NULL;
 
     RETURN FOUND;
 END;
