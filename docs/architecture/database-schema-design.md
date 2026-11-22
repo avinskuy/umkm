@@ -1,11 +1,11 @@
 # Rancangan Skema Database PostgreSQL
 
-> Status: skema Identity Core migration 0001–0005 tersedia; skema domain produk lainnya masih berupa rancangan  
+> Status: skema Identity Core migration 0001–0010 tersedia; skema domain produk lainnya masih berupa rancangan  
 > Cakupan: model relasional, constraint integritas, batas privasi, dan urutan migration  
 > Baseline runtime: PostgreSQL 16 + SQLx 0.8
 > Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
-Dokumen ini menerjemahkan kebijakan produk dan autentikasi USahapintar ke dalam model relasional. Migration Identity Core 0001–0005 sudah tersedia sebagai SQLx migration dan diuji di CI. Skema untuk domain produk lainnya masih berupa rancangan. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi atau alur registrasi dan autentikasi sudah aktif.
+Dokumen ini menerjemahkan kebijakan produk dan autentikasi USahapintar ke dalam model relasional. Migration Identity Core 0001–0010 sudah tersedia sebagai SQLx migration dan diuji di CI. Skema untuk domain produk lainnya masih berupa rancangan. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi atau alur registrasi dan autentikasi sudah aktif.
 
 Tinjauan teknis Identity Core tersedia di [Tinjauan Teknis Skema Identity Core](identity-core-schema-review.md). Baca bersama keputusan registrasi dan kontak pemulihan bersama. Kontrak migration 0001–0005 masing-masing menjelaskan skema akun, verifikasi, sesi, pemulihan, dan audit; seluruh migration tersebut sudah tersedia di `backend/migrations/`. Migration tidak dijalankan otomatis oleh HTTP server dan belum tentu sudah diterapkan pada database produksi.
 
@@ -50,7 +50,7 @@ Label produk yang lebih singkat, “Owner” dan “Investor”, merupakan istil
 
 | Tabel | Tanggung jawab | Constraint penting |
 | --- | --- | --- |
-| `users` | Identitas akun, role utama yang tetap, siklus hidup, nilai kontak ternormalisasi, status verifikasi kontak, dan hash kata sandi lokal | Reservasi email/telepon unik; registrasi klien selalu memakai password; status verifikasi kontak dipisahkan dari status aktif akun; role immutable; transisi lifecycle terlindungi |
+| `users` | Identitas akun, role utama yang tetap, siklus hidup, nilai kontak ternormalisasi, status verifikasi kontak, dan hash kata sandi lokal | Reservasi email/telepon unik; registrasi klien selalu memakai password; status verifikasi kontak dipisahkan dari status aktif akun; role immutable; transisi lifecycle terlindungi |\n| `user_profiles` | Profil dasar pengguna yang terpisah dari kredensial dan kontak akun | Satu baris per akun; `display_name` menjadi nama tampilan publik, bukan identitas legal; FK RESTRICT; panjang dan nilai kosong dibatasi |
 | `sessions` | Sesi server yang dapat dicabut | Hash token unik; batas 7 hari tanpa aktivitas dan 30 hari absolut; preferensi cookie persisten; waktu pencabutan; FK ke pengguna |
 | `verification_sessions` | Status alur verifikasi yang tetap berlaku saat OTP dikirim ulang | Batas lima kegagalan dan penguncian satu jam tetap berlaku meski kode diganti; terikat pada tujuan/alamat penerima; `user_id` wajib kecuali pemulihan sebelum pemilihan akun; status jeda pengiriman tersimpan secara persisten |
 | `verification_challenges` | Kode OTP individual melalui email/WhatsApp | Keyed hash, masa berlaku 10 menit, waktu pembatalan/penggunaan; hanya sekali pakai; terhubung ke sesi verifikasi |
@@ -149,7 +149,7 @@ Status moderasi bukan status publikasi. Peluang dapat diterbitkan lalu dibatasi 
 
 | Tabel | Tanggung jawab | Constraint penting |
 | --- | --- | --- |
-| `consent_records` | Catatan consent opsional dan pilihan pengguna berdasarkan tujuan | Pengguna, tujuan, kebijakan/versi, timestamp pemberian/pencabutan, sumber; consent pemasaran tidak boleh digabungkan |
+| `policy_acceptance_records` | Bukti penerimaan Terms of Service dan Privacy Policy | Dua catatan terpisah per akun dan versi; timestamp server; append-only |\n| `consent_events` | Riwayat event consent opsional berdasarkan tujuan | Event grant/withdraw marketing terpisah; notice version dan timestamp; append-only; tanpa event grant berarti tidak disetujui |
 | `account_deletion_requests` | Melacak permintaan penghapusan akun permanen oleh pengguna | Pengguna, waktu permintaan, batas pembatalan 30 hari, status siklus hidup, timestamp pembatalan/penyelesaian; Admin tidak dapat membuat penghapusan permanen secara sepihak |
 | `data_retention_records` | Melacak data yang disimpan untuk tujuan hukum/keamanan/akuntabilitas yang terdokumentasi | Kategori/referensi data, tujuan/dasar, pembatasan akses, batas waktu/tinjauan retensi; data yang disimpan tidak boleh dialihkan untuk pemasaran |
 | `data_export_requests` | Melacak permintaan salinan data milik pengguna sendiri | Pengguna, timestamp permintaan/status, verifikasi keamanan, referensi artefak aman dan masa berlaku; tidak menyertakan data pengguna lain atau materi keamanan internal |
