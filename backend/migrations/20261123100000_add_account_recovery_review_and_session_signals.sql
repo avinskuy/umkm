@@ -79,6 +79,14 @@ CREATE TRIGGER account_recovery_review_decisions_10_append_only
     BEFORE UPDATE OR DELETE ON public.account_recovery_review_decisions
     FOR EACH ROW EXECUTE FUNCTION public.guard_account_recovery_append_only();
 
+CREATE TRIGGER account_recovery_case_signals_20_no_truncate
+    BEFORE TRUNCATE ON public.account_recovery_case_signals
+    FOR EACH STATEMENT EXECUTE FUNCTION public.guard_account_recovery_append_only();
+
+CREATE TRIGGER account_recovery_review_decisions_20_no_truncate
+    BEFORE TRUNCATE ON public.account_recovery_review_decisions
+    FOR EACH STATEMENT EXECUTE FUNCTION public.guard_account_recovery_append_only();
+
 CREATE FUNCTION public.record_account_recovery_session_signal(
     p_case_id UUID,
     p_session_token_hash BYTEA
@@ -92,6 +100,7 @@ DECLARE
     v_target_user_id UUID;
     v_case_created_at TIMESTAMPTZ;
     v_session_id UUID;
+    v_inserted_rows INTEGER;
 BEGIN
     IF p_case_id IS NULL
        OR p_session_token_hash IS NULL
@@ -136,6 +145,11 @@ BEGIN
     VALUES (p_case_id, v_session_id, 'active_session_match')
     ON CONFLICT (recovery_case_id, signal_code) DO NOTHING;
 
+    GET DIAGNOSTICS v_inserted_rows = ROW_COUNT;
+    IF v_inserted_rows = 0 THEN
+        RETURN TRUE;
+    END IF;
+
     INSERT INTO public.identity_audit_events (
         actor_type, subject_user_id, action_code, outcome, reason_code, metadata
     )
@@ -178,6 +192,8 @@ DECLARE
 BEGIN
     IF p_case_id IS NULL
        OR p_reviewer_user_id IS NULL
+       OR p_decision IS NULL
+       OR p_reason_code IS NULL
        OR p_decision NOT IN ('approved', 'rejected')
        OR p_reason_code NOT IN (
            'ownership_confirmed',
