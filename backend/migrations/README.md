@@ -1,6 +1,6 @@
 # Migrasi Database
 
-Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0013):
+Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0014):
 
 - `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
 - `20261122100000_create_identity_verification.sql` — membuat `verification_sessions`, `verification_challenges`, `otp_verification_attempt_events`, dan `otp_delivery_events`, termasuk state constraints, batas umur challenge 10 menit, satu challenge pending per sesi, binding recovery pra-pemilihan akun, serta indeks event lintas sesi.
@@ -15,6 +15,7 @@ Direktori ini berisi migration SQLx berversi. Migration Identity Core yang terse
 - `20261122200000_allow_otp_resend_during_verification_lock.sql` — mengizinkan penerbitan ulang OTP selama lock verifikasi aktif tanpa mengubah penghitung kegagalan atau `locked_until`; verifikasi tetap ditolak sampai lock berakhir.
 - `20261122210000_add_password_authentication_runtime.sql` — menambahkan operasi login berbasis role, pembuatan/pencabutan sesi opaque, dan rate limit HMAC per identifier/IP.
 - `20261122220000_add_session_runtime_operations.sql` — menambahkan validasi sesi aktif, pembaruan `last_seen_at`, rotasi token, dan pencabutan semua sesi satu akun.
+- `20261122230000_add_registration_http_rate_limits.sql` — menambahkan rate limit endpoint registrasi/resend/verifikasi dengan fingerprint HMAC per IP dan per sesi verifikasi.
 
 ## Status runtime
 
