@@ -88,19 +88,19 @@ impl From<RecoveryCandidate> for RecoveryCandidateItem {
     }
 }
 
-fn message(status: StatusCode, value: &'static str) -> Response {
+pub(super) fn message(status: StatusCode, value: &'static str) -> Response {
     let mut response = (status, Json(MessageResponse { message: value })).into_response();
     no_store(&mut response);
     response
 }
 
-fn error(status: StatusCode, value: &'static str) -> Response {
+pub(super) fn error(status: StatusCode, value: &'static str) -> Response {
     let mut response = (status, Json(ErrorResponse { error: value })).into_response();
     no_store(&mut response);
     response
 }
 
-fn no_store(response: &mut Response) {
+pub(super) fn no_store(response: &mut Response) {
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -114,7 +114,7 @@ fn database_error_code(error_value: &VerificationError, expected: &str) -> bool 
     )
 }
 
-fn rate_limit_response(decision: AbuseDecision) -> Option<Response> {
+pub(super) fn rate_limit_response(decision: AbuseDecision) -> Option<Response> {
     match decision {
         AbuseDecision::Allowed => None,
         AbuseDecision::Limited => Some(error(
@@ -188,6 +188,10 @@ pub fn recovery_router(state: RecoveryApiState) -> Router {
         .route(
             "/api/v1/identity/recovery/cases/{case_id}/select",
             post(select_account),
+        )
+        .route(
+            "/api/v1/identity/recovery/password-reset",
+            post(super::password_reset::complete),
         )
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
         .with_state(state)

@@ -11,6 +11,7 @@ pub mod crypto;
 pub mod delivery;
 pub mod http;
 pub mod password;
+pub mod password_reset;
 pub mod recovery;
 mod registration;
 pub mod verification;
@@ -20,7 +21,10 @@ pub use authentication::{
     AuthenticatedSession, AuthenticationConfigError, AuthenticationError,
     AuthenticationRateLimitKey, AuthenticationService, LoginRole, LoginSession, RotatedSession,
 };
-pub use delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider};
+pub use delivery::{
+    DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
+    PasswordResetDeliveryMessage, PasswordResetDeliveryProvider,
+};
 pub use registration::{create_client_user, ClientRegistration, ClientRole, ContactChannel};
 
 pub use verification::{RegistrationStart, VerificationError, VerificationService};
@@ -28,4 +32,9 @@ pub use verification::{RegistrationStart, VerificationError, VerificationService
 pub use recovery::{
     RecoveryAction, RecoveryCandidate, RecoveryReviewDecision, RecoveryReviewReason,
     RecoveryReviewService, RecoveryService, RecoveryStart,
+};
+
+pub use password_reset::{
+    PasswordResetCompletion, PasswordResetError, PasswordResetIssuanceService,
+    PasswordResetIssueResult, PasswordResetService,
 };

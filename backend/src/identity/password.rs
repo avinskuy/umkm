@@ -14,6 +14,11 @@ const MAX_VERIFY_MEMORY_KIB: u32 = 256 * 1024;
 const MAX_VERIFY_TIME_COST: u32 = 10;
 const MAX_VERIFY_PARALLELISM: u32 = 4;
 
+/// Kebijakan password yang digunakan bersama oleh registrasi dan pemulihan akun.
+pub trait PasswordPolicy: Send + Sync {
+    fn accepts(&self, password: &str) -> bool;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PasswordError {
     HashingFailed,

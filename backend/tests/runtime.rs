@@ -614,8 +614,12 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             contact_fingerprint, CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey,
             VersionedKey,
         },
-        delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
-        password::hash_password,
+        delivery::{
+            DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
+            PasswordResetDeliveryMessage, PasswordResetDeliveryProvider,
+        },
+        password::{hash_password, verify_password},
+        password_reset::PasswordResetIssuanceService,
         ClientRegistration, ClientRole, ContactChannel, RecoveryReviewDecision,
         RecoveryReviewReason, RecoveryReviewService, VerificationService,
     };
@@ -645,6 +649,47 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         last_code: Arc<Mutex<Option<String>>>,
     }
 
+    struct CapturingPasswordResetDelivery {
+        reset_url: Arc<Mutex<Option<String>>>,
+        destination: Arc<Mutex<Option<String>>>,
+        expires_at_unix: Arc<Mutex<Option<i64>>>,
+        status: DispatchStatus,
+    }
+
+    impl PasswordResetDeliveryProvider for CapturingPasswordResetDelivery {
+        fn dispatch<'a>(
+            &'a self,
+            message: PasswordResetDeliveryMessage,
+        ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>> {
+            Box::pin(async move {
+                *self
+                    .reset_url
+                    .lock()
+                    .expect("reset URL capture lock should be available") =
+                    Some(message.reset_url.to_string());
+                *self
+                    .destination
+                    .lock()
+                    .expect("reset destination capture lock should be available") =
+                    Some(message.destination.to_string());
+                *self
+                    .expires_at_unix
+                    .lock()
+                    .expect("reset expiry capture lock should be available") =
+                    Some(message.expires_at_unix);
+                self.status
+            })
+        }
+    }
+
+    struct ResetPasswordPolicy;
+
+    impl usahapintar_api::identity::http::RegistrationPasswordPolicy for ResetPasswordPolicy {
+        fn accepts(&self, password: &str) -> bool {
+            (12..=1024).contains(&password.len())
+        }
+    }
+
     impl OtpDeliveryProvider for RecoveryDelivery {
         fn dispatch<'a>(
             &'a self,
@@ -664,7 +709,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     }
 
     let pool = application_pool().await;
-    let keys = RecoveryKeys;
+    let keys = Arc::new(RecoveryKeys);
     let last_code = Arc::new(Mutex::new(None));
     let delivery = RecoveryDelivery {
         last_code: last_code.clone(),
@@ -691,7 +736,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         marketing_consent: false,
         marketing_notice_version: None,
     };
-    let verification = VerificationService::new(&pool, &keys, &delivery);
+    let verification = VerificationService::new(&pool, keys.as_ref(), &delivery);
     let registered = verification
         .register(&registration)
         .await
@@ -714,7 +759,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .await
         .expect("disposable DBA connection should succeed");
     let recovery_email = format!("recovery-{email}");
-    let fingerprint = contact_fingerprint(&keys, "email", &recovery_email)
+    let fingerprint = contact_fingerprint(keys.as_ref(), "email", &recovery_email)
         .expect("recovery contact fingerprint should be generated");
     let contact_session_id: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions ( \
@@ -786,14 +831,17 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         }
     }
 
-    let recovery_router = recovery_router(RecoveryApiState::new(
-        pool.clone(),
-        Arc::new(RecoveryKeys),
-        Arc::new(RecoveryDelivery {
-            last_code: last_code.clone(),
-        }),
-        Arc::new(AllowRecoveryGuard),
-    ));
+    let recovery_router = recovery_router(
+        RecoveryApiState::new(
+            pool.clone(),
+            keys.clone(),
+            Arc::new(RecoveryDelivery {
+                last_code: last_code.clone(),
+            }),
+            Arc::new(AllowRecoveryGuard),
+        )
+        .with_password_policy(Arc::new(ResetPasswordPolicy)),
+    );
     let make_recovery_request =
         |method: Method, uri: String, body: Option<serde_json::Value>, cross_site: bool| {
             let mut builder = Request::builder().method(method).uri(uri);
@@ -821,7 +869,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             "/api/v1/identity/recovery".to_owned(),
             Some(serde_json::json!({
                 "contact_channel": "email",
-                "email": recovery_email,
+                "email": recovery_email.clone(),
                 "requested_action": "password_reset"
             })),
             false,
@@ -962,6 +1010,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             .expect("session cookie header should be valid"),
     );
     let selected = recovery_router
+        .clone()
         .oneshot(select_request)
         .await
         .expect("account selection route should respond");
@@ -1084,6 +1133,283 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .await
     .expect("DBA should inspect the append-only review decision");
     assert_eq!(review_event_count, 1);
+
+    let reset_url_capture = Arc::new(Mutex::new(None));
+    let reset_destination_capture = Arc::new(Mutex::new(None));
+    let reset_expiry_capture = Arc::new(Mutex::new(None));
+    {
+        let failed_delivery = CapturingPasswordResetDelivery {
+            reset_url: reset_url_capture.clone(),
+            destination: reset_destination_capture.clone(),
+            expires_at_unix: reset_expiry_capture.clone(),
+            status: DispatchStatus::Failed,
+        };
+        let failed_issuer = PasswordResetIssuanceService::new(
+            &pool,
+            keys.as_ref(),
+            &failed_delivery,
+            "https://app.example.test/reset-password".to_owned(),
+        )
+        .expect("valid HTTPS password reset URL should be accepted");
+        let failed_result = failed_issuer
+            .issue_for_approved_case(&recovery_case_id)
+            .await
+            .expect("failed delivery should still be recorded");
+        assert_eq!(failed_result.dispatch_status, DispatchStatus::Failed);
+    }
+
+    let failed_delivery_token_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.password_reset_tokens \
+          WHERE recovery_case_id = $1::uuid AND revocation_reason = 'delivery_failed'",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("failed delivery token should be revoked");
+    assert_eq!(failed_delivery_token_count, 1);
+
+    let reset_delivery = CapturingPasswordResetDelivery {
+        reset_url: reset_url_capture.clone(),
+        destination: reset_destination_capture.clone(),
+        expires_at_unix: reset_expiry_capture.clone(),
+        status: DispatchStatus::Accepted,
+    };
+    let reset_issuer = PasswordResetIssuanceService::new(
+        &pool,
+        keys.as_ref(),
+        &reset_delivery,
+        "https://app.example.test/reset-password".to_owned(),
+    )
+    .expect("valid HTTPS password reset URL should be accepted");
+    let issue_result = reset_issuer
+        .issue_for_approved_case(&recovery_case_id)
+        .await
+        .expect("approved recovery case should issue a reset token");
+    assert_eq!(issue_result.dispatch_status, DispatchStatus::Accepted);
+    assert!(
+        reset_issuer
+            .issue_for_approved_case(&recovery_case_id)
+            .await
+            .is_err(),
+        "an active token must prevent duplicate reset delivery"
+    );
+
+    let delivered_url = reset_url_capture
+        .lock()
+        .expect("reset URL capture lock should be available")
+        .clone()
+        .expect("password reset provider should receive a URL");
+    assert!(delivered_url.starts_with("https://app.example.test/reset-password#token="));
+    assert!(!delivered_url.contains("?token="));
+    let reset_token = delivered_url
+        .split_once("#token=")
+        .expect("reset token should be placed in the URL fragment")
+        .1
+        .to_owned();
+    assert_eq!(reset_token.len(), 64);
+    assert!(reset_token
+        .chars()
+        .all(|character| character.is_ascii_hexdigit()));
+
+    assert_eq!(
+        reset_destination_capture
+            .lock()
+            .expect("reset destination capture lock should be available")
+            .as_deref(),
+        Some(recovery_email.as_str())
+    );
+    assert_eq!(
+        *reset_expiry_capture
+            .lock()
+            .expect("reset expiry capture lock should be available"),
+        Some(issue_result.expires_at_unix)
+    );
+
+    let database_now: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()))::bigint")
+            .fetch_one(&admin_pool)
+            .await
+            .expect("database clock should be readable");
+    assert!(issue_result.expires_at_unix > database_now);
+    assert!(issue_result.expires_at_unix <= database_now + 15 * 60);
+
+    let reset_uri = "/api/v1/identity/recovery/password-reset".to_owned();
+    let reset_password = "recovery-password-reset-strong";
+    let mismatch = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            reset_uri.clone(),
+            Some(serde_json::json!({
+                "token": reset_token.clone(),
+                "new_password": reset_password,
+                "confirm_password": "different-password"
+            })),
+            false,
+        ))
+        .await
+        .expect("mismatched reset password request should respond");
+    assert_eq!(mismatch.status(), axum::http::StatusCode::BAD_REQUEST);
+    assert_eq!(
+        mismatch.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+
+    let rejected_password = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            reset_uri.clone(),
+            Some(serde_json::json!({
+                "token": reset_token.clone(),
+                "new_password": "short",
+                "confirm_password": "short"
+            })),
+            false,
+        ))
+        .await
+        .expect("weak reset password request should respond");
+    assert_eq!(
+        rejected_password.status(),
+        axum::http::StatusCode::BAD_REQUEST
+    );
+
+    let cross_site_reset = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            reset_uri.clone(),
+            Some(serde_json::json!({
+                "token": reset_token.clone(),
+                "new_password": reset_password,
+                "confirm_password": reset_password
+            })),
+            true,
+        ))
+        .await
+        .expect("cross-site reset request should respond");
+    assert_eq!(cross_site_reset.status(), axum::http::StatusCode::FORBIDDEN);
+    assert_eq!(
+        cross_site_reset
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
+        "no-store"
+    );
+
+    let make_valid_reset_request = || {
+        make_recovery_request(
+            Method::POST,
+            reset_uri.clone(),
+            Some(serde_json::json!({
+                "token": reset_token.clone(),
+                "new_password": reset_password,
+                "confirm_password": reset_password
+            })),
+            false,
+        )
+    };
+    let first_reset = recovery_router.clone().oneshot(make_valid_reset_request());
+    let second_reset = recovery_router.clone().oneshot(make_valid_reset_request());
+    let (first_reset, second_reset) = tokio::join!(first_reset, second_reset);
+    let first_reset = first_reset.expect("first concurrent reset request should complete");
+    let second_reset = second_reset.expect("second concurrent reset request should complete");
+    let first_succeeded = first_reset.status() == axum::http::StatusCode::OK;
+    let second_succeeded = second_reset.status() == axum::http::StatusCode::OK;
+    assert_ne!(
+        first_succeeded, second_succeeded,
+        "concurrent password reset attempts must have exactly one winner"
+    );
+
+    let success_response = if first_succeeded {
+        first_reset
+    } else {
+        second_reset
+    };
+    assert_eq!(
+        success_response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
+        "no-store"
+    );
+    assert!(
+        success_response
+            .headers()
+            .get(header::SET_COOKIE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.contains("__Host-usahapintar_session=")
+                && value.contains("Max-Age=0")),
+        "successful password reset should clear the current browser cookie"
+    );
+
+    let replay = recovery_router
+        .clone()
+        .oneshot(make_valid_reset_request())
+        .await
+        .expect("replayed reset token request should respond");
+    assert_eq!(replay.status(), axum::http::StatusCode::BAD_REQUEST);
+    assert_eq!(
+        replay.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+
+    let updated_password_hash: String =
+        sqlx::query_scalar("SELECT password_hash FROM public.users WHERE id = $1::uuid")
+            .bind(&registered.user_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("updated password hash should be present");
+    assert!(
+        verify_password(reset_password.as_bytes(), &updated_password_hash)
+            .expect("updated Argon2id password hash should be valid")
+    );
+
+    let active_session_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.sessions WHERE user_id = $1::uuid AND revoked_at IS NULL",
+    )
+    .bind(&registered.user_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("active session count should be queryable");
+    assert_eq!(active_session_count, 0);
+
+    let reset_revoked_session_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.sessions WHERE user_id = $1::uuid AND revocation_reason = 'password_reset'",
+    )
+    .bind(&registered.user_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("password-reset session revocations should be queryable");
+    assert_eq!(reset_revoked_session_count, 1);
+
+    let completed_case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&recovery_case_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("completed recovery case should be queryable");
+    assert_eq!(completed_case_status, "completed");
+
+    let consumed_token_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.password_reset_tokens \
+          WHERE recovery_case_id = $1::uuid AND consumed_at IS NOT NULL AND revoked_at IS NULL",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("consumed reset token should be queryable");
+    assert_eq!(consumed_token_count, 1);
+
+    let reset_audit_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.identity_audit_events \
+          WHERE action_code = 'identity.password.reset.completed' AND subject_user_id = $1::uuid",
+    )
+    .bind(&registered.user_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("password reset audit event should be queryable");
+    assert_eq!(reset_audit_count, 1);
 
     admin_pool.close().await;
     pool.close().await;
