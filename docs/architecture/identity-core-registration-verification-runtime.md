@@ -253,12 +253,12 @@ CI menjalankan format, Clippy, unit tests, PostgreSQL integration tests dengan p
 
 ## 10. Tahapan implementasi
 
-Tahapan pada dokumen ini dimulai setelah fondasi registrasi password dan verifikasi OTP disetujui untuk implementasi runtime. Urutan tahap verifikasi berikutnya:
-1. **Database operations:** migration dan operasi terkontrol untuk sesi/challenge/rate limit serta bootstrap privilege sempit.
-2. **Verification orchestration:** sesi verifikasi, fake delivery provider, audit, dan transaksi atomik.
-3. **OTP lifecycle:** issue/resend, dispatch result, verify, lock, dan cross-session limits.
-4. **HTTP API:** endpoint verifikasi/resend dengan validasi, rate limit, error contract, dan tests.
-5. **Operational readiness:** key provider produksi, provider OTP nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
+Status tahapan implementasi:
+1. **Database operations — selesai:** migration 0007 dan 0008 menyediakan fungsi terkontrol untuk sesi, challenge, delivery, attempt, dan aktivasi.
+2. **Verification orchestration — implementasi inti:** `VerificationService` menangani registrasi pending, enkripsi tujuan, issue/resend, dispatch result, dan verifikasi. CI memakai fake provider.
+3. **OTP lifecycle — inti tersedia:** expiry, cooldown, rate limit lintas sesi, lock, konsumsi satu kali, dan aktivasi atomik dikelola PostgreSQL bersama runtime.
+4. **HTTP API — belum dimulai:** endpoint publik, validasi request/response, rate limit HTTP, dan kontrak frontend belum dibuat.
+5. **Operational readiness — belum dimulai:** key provider produksi, adapter provider nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
 
 Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi merge. Migration produksi, provisioning credential produksi, dan deployment memerlukan persetujuan terpisah.
 
@@ -266,9 +266,9 @@ Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi 
 
 Hal berikut tetap terbuka dan tidak boleh ditebak:
 - Provider email/WhatsApp dan sender resmi.
-- Production KMS/secret manager.
-- Library AEAD final dan prosedur rotasi key.
-- Jumlah digit OTP dan format pesan.
+- Production KMS/secret manager dan prosedur rotasi/pemulihan key.
+- Review operasional implementasi AES-256-GCM dan key provider produksi.
+- Format pesan dan kebijakan template provider.
 - Batas password minimum/maksimum dan benchmark Argon2id pada runtime sasaran.
 - Idempotency strategy provider dan retry/outbox operasional.
 - Jadwal cleanup dan retensi event.
