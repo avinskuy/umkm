@@ -16,8 +16,7 @@ use super::super::{
 };
 use super::{
     authentication::{is_cross_site_request, resolved_client_ip},
-    valid_contact_input, AbuseDecision, RecoveryApiState, RegistrationAbuseGuard,
-    RegistrationAction,
+    valid_contact_input, AbuseDecision, RecoveryApiState, RegistrationAction,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
