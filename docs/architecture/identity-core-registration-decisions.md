@@ -113,7 +113,7 @@ Pada snapshot keputusan ini:
 - Migration Identity Core 0001–0010 tersedia di repository dan diuji melalui PostgreSQL CI.
 - Rust `VerificationService` mengorkestrasi registrasi, issue/resend OTP, dispatch, verifikasi, dan aktivasi dengan fake provider pada tes.
 - Migration 0010 menyimpan nama tampilan publik, penerimaan Terms/Privacy per versi, dan consent marketing opsional secara atomik dengan pembuatan akun.
-- Endpoint HTTP registrasi/verifikasi belum dibuat.
+- Router HTTP registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default.
 - Provider Resend/FlowKirim nyata belum diimplementasikan atau dikonfigurasi.
 - Versi Terms/Privacy final belum ditetapkan; registry belum memiliki versi penerimaan aktif.
 - Migration belum diterapkan ke database produksi. Bootstrap privilege, provisioning, dan deployment merupakan operasi terpisah.
