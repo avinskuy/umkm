@@ -82,12 +82,21 @@ impl LoginRole {
             Self::Investor => "investor",
         }
     }
+
+    fn from_db_value(value: &str) -> Option<Self> {
+        match value {
+            "business_owner" => Some(Self::BusinessOwner),
+            "investor" => Some(Self::Investor),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthenticationError {
     Database,
     InvalidCredentials,
+    InvalidSession,
     RateLimited,
     InvalidInput,
     Internal,
@@ -98,6 +107,7 @@ impl std::fmt::Display for AuthenticationError {
         let message = match self {
             Self::Database => "authentication database operation failed",
             Self::InvalidCredentials => "identifier or password is invalid",
+            Self::InvalidSession => "authentication session is invalid or expired",
             Self::RateLimited => "too many login attempts",
             Self::InvalidInput => "login input is invalid",
             Self::Internal => "authentication operation failed",
@@ -112,6 +122,22 @@ pub struct LoginSession {
     pub user_id: String,
     pub role: LoginRole,
     pub token: Zeroizing<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthenticatedSession {
+    pub session_id: String,
+    pub user_id: String,
+    pub role: LoginRole,
+    pub expires_in_seconds: i64,
+}
+
+pub struct RotatedSession {
+    pub session_id: String,
+    pub user_id: String,
+    pub role: LoginRole,
+    pub token: Zeroizing<String>,
+    pub expires_in_seconds: i64,
 }
 
 pub struct AuthenticationService<'a> {
@@ -261,11 +287,132 @@ impl<'a> AuthenticationService<'a> {
             .map_err(|_| AuthenticationError::Database)
     }
 
+    pub async fn validate_session(
+        &self,
+        token: &str,
+    ) -> Result<AuthenticatedSession, AuthenticationError> {
+        let token_hash = session_token_hash(token)?;
+        let row = sqlx::query_as::<_, (String, String, String, i64)>(
+            "SELECT session_id::text, user_id::text, primary_role, expires_in_seconds FROM public.get_active_password_login_session($1)",
+        )
+        .bind(token_hash.to_vec())
+        .fetch_optional(self.pool)
+        .await
+        .map_err(|_| AuthenticationError::Database)?
+        .ok_or(AuthenticationError::InvalidSession)?;
+
+        Ok(AuthenticatedSession {
+            session_id: row.0,
+            user_id: row.1,
+            role: LoginRole::from_db_value(&row.2)
+                .ok_or(AuthenticationError::InvalidSession)?,
+            expires_in_seconds: row.3,
+        })
+    }
+
+    pub async fn rotate_session(
+        &self,
+        token: &str,
+    ) -> Result<RotatedSession, AuthenticationError> {
+        let old_token_hash = session_token_hash(token)?;
+        let new_token = random_session_token()?;
+        let new_token_hash = hash_session_token(&new_token);
+
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+        let row = sqlx::query_as::<_, (String, String, String, i64)>(
+            "SELECT session_id::text, user_id::text, primary_role, expires_in_seconds FROM public.rotate_active_password_login_session($1, $2)",
+        )
+        .bind(old_token_hash.to_vec())
+        .bind(new_token_hash.to_vec())
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| AuthenticationError::Database)?
+        .ok_or(AuthenticationError::InvalidSession)?;
+
+        let role = LoginRole::from_db_value(&row.2).ok_or(AuthenticationError::InvalidSession)?;
+        let audit_event = AuditEvent {
+            actor_type: AuditActorType::User,
+            actor_id: Some(&row.1),
+            subject_user_id: Some(&row.1),
+            action_code: "identity.session.rotated",
+            outcome: AuditOutcome::Success,
+            reason_code: None,
+            request_id: None,
+            metadata: serde_json::json!({
+                "role": role.as_db_value(),
+                "session_id": row.0
+            }),
+        };
+        append_audit_event(&mut transaction, &audit_event)
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+
+        Ok(RotatedSession {
+            session_id: row.0,
+            user_id: row.1,
+            role,
+            token: Zeroizing::new(new_token),
+            expires_in_seconds: row.3,
+        })
+    }
+
+    pub async fn logout_all(
+        &self,
+        user_id: &str,
+        role: LoginRole,
+    ) -> Result<i32, AuthenticationError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+        let revoked_count: i32 =
+            sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1::uuid)")
+                .bind(user_id)
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|_| AuthenticationError::Database)?;
+        let count_bucket = match revoked_count {
+            0 => "0",
+            1 => "1",
+            2..=5 => "2-5",
+            _ => "6+",
+        };
+        let audit_event = AuditEvent {
+            actor_type: AuditActorType::User,
+            actor_id: Some(user_id),
+            subject_user_id: Some(user_id),
+            action_code: "identity.sessions.logout_all",
+            outcome: AuditOutcome::Success,
+            reason_code: None,
+            request_id: None,
+            metadata: serde_json::json!({
+                "role": role.as_db_value(),
+                "count_bucket": count_bucket
+            }),
+        };
+        append_audit_event(&mut transaction, &audit_event)
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
+        Ok(revoked_count)
+    }
+
     pub async fn logout(&self, token: &str) -> Result<(), AuthenticationError> {
-        if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        let Ok(token_hash) = session_token_hash(token) else {
             return Ok(());
-        }
-        let token_hash = hash_session_token(token);
+        };
         sqlx::query_scalar::<_, bool>("SELECT public.revoke_password_login_session($1)")
             .bind(token_hash.to_vec())
             .fetch_one(self.pool)
@@ -343,6 +490,13 @@ fn hex_encode(bytes: &[u8]) -> String {
         output.push(HEX[(byte & 0x0f) as usize] as char);
     }
     output
+}
+
+fn session_token_hash(token: &str) -> Result<[u8; 32], AuthenticationError> {
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AuthenticationError::InvalidSession);
+    }
+    Ok(hash_session_token(token))
 }
 
 pub fn hash_session_token(token: &str) -> [u8; 32] {
