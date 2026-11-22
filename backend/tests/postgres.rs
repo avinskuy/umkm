@@ -1746,30 +1746,64 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
             .fetch_one(pool)
             .await
             .expect("active user should be able to create another device session");
-    let revoked_count: i32 =
+    let third_token_hash = vec![44_u8; 32];
+    let third_session_id: String =
+        sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
+            .bind(&user_id)
+            .bind(&third_token_hash)
+            .fetch_one(pool)
+            .await
+            .expect("active user should be able to create a third device session");
+
+    let invalid_revoke_count: i32 =
         sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1)")
-            .bind(&second_token_hash)
+            .bind(vec![99_u8; 32])
             .fetch_one(pool)
             .await
-            .expect("logout-all should revoke every active session for the account");
-    assert_eq!(revoked_count, 1);
+            .expect("invalid session token should return a safe no-op result");
+    assert_eq!(invalid_revoke_count, 0);
 
-    let second_reason: String =
-        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid")
-            .bind(&second_session_id)
-            .fetch_one(pool)
-            .await
-            .expect("logout-all revocation reason should be recorded");
-    assert_eq!(second_reason, "logout_all");
-
-    let revoked_all_session: Option<String> = sqlx::query_scalar(
-        "SELECT session_id::text FROM public.get_active_password_login_session($1)",
+    let first_revoke = sqlx::query_scalar::<_, i32>(
+        "SELECT public.revoke_all_password_login_sessions($1)",
     )
     .bind(&second_token_hash)
-    .fetch_optional(pool)
-    .await
-    .expect("revoked session validation should execute");
-    assert!(revoked_all_session.is_none());
+    .fetch_one(pool);
+    let second_revoke = sqlx::query_scalar::<_, i32>(
+        "SELECT public.revoke_all_password_login_sessions($1)",
+    )
+    .bind(&third_token_hash)
+    .fetch_one(pool);
+    let (first_revoke, second_revoke) = tokio::join!(first_revoke, second_revoke);
+    let revoked_counts = [
+        first_revoke.expect("first concurrent logout-all should complete"),
+        second_revoke.expect("second concurrent logout-all should complete"),
+    ];
+    assert_eq!(revoked_counts.iter().sum::<i32>(), 2);
+    assert!(
+        revoked_counts.contains(&0) && revoked_counts.contains(&2),
+        "concurrent logout-all should revoke the account sessions exactly once"
+    );
+
+    for session_id in [&second_session_id, &third_session_id] {
+        let reason: String =
+            sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid")
+                .bind(session_id)
+                .fetch_one(pool)
+                .await
+                .expect("logout-all revocation reason should be recorded");
+        assert_eq!(reason, "logout_all");
+    }
+
+    for token_hash in [&second_token_hash, &third_token_hash] {
+        let revoked_session: Option<String> = sqlx::query_scalar(
+            "SELECT session_id::text FROM public.get_active_password_login_session($1)",
+        )
+        .bind(token_hash)
+        .fetch_optional(pool)
+        .await
+        .expect("revoked session validation should execute");
+        assert!(revoked_session.is_none());
+    }
 }
 
 async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
