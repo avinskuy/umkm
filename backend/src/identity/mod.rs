@@ -5,8 +5,8 @@
 //! append-only. Router HTTP registrasi tersedia sebagai komponen terinjeksi, tetapi
 //! sengaja belum dipasang pada aplikasi runtime.
 
-mod audit;
 pub mod abuse;
+mod audit;
 pub mod authentication;
 pub mod crypto;
 pub mod delivery;
