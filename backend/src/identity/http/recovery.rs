@@ -8,8 +8,6 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::error::DatabaseError;
-use zeroize::Zeroizing;
 
 use super::super::{
     registration::ContactChannel,
@@ -107,6 +105,14 @@ fn no_store(response: &mut Response) {
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+}
+
+fn database_error_code(error_value: &VerificationError, expected: &str) -> bool {
+    matches!(
+        error_value,
+        VerificationError::Database(sqlx::Error::Database(database_error))
+            if database_error.code().as_deref() == Some(expected)
+    )
 }
 
 fn rate_limit_response(decision: AbuseDecision) -> Option<Response> {
@@ -278,6 +284,9 @@ async fn resend_recovery(
         Err(VerificationError::Database(sqlx::Error::RowNotFound)) => {
             message(StatusCode::ACCEPTED, ACCEPTED_RESEND_MESSAGE)
         }
+        Err(error_value) if database_error_code(&error_value, "P0002") => {
+            message(StatusCode::ACCEPTED, ACCEPTED_RESEND_MESSAGE)
+        }
         Err(error_value) => recovery_error(error_value),
     }
 }
@@ -321,6 +330,9 @@ async fn verify_recovery(
             error(StatusCode::BAD_REQUEST, INVALID_CODE_MESSAGE)
         }
         Err(VerificationError::Database(sqlx::Error::RowNotFound)) => {
+            error(StatusCode::BAD_REQUEST, INVALID_CODE_MESSAGE)
+        }
+        Err(error_value) if database_error_code(&error_value, "P0002") => {
             error(StatusCode::BAD_REQUEST, INVALID_CODE_MESSAGE)
         }
         Err(error_value) => recovery_error(error_value),
@@ -368,6 +380,9 @@ async fn list_candidates(
         | Err(VerificationError::Database(sqlx::Error::RowNotFound)) => {
             error(StatusCode::NOT_FOUND, "Kasus pemulihan tidak ditemukan.")
         }
+        Err(error_value) if database_error_code(&error_value, "P0002") => {
+            error(StatusCode::NOT_FOUND, "Kasus pemulihan tidak ditemukan.")
+        }
         Err(error_value) => recovery_error(error_value),
     }
 }
@@ -408,14 +423,16 @@ async fn select_account(
             "Permintaan pemulihan diteruskan untuk pemeriksaan keamanan.",
         ),
         Err(VerificationError::InvalidInput)
-        | Err(VerificationError::Database(sqlx::Error::RowNotFound))
-        | Err(VerificationError::Database(sqlx::Error::Database(_))) => {
+        | Err(VerificationError::Database(sqlx::Error::RowNotFound)) => {
+            error(StatusCode::BAD_REQUEST, "Pilihan akun tidak valid.")
+        }
+        Err(error_value)
+            if database_error_code(&error_value, "P0001")
+                || database_error_code(&error_value, "P0002") =>
+        {
             error(StatusCode::BAD_REQUEST, "Pilihan akun tidak valid.")
         }
         Err(error_value) => recovery_error(error_value),
     }
 }
 
-fn _database_error_code(error_value: &dyn DatabaseError) -> Option<&str> {
-    error_value.code().as_deref()
-}
