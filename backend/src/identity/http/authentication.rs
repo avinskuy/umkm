@@ -252,9 +252,13 @@ async fn logout_all(
         );
     }
 
+    let Some(token) = session_cookie(&headers) else {
+        return unauthorized_session();
+    };
+
     match state
         .service()
-        .logout_all(&session.user_id, session.role)
+        .logout_all(&session.user_id, session.role, token.as_str())
         .await
     {
         Ok(_) => {
