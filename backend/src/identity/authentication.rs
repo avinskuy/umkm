@@ -492,7 +492,7 @@ fn hex_encode(bytes: &[u8]) -> String {
     output
 }
 
-fn session_token_hash(token: &str) -> Result<[u8; 32], AuthenticationError> {
+pub(crate) fn session_token_hash(token: &str) -> Result<[u8; 32], AuthenticationError> {
     if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(AuthenticationError::InvalidSession);
     }
