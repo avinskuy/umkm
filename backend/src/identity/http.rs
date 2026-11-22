@@ -172,7 +172,7 @@ pub struct RecoveryApiState {
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
-    pub(super) password_policy: Option<Arc<dyn PasswordPolicy>>,
+    pub(super) password_policy: Option<Arc<dyn RegistrationPasswordPolicy>>,
 }
 
 impl RecoveryApiState {
@@ -191,7 +191,7 @@ impl RecoveryApiState {
         }
     }
 
-    pub fn with_password_policy(mut self, policy: Arc<dyn PasswordPolicy>) -> Self {
+    pub fn with_password_policy(mut self, policy: Arc<dyn RegistrationPasswordPolicy>) -> Self {
         self.password_policy = Some(policy);
         self
     }
