@@ -123,7 +123,13 @@ async fn login_owner(
             "Permintaan login lintas situs ditolak.",
         );
     }
-    login(state, resolved_client_ip(&headers, peer.ip()), request, LoginRole::BusinessOwner).await
+    login(
+        state,
+        resolved_client_ip(&headers, peer.ip()),
+        request,
+        LoginRole::BusinessOwner,
+    )
+    .await
 }
 
 async fn login_investor(
@@ -138,7 +144,13 @@ async fn login_investor(
             "Permintaan login lintas situs ditolak.",
         );
     }
-    login(state, resolved_client_ip(&headers, peer.ip()), request, LoginRole::Investor).await
+    login(
+        state,
+        resolved_client_ip(&headers, peer.ip()),
+        request,
+        LoginRole::Investor,
+    )
+    .await
 }
 
 async fn login(
