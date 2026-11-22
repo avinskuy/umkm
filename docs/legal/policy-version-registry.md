@@ -34,7 +34,8 @@ Jangan mengubah isi dokumen setelah versi aktif diterbitkan. Perubahan substanti
 ## Jejak rujukan implementasi
 
 - Skema dan kontrak persistence: [Migration 0010 — Profil Publik dan Penerimaan Kebijakan](../architecture/identity-core-migration-0010-contract.md).
-- Baseline consent: [Kebijakan Persetujuan & Pemrosesan Data](../security/consent-data-processing.md).\n- Draf pilihan marketing: [Pemberitahuan Persetujuan Marketing](marketing-consent-notice-draft.md).
+- Baseline consent: [Kebijakan Persetujuan & Pemrosesan Data](../security/consent-data-processing.md).
+- Draf pilihan marketing: [Pemberitahuan Persetujuan Marketing](marketing-consent-notice-draft.md).
 - Baseline privasi: [Kebijakan Privasi & Kendali Data](../security/privacy-data-control.md).
 - Keputusan registrasi: [Keputusan Autentikasi Identity Core](../architecture/identity-core-authentication-stage-one-decision.md).
 
