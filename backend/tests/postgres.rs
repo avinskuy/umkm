@@ -1654,7 +1654,10 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
                 .fetch_one(pool)
                 .await
                 .expect("IP bucket should accept requests through its threshold");
-        assert!(allowed, "IP attempt {attempt} should be inside the threshold");
+        assert!(
+            allowed,
+            "IP attempt {attempt} should be inside the threshold"
+        );
     }
     let ip_blocked: bool =
         sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
