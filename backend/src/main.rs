@@ -21,13 +21,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::io::Error::other("failed to connect to PostgreSQL using APP_DATABASE_URL")
     })?;
 
-    let rate_limit_key = env::var("AUTH_RATE_LIMIT_HMAC_KEY").map_err(|error| {
+    let rate_limit_key = zeroize::Zeroizing::new(env::var("AUTH_RATE_LIMIT_HMAC_KEY").map_err(|error| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!("AUTH_RATE_LIMIT_HMAC_KEY is required: {error}"),
         )
-    })?;
-    let rate_limit_key = AuthenticationRateLimitKey::from_hex(&rate_limit_key)?;
+    })?);
+    let rate_limit_key = AuthenticationRateLimitKey::from_hex(rate_limit_key.as_str())?;
     let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key);
 
     let host = env::var("HOST").ok();
