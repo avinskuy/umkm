@@ -156,7 +156,7 @@ async fn login(
         Ok(session) => {
             let cookie = Zeroizing::new(format!(
                 "{SESSION_COOKIE}={}; Path=/; Max-Age={SESSION_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax",
-                session.token
+                session.token.as_str()
             ));
             let Ok(cookie_value) = HeaderValue::from_str(&cookie) else {
                 return error(
