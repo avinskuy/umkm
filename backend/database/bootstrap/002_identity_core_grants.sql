@@ -102,10 +102,10 @@ DECLARE
     v_has_safe_search_path BOOLEAN;
 BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
-        'public.create_registration_verification_session(uuid,text,bytea,bytea,text,bytea,text,timestamp with time zone)',
+        'public.create_registration_verification_session(uuid,uuid,text,bytea,bytea,text,bytea,text,timestamp with time zone)',
         'public.get_registration_verification_session(uuid)',
         'public.get_pending_otp_challenge(uuid)',
-        'public.reserve_otp_challenge(uuid,bytea,text,bytea[])',
+        'public.reserve_otp_challenge(uuid,uuid,bytea,text,bytea[])',
         'public.record_otp_delivery_result(uuid,text)',
         'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])'
     ] LOOP
@@ -128,13 +128,13 @@ END;
 $verification_ownership_guard$;
 
 -- verification function grants --
-GRANT EXECUTE ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ)
+GRANT EXECUTE ON FUNCTION public.create_registration_verification_session(UUID, UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.get_registration_verification_session(UUID)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.get_pending_otp_challenge(UUID)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT, BYTEA[])
+GRANT EXECUTE ON FUNCTION public.reserve_otp_challenge(UUID, UUID, BYTEA, TEXT, BYTEA[])
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.record_otp_delivery_result(UUID, TEXT)
     TO usahapintar_app;
