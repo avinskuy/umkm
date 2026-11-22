@@ -133,8 +133,8 @@ BEGIN
        OR cardinality(p_destination_hmac_aliases) > 8
        OR EXISTS (
             SELECT 1
-              FROM unnest(p_destination_hmac_aliases) AS alias_digest
-             WHERE octet_length(alias_digest) <> 32
+              FROM unnest(p_destination_hmac_aliases) AS aliases(digest)
+             WHERE octet_length(aliases.digest) <> 32
        ) THEN
         RAISE EXCEPTION 'password reset token issuance input is invalid'
             USING ERRCODE = '22023';
