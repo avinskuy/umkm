@@ -1,4 +1,72 @@
--- audit events for OTP delivery and failed verification --
+-- audit events for registration and OTP verification lifecycle --
+
+CREATE OR REPLACE FUNCTION public.create_registration_verification_session(
+    p_session_id UUID,
+    p_user_id UUID,
+    p_channel TEXT,
+    p_destination_ciphertext BYTEA,
+    p_destination_nonce BYTEA,
+    p_encryption_key_version TEXT,
+    p_destination_hmac BYTEA,
+    p_hmac_key_version TEXT,
+    p_expires_at TIMESTAMPTZ
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $
+DECLARE
+    v_user public.users%ROWTYPE;
+BEGIN
+    SELECT * INTO v_user
+      FROM public.users
+     WHERE id = p_user_id
+     FOR UPDATE;
+
+    IF NOT FOUND
+       OR p_session_id IS NULL
+       OR v_user.account_status <> 'pending_verification'
+       OR p_channel NOT IN ('email', 'whatsapp')
+       OR (p_channel = 'email' AND v_user.initial_contact_channel <> 'email')
+       OR (p_channel = 'whatsapp' AND v_user.initial_contact_channel <> 'phone')
+       OR p_expires_at <= clock_timestamp()
+       OR p_expires_at > v_user.pending_expires_at
+       OR p_expires_at > clock_timestamp() + INTERVAL '10 minutes'
+       OR p_destination_ciphertext IS NULL OR octet_length(p_destination_ciphertext) = 0
+       OR p_destination_nonce IS NULL OR octet_length(p_destination_nonce) = 0
+       OR p_destination_hmac IS NULL OR octet_length(p_destination_hmac) = 0
+       OR p_encryption_key_version IS NULL OR length(btrim(p_encryption_key_version)) = 0
+       OR p_hmac_key_version IS NULL OR length(btrim(p_hmac_key_version)) = 0 THEN
+        RAISE EXCEPTION 'registration verification session input is invalid'
+            USING ERRCODE = '22023';
+    END IF;
+
+    INSERT INTO public.verification_sessions (
+        id, user_id, purpose, channel, destination_ciphertext, destination_nonce,
+        encryption_key_version, destination_hmac, hmac_key_version, expires_at
+    )
+    VALUES (
+        p_session_id, p_user_id, 'registration', p_channel, p_destination_ciphertext, p_destination_nonce,
+        p_encryption_key_version, p_destination_hmac, p_hmac_key_version, p_expires_at
+    );
+
+    INSERT INTO public.identity_audit_events (
+        actor_type, subject_user_id, action_code, outcome, metadata
+    )
+    VALUES (
+        'system', p_user_id, 'identity.registration.requested', 'success',
+        pg_catalog.jsonb_build_object(
+            'channel', p_channel,
+            'purpose', 'registration',
+            'session_id', p_session_id::text
+        )
+    );
+
+    RETURN p_session_id;
+END;
+$;
+
 
 CREATE OR REPLACE FUNCTION public.reserve_otp_challenge(
     p_session_id UUID,
@@ -294,14 +362,25 @@ BEGIN
                 USING ERRCODE = 'P0001';
         END IF;
 
-        INSERT INTO public.identity_audit_events (actor_type, action_code, outcome)
-        VALUES ('system', 'identity.registration.verified', 'success');
+        INSERT INTO public.identity_audit_events (
+            actor_type, subject_user_id, action_code, outcome, metadata
+        )
+        VALUES (
+            'system', v_session.user_id, 'identity.registration.verified', 'success',
+            pg_catalog.jsonb_build_object(
+                'channel', v_session.channel,
+                'purpose', v_session.purpose,
+                'session_id', p_session_id::text,
+                'challenge_id', p_challenge_id::text
+            )
+        );
     END IF;
 
     RETURN TRUE;
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.create_registration_verification_session(UUID, UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.reserve_otp_challenge(UUID, UUID, BYTEA, TEXT, BYTEA[]) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[]) FROM PUBLIC;
