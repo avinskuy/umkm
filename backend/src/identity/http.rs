@@ -8,7 +8,7 @@ use std::{
 use sqlx::PgPool;
 
 use super::{
-    crypto::{random_bytes, CryptoError, KeyProvider},
+    crypto::{random_bytes, KeyProvider},
     delivery::OtpDeliveryProvider,
     registration::ContactChannel,
     verification::VerificationService,
