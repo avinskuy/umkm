@@ -70,7 +70,7 @@ Label produk yang lebih singkat, “Owner” dan “Investor”, merupakan istil
 - Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
 - Registrasi email/WhatsApp + password membuat akun pending dan hanya aktif setelah OTP valid; lifecycle pending 30 menit berlaku. Login rutin menggunakan password tanpa OTP.
 - Data sesi harus mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut, fitur “Ingat perangkat ini” tanpa melewati kedua batas, pencabutan sesi individual, dan logout dari semua perangkat.
-- Kontak pemulihan bersifat opsional dan harus dibuktikan kepemilikannya sebelum dipakai. Karena OTP ditunda, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; desain kanal pembuktian/pemulihan harus diselesaikan sebelum fitur reset dirilis.
+- Kontak pemulihan bersifat opsional dan harus dibuktikan kepemilikannya sebelum dipakai. Sampai runtime OTP dan kanal pengiriman aman tersedia, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; fitur reset belum boleh dirilis.
 - Rancangan status akun harus membedakan penonaktifan sementara dan penghapusan permanen. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus ditetapkan berdasarkan kategori data.
 
 ### B. Profil dan informasi usaha
