@@ -1,7 +1,7 @@
 # Desain Runtime Registrasi dan Verifikasi Identity Core
 
 > **Cakupan:** desain dan status implementasi runtime registrasi serta verifikasi OTP Identity Core.
-> **Batas operasional:** router registrasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Provider nyata, key produksi, login/logout, sesi HTTP, dan recovery runtime belum tersedia.
+> **Batas operasional:** router registrasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Provider nyata, key produksi, middleware validasi sesi untuk endpoint terproteksi, dan recovery runtime belum tersedia. Login password Owner/Investor dan logout sudah tersedia dengan sesi server-side.
 
 Registrasi email + password diverifikasi melalui OTP email; registrasi nomor telepon/WhatsApp + password diverifikasi melalui OTP WhatsApp. Login rutin menggunakan email/nomor telepon + password tanpa OTP.
 

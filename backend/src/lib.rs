@@ -2,6 +2,7 @@ pub mod config;
 pub mod database;
 pub mod identity;
 
+use crate::identity::http::{authentication_router, AuthenticationApiState};
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
@@ -50,6 +51,11 @@ pub fn app(pool: PgPool) -> Router {
         .route("/api/v1/health", get(health))
         .route("/api/v1/readyz", get(readiness))
         .with_state(pool)
+}
+
+/// Build the public API with password authentication routes mounted.
+pub fn app_with_authentication(pool: PgPool, authentication: AuthenticationApiState) -> Router {
+    app(pool).merge(authentication_router(authentication))
 }
 
 #[cfg(test)]

@@ -10,12 +10,13 @@ Server membaca alamat bind dari variabel lingkungan:
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | Alamat IP untuk bind. Mendukung literal IPv4 dan IPv6. |
 | `PORT` | `5000` | Port TCP. Harus berupa bilangan bulat dari 1 sampai 65535. |
+| `AUTH_RATE_LIMIT_HMAC_KEY` | — | Wajib. Secret 32 byte dalam 64 karakter hex untuk fingerprint rate limit login. Gunakan nilai acak dari secret manager; jangan commit ke repository atau log. |
 
 Jika salah satu variabel tidak diisi, server menggunakan nilai bawaannya. Nilai yang tidak valid akan menghentikan proses startup dengan kesalahan konfigurasi, bukan diam-diam diganti dengan nilai bawaan.
 
 Alamat loopback bawaan menjaga API tetap dapat diakses dari host itu sendiri. Atur `HOST=0.0.0.0` hanya jika lingkungan deployment memang memerlukan antarmuka yang dapat dijangkau dari luar. Lindungi layanan menggunakan kontrol jaringan atau reverse proxy yang sesuai. Jangan membuka API secara langsung ke internet publik tanpa tinjauan keamanan deployment yang jelas.
 
-Aplikasi tidak memuat file `.env` dengan sendirinya. Atur variabel lingkungan melalui shell, service manager, container runtime, atau platform deployment.
+Aplikasi tidak memuat file `.env` dengan sendirinya. Atur variabel lingkungan melalui shell, service manager, container runtime, atau platform deployment. Generate key dengan `openssl rand -hex 32`, simpan di secret manager, dan gunakan nilai yang sama pada seluruh instance. Rotasi key harus dikoordinasikan agar tidak menghapus bucket rate limit yang masih aktif.
 
 ## PostgreSQL
 
@@ -25,6 +26,8 @@ Runtime HTTP memakai principal aplikasi dengan hak minimum dan hanya membaca kon
 | --- | --- | --- | --- |
 | `APP_DATABASE_URL` | Ya | — | URL koneksi PostgreSQL milik `usahapintar_app_login`; jangan gunakan kredensial DBA atau migrator. |
 | `DATABASE_MAX_CONNECTIONS` | Tidak | `10` | Batas connection pool; rentang yang diterima 1–100. |
+
+Login Owner/Investor tersedia melalui `POST /api/v1/identity/login/owner` dan `POST /api/v1/identity/login/investor`; logout melalui `POST /api/v1/identity/logout`. Login menggunakan email/nomor telepon + password dan tidak meminta OTP rutin. Cookie sesi menggunakan prefix `__Host-`, `HttpOnly`, `Secure`, `SameSite=Lax`, dan masa absolut 30 hari. Rate limit database: maksimal 10 percobaan per identifier dan 30 per IP dalam 15 menit; fingerprint disimpan sebagai HMAC. Jika API berada di belakang reverse proxy lokal, proxy wajib menimpa header `X-Real-IP` dengan alamat klien (`$remote_addr` pada Nginx); backend hanya mempercayai header tersebut ketika koneksi TCP berasal dari loopback. Jangan meneruskan nilai `X-Real-IP` dari input klien tanpa ditimpa.
 
 Pool runtime membuka minimal satu koneksi saat startup untuk memverifikasi database tersedia, dengan batas maksimum sesuai konfigurasi, waktu tunggu akuisisi 5 detik, idle timeout 10 menit, dan masa hidup koneksi maksimum 30 menit. Kegagalan koneksi awal menghentikan startup agar layanan tidak berjalan dalam keadaan database yang dibutuhkan tidak tersedia. Kredensial dan URL database tidak ditulis ke log.
 
@@ -46,7 +49,7 @@ Gunakan liveness untuk mengetahui apakah proses perlu dipulihkan dan readiness u
 Siapkan database lokal dan principal aplikasi terlebih dahulu, kemudian jalankan:
 
 ```sh
-APP_DATABASE_URL='postgres://usahapintar_app_login:local_password@127.0.0.1:5432/usahapintar_dev' HOST=127.0.0.1 PORT=5000 cargo run --locked -p usahapintar-api
+AUTH_RATE_LIMIT_HMAC_KEY="$(openssl rand -hex 32)" APP_DATABASE_URL='postgres://usahapintar_app_login:local_password@127.0.0.1:5432/usahapintar_dev' HOST=127.0.0.1 PORT=5000 cargo run --locked -p usahapintar-api
 ```
 
 Jangan menggunakan kredensial produksi untuk pengembangan atau CI. Untuk migration lokal yang eksplisit, gunakan URL khusus migrator:
@@ -79,10 +82,10 @@ Lapisan `usahapintar_api::identity` menyediakan operasi terbatas untuk registras
 - `VerificationService` mengorkestrasi registrasi, penerbitan/resend OTP, pencatatan hasil pengiriman, verifikasi, dan aktivasi akun. Password diproses menggunakan komponen hashing backend; password plaintext tidak disimpan atau diteruskan ke provider.
 - `registration_router` menyediakan endpoint registrasi, resend, dan verifikasi. Router ini telah memiliki pengujian runtime, tetapi sengaja belum dipasang pada `app()`/`main()` sehingga belum tersedia melalui HTTP server default.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin yang ditargetkan menggunakan email/nomor telepon + password tanpa OTP setiap kali login; endpoint login/logout, pencarian kredensial runtime, cookie/session middleware, dan validasi sesi belum tersedia.
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login Owner/Investor menggunakan email/nomor telepon + password tanpa OTP rutin dan sudah tersedia pada runtime. Router registrasi HTTP publik, middleware validasi sesi untuk endpoint terproteksi, rotasi token otomatis, dan recovery runtime belum tersedia.
 
 Provider pengiriman masih berupa abstraksi. Resend (email) dan FlowKirim (WhatsApp) merupakan target adapter, bukan integrasi nyata yang telah dikonfigurasi atau diuji dengan pengiriman langsung. CI menggunakan fake provider dan tidak mengirim pesan.
 
 Untuk menjaga konsistensi, operasi pembuatan akun, profil, penerimaan Terms/Privacy, consent opsional, dan event audit yang terkait harus menggunakan transaksi sesuai kontrak database dan hanya commit setelah seluruh operasi berhasil. Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya, bukan payload klien. Metadata hanya boleh memuat key allowlist non-sensitif; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
 
-Operasi login/logout, middleware sesi, pemulihan akun, adapter provider nyata, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
+Login password Owner/Investor dan logout telah tersedia. Middleware sesi untuk endpoint terproteksi, pemulihan akun, adapter provider nyata, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.

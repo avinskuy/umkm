@@ -3,19 +3,19 @@
 > Cakupan: hasil review skema, migration, privilege, dan kontrak runtime Identity Core.
 > Status implementasi harus dibaca bersama hasil CI dan kondisi deployment; migration yang tersedia belum berarti telah diterapkan pada database produksi.
 
-Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Migration 0001–0011 serta skrip bootstrap principal dan grant tersedia di repository dan diuji melalui CI. Migration dan bootstrap tidak dijalankan otomatis oleh HTTP runtime; penerapan pada database produksi merupakan operasi terpisah.
+Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Migration 0001–0012 serta skrip bootstrap principal dan grant tersedia di repository dan diuji melalui CI. Migration dan bootstrap tidak dijalankan otomatis oleh HTTP runtime; penerapan pada database produksi merupakan operasi terpisah.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0001–0010 membentuk baseline skema saat ini; seluruh migration yang sudah diterapkan pada database bersama harus diperlakukan immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0001–0012 membentuk baseline skema saat ini; seluruh migration yang sudah diterapkan pada database bersama harus diperlakukan immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Hasil pemeriksaan repository
 
 - Backend menggunakan Rust, Axum, Tokio, dan SQLx 0.8 dengan PostgreSQL 16 sebagai baseline.
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
-- `backend/migrations/` memiliki migration Identity Core 0001–0010, termasuk penghapusan OAuth, operasi database verifikasi, binding ID runtime, audit runtime verifikasi, profil publik, dan penerimaan kebijakan.
+- `backend/migrations/` memiliki migration Identity Core 0001–0012, termasuk penghapusan OAuth, operasi database verifikasi, binding ID runtime, audit runtime verifikasi, profil publik, dan penerimaan kebijakan.
 - HTTP server menyediakan `GET /api/v1/health` dan `GET /api/v1/readyz`. Pool PostgreSQL diinisialisasi saat startup menggunakan principal aplikasi.
 - Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, autentikasi password-only, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
-- Migration 0001–0010 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
-- `VerificationService` dan router HTTP registrasi/resend/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default. Login/logout, cookie/session middleware, adapter provider nyata, konfigurasi key produksi, dan runtime recovery belum tersedia. Grant database minimal tidak berarti seluruh autentikasi telah aktif.
+- Migration 0001–0012 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
+- `VerificationService` dan router HTTP registrasi/resend/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default. Login password Owner/Investor dan logout tersedia dengan cookie aman, sesi server-side, dan rate limit PostgreSQL. Middleware validasi sesi untuk endpoint terproteksi, adapter provider nyata, konfigurasi key produksi, dan runtime recovery belum tersedia. Grant database minimal tidak berarti seluruh autentikasi telah aktif.
 
 ## 2. Prinsip desain yang harus dipertahankan
 
@@ -38,7 +38,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 | --- | --- | --- |
 | 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, dan perlindungan role immutable |
 | 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; skema dan fungsi database digunakan oleh `VerificationService` untuk registrasi OTP |
-| 0003 | Sesi autentikasi | `sessions`, hash token SHA-256 unik, idle timeout 7 hari, absolute expiry 30 hari, rotasi token, dan pencabutan server-side; skema dan tes invariant tersedia di `main`, runtime sesi belum tersedia |
+| 0003 | Sesi autentikasi | `sessions`, hash token SHA-256 unik, idle timeout 7 hari, absolute expiry 30 hari, rotasi token, dan pencabutan server-side; skema, operasi pembuatan/pencabutan sesi, dan tes invariant tersedia; middleware validasi sesi untuk endpoint terproteksi masih belum tersedia |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
 | 0005 | Audit Identity Core | audit event yang dibutuhkan untuk perubahan identitas, sesi, verifikasi, dan pemulihan |
 
@@ -224,7 +224,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Migration 0001–0010 dan bootstrap principal/privilege telah diuji melalui CI pada PostgreSQL sementara. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP serta router HTTP yang belum dipasang pada aplikasi default. Login/logout, sesi HTTP, provider nyata, recovery runtime, dan cleanup job masih memerlukan implementasi serta pengujian tersendiri. Migration dan bootstrap belum diterapkan ke database produksi; jangan menjalankan migration otomatis pada HTTP startup.
+Migration 0001–0012 dan bootstrap principal/privilege telah diuji melalui CI pada PostgreSQL sementara. Runtime menyediakan orkestrasi registrasi/verifikasi OTP serta login password Owner/Investor dan logout. Router registrasi publik, middleware validasi sesi untuk endpoint terproteksi, provider nyata, recovery runtime, dan cleanup job masih memerlukan implementasi serta pengujian tersendiri. Migration dan bootstrap belum diterapkan ke database produksi; jangan menjalankan migration otomatis pada HTTP startup.
 
 ## 9. Referensi internal
 

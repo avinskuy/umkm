@@ -82,6 +82,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_verification_database_operations(&pool).await;
     assert_otp_resend_during_verification_lock(&pool).await;
     assert_authentication_session_invariants(&pool).await;
+    assert_authentication_database_operations(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
@@ -1529,6 +1530,165 @@ async fn assert_authentication_session_invariants(pool: &PgPool) {
             .is_err(),
         "deactivated accounts cannot create new sessions"
     );
+}
+
+async fn assert_authentication_database_operations(pool: &PgPool) {
+    let user_id = insert_active_email(pool, "password-login-database@example.test").await;
+
+    let credential: (String, String) = sqlx::query_as(
+        "SELECT user_id::text, password_hash \
+         FROM public.find_active_password_login('password-login-database@example.test', 'business_owner')",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("active owner credentials should be returned through the guarded function");
+    assert_eq!(credential.0, user_id);
+
+    let wrong_role: Option<String> = sqlx::query_scalar(
+        "SELECT user_id::text \
+         FROM public.find_active_password_login('password-login-database@example.test', 'investor')",
+    )
+    .fetch_optional(pool)
+    .await
+    .expect("role-scoped credential lookup should execute");
+    assert!(
+        wrong_role.is_none(),
+        "owner credentials must not authenticate as investor"
+    );
+
+    let token_hash = vec![41_u8; 32];
+    let session_id: String =
+        sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
+            .bind(&user_id)
+            .bind(&token_hash)
+            .fetch_one(pool)
+            .await
+            .expect("active password account should create a session through the guarded function");
+    let session_owner: String =
+        sqlx::query_scalar("SELECT user_id::text FROM public.sessions WHERE id = $1::uuid")
+            .bind(&session_id)
+            .fetch_one(pool)
+            .await
+            .expect("created session should be persisted");
+    assert_eq!(session_owner, user_id);
+
+    let identifier_hash = vec![51_u8; 32];
+    let ip_hash = vec![52_u8; 32];
+    for attempt in 1..=10 {
+        let allowed: bool =
+            sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+                .bind(&identifier_hash)
+                .bind(&ip_hash)
+                .fetch_one(pool)
+                .await
+                .expect("identifier and IP login rate limit should accept the initial window");
+        assert!(
+            allowed,
+            "attempt {attempt} should be inside the identifier threshold"
+        );
+    }
+    let blocked: bool = sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+        .bind(&identifier_hash)
+        .bind(&ip_hash)
+        .fetch_one(pool)
+        .await
+        .expect("rate limit function should return a decision after the threshold");
+    assert!(!blocked, "the eleventh identifier attempt must be limited");
+
+    sqlx::query(
+        "UPDATE public.password_login_rate_limits SET window_started_at = clock_timestamp() - INTERVAL '20 minutes' WHERE scope = 'identifier' AND key_hash = $1",
+    )
+    .bind(&identifier_hash)
+    .execute(pool)
+    .await
+    .expect("test should age the rate-limit window without expiring its active block");
+    let still_blocked: bool =
+        sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("active login block should remain enforceable after the original window");
+    assert!(
+        !still_blocked,
+        "an active block must not reset with its original window"
+    );
+
+    sqlx::query(
+        "UPDATE public.password_login_rate_limits SET blocked_until = clock_timestamp() - INTERVAL '1 second' WHERE scope = 'identifier' AND key_hash = $1",
+    )
+    .bind(&identifier_hash)
+    .execute(pool)
+    .await
+    .expect("test should expire the login block");
+    let allowed_after_block: bool =
+        sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("identifier should be reset after its block expires");
+    assert!(allowed_after_block);
+
+    sqlx::query("SELECT public.clear_password_login_identifier_limit($1)")
+        .bind(&identifier_hash)
+        .execute(pool)
+        .await
+        .expect("successful login should be able to clear the identifier bucket");
+    let allowed_after_clear: bool =
+        sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("cleared identifier should be eligible again");
+    assert!(allowed_after_clear);
+
+    let ip_only_hash = vec![61_u8; 32];
+    for attempt in 1..=30 {
+        let identifier_only_hash = vec![attempt as u8; 32];
+        let allowed: bool =
+            sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+                .bind(&identifier_only_hash)
+                .bind(&ip_only_hash)
+                .fetch_one(pool)
+                .await
+                .expect("IP bucket should accept requests through its threshold");
+        assert!(
+            allowed,
+            "IP attempt {attempt} should be inside the threshold"
+        );
+    }
+    let ip_blocked: bool =
+        sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+            .bind(vec![99_u8; 32])
+            .bind(&ip_only_hash)
+            .fetch_one(pool)
+            .await
+            .expect("IP limit should return a decision after its threshold");
+    assert!(!ip_blocked, "the thirty-first IP attempt must be limited");
+
+    let revoked: bool = sqlx::query_scalar("SELECT public.revoke_password_login_session($1)")
+        .bind(&token_hash)
+        .fetch_one(pool)
+        .await
+        .expect("logout function should revoke the session");
+    assert!(revoked);
+
+    let revoked_again: bool = sqlx::query_scalar("SELECT public.revoke_password_login_session($1)")
+        .bind(&token_hash)
+        .fetch_one(pool)
+        .await
+        .expect("repeated logout should be idempotent");
+    assert!(!revoked_again);
+
+    let reason: String =
+        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid")
+            .bind(&session_id)
+            .fetch_one(pool)
+            .await
+            .expect("revocation reason should remain auditable");
+    assert_eq!(reason, "logout");
 }
 
 async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
