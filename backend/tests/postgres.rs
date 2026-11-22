@@ -1054,6 +1054,19 @@ async fn assert_verification_database_operations(pool: &PgPool) {
         "resend must respect the 60-second cooldown"
     );
 
+    assert!(
+        sqlx::query_scalar::<_, bool>(
+            "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, NULL, $3)",
+        )
+        .bind(&session_id)
+        .bind(&challenge_id)
+        .bind(vec![vec![3_u8; 32]])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "null OTP comparison result must be rejected"
+    );
+
     let verified: bool = sqlx::query_scalar(
         "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
     )
