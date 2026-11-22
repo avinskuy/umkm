@@ -1,4 +1,4 @@
--- Jalankan setelah migration Identity Core 0001–0013 selesai.
+-- Jalankan setelah migration Identity Core 0001–0014 selesai.
 -- Fail closed jika SECURITY DEFINER registration function bukan milik migrator non-superuser.
 
 DO $ownership_guard$
@@ -273,4 +273,42 @@ GRANT EXECUTE ON FUNCTION public.get_active_password_login_session(BYTEA)
 GRANT EXECUTE ON FUNCTION public.rotate_active_password_login_session(BYTEA, BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.revoke_all_password_login_sessions(BYTEA)
+    TO usahapintar_app;
+
+-- Account recovery verification and account selection.
+DO $account_recovery_ownership_guard$
+DECLARE
+    v_signature TEXT;
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    FOREACH v_signature IN ARRAY ARRAY[
+        'public.create_account_recovery_verification_session(uuid,uuid,text,text,bytea,bytea,text,bytea,text,timestamp with time zone)',
+        'public.get_account_recovery_verification_session(uuid)',
+        'public.bind_account_recovery_session_to_account(uuid,uuid,bytea[])'
+    ] LOOP
+        SELECT pg_catalog.pg_get_userbyid(p.proowner),
+               p.prosecdef,
+               COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+          INTO v_owner, v_is_security_definer, v_has_safe_search_path
+          FROM pg_catalog.pg_proc AS p
+         WHERE p.oid = pg_catalog.to_regprocedure(v_signature);
+
+        IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+           OR v_is_security_definer IS DISTINCT FROM TRUE
+           OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+            RAISE EXCEPTION
+                'Refusing account recovery grants: % must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path',
+                v_signature;
+        END IF;
+    END LOOP;
+END;
+$account_recovery_ownership_guard$;
+
+GRANT EXECUTE ON FUNCTION public.create_account_recovery_verification_session(UUID, UUID, TEXT, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.get_account_recovery_verification_session(UUID)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.bind_account_recovery_session_to_account(UUID, UUID, BYTEA[])
     TO usahapintar_app;
