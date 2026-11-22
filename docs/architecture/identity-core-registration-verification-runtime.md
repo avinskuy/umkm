@@ -301,3 +301,8 @@ Kontrak provider berada di `identity::delivery`. Provider mengembalikan `accepte
 Format label versi key yang disimpan pada kolom TEXT adalah `vN`; parsing dilakukan ketat dan versi yang tidak dikenal ditolak. `KeyProvider::key_versions` harus mengembalikan seluruh versi HMAC fingerprint yang masih diperlukan selama jendela rate-limit. Implementasi default hanya mengembalikan key aktif dan tidak cukup untuk rotasi produksi. Provider produksi wajib mengimplementasikan riwayat versi secara eksplisit.
 
 Kebijakan awal OTP untuk orchestration ini menggunakan enam digit numerik dari CSPRNG dengan rejection sampling. Nilai ini berlaku untuk implementasi internal; endpoint publik tetap belum tersedia dan provider produksi belum dikonfigurasi.
+
+
+### Migration 0009 — audit siklus verifikasi
+
+Migration `20261122180000_audit_verification_runtime_events.sql` mencatat permintaan delivery, hasil dispatch (`accepted`, `failed`, `unknown`), dan percobaan OTP yang gagal ke `identity_audit_events`. Event registrasi diminta dan berhasil juga diikat ke `subject_user_id` serta metadata aman berupa kanal, purpose, session ID, dan challenge ID. Audit ditulis di transaksi fungsi database yang melakukan perubahan terkait; metadata tidak memuat kontak plaintext, kode OTP, ciphertext, atau key.
