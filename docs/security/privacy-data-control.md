@@ -20,7 +20,7 @@ Persetujuan kebijakan ini bukan klaim bahwa seluruh kontrol privasi telah diimpl
 
 ## 2. Default visibilitas profil
 
-Hanya informasi profil minimum yang memang ditujukan untuk publik yang boleh tampil secara publik secara default:
+Nama yang dimasukkan pada formulir registrasi disimpan sebagai `display_name` di profil pengguna. Field ini adalah nama tampilan publik, bukan nama legal atau bukti verifikasi identitas. Nama tampilan menjadi bagian profil publik setelah akun aktif.\n\nHanya informasi profil minimum yang memang ditujukan untuk publik yang boleh tampil secara publik secara default:
 
 - Nama tampilan.
 - Foto profil, jika pengguna memilih menggunakannya.
