@@ -2,12 +2,12 @@
 
 > Status: migration 0001–0005 dan bootstrap principal/privilege tersedia di `main` serta diuji melalui CI; runtime Identity Core masih terbatas
 > Tanggal: 22 November 2026
-> Keputusan autentikasi tahap pertama: email/telepon + password atau Google OAuth; OTP registrasi/login ditunda.
+> Keputusan autentikasi terbaru: OTP wajib untuk registrasi email/WhatsApp + password; Google OAuth tanpa OTP tambahan; login rutin tanpa OTP.
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
 Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration 0001–0005 serta skrip bootstrap principal dan grant tersedia di `main` dan diuji melalui CI. Seluruh migration dan bootstrap tetap belum dijalankan pada database produksi. HTTP runtime menginisialisasi pool PostgreSQL menggunakan principal aplikasi, tetapi tidak menjalankan migration otomatis.
 
-> **Perubahan keputusan 22 November 2026:** registrasi dan login tahap pertama menggunakan email/telepon + password atau Google OAuth; OTP tidak menjadi syarat registrasi/login. Migration 0001 saat ini masih mewajibkan verifikasi kontak sebelum aktivasi, sehingga skema yang ada belum sesuai untuk runtime tahap pertama. Migration lama tidak diubah; diperlukan migration lanjutan dan tes PostgreSQL sebelum runtime autentikasi dibuat. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+> **Amendemen keputusan 22 November 2026:** pendaftaran email/WhatsApp + password kembali mewajibkan OTP. Google OAuth tidak memerlukan OTP tambahan setelah validasi provider dan email_verified=true; login rutin tidak memakai OTP. Migration 0001 sudah menyediakan akun pending dan aktivasi setelah verifikasi, sedangkan migration 0002 menyediakan sesi/challenge email dan WhatsApp. Tetap audit fungsi, trigger, operasi aktivasi, dan tes PostgreSQL sebelum runtime dibuat. Lihat [Keputusan Autentikasi Identity Core — Registrasi OTP dan Google OAuth](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Hasil pemeriksaan repository
 
@@ -57,7 +57,7 @@ Kolom konseptual yang diperlukan:
 - `id`: UUID primary key.
 - `primary_role`: constrained value `business_owner`, `investor`, `admin`.
 - `account_status`: constrained lifecycle value `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`. Suspend/limit fitur dicatat terpisah melalui moderation/enforcement records.
-- `email_normalized` dan `phone_e164`: nullable secara individual; akun klien memilih satu identifier awal. Kontak yang dimasukkan melalui registrasi password tidak otomatis dianggap terverifikasi. Google OAuth tidak memerlukan OTP tambahan.
+- `email_normalized` dan `phone_e164`: nullable secara individual; akun klien memilih satu identifier awal. Kontak dari registrasi password baru diverifikasi setelah OTP email/WhatsApp valid. Google OAuth tidak memerlukan OTP tambahan bila email_verified=true.
 - `initial_contact_channel`: mencatat identifier awal (email atau phone) yang dipilih saat pendaftaran; pada skema tahap pertama yang diperbarui, nilainya tidak mensyaratkan verifikasi sebelum akun aktif.
 - `email_verified_at` dan `phone_verified_at`: waktu verifikasi yang sesuai; jangan menyimpulkan kontak kedua telah diverifikasi.
 - `password_hash`: nullable hanya untuk akun yang mendaftar melalui Google OAuth tanpa kata sandi lokal. Pendaftaran email/nomor HP wajib memiliki password hash.

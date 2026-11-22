@@ -1,105 +1,110 @@
-# Keputusan Autentikasi Identity Core — Tahap Pertama
+# Keputusan Autentikasi Identity Core — Registrasi OTP dan Google OAuth
 
-> Status: disetujui pada 22 November 2026  
-> Cakupan: metode registrasi/login awal, pemilihan role, status kontak, dan penundaan OTP  
+> Status: disetujui pada 22 November 2026 (amendemen setelah keputusan OTP ditunda)
+> Cakupan: metode registrasi/login, verifikasi kontak, pemilihan role, dan provider pengiriman OTP
 > Implementasi runtime: belum tersedia; dokumen ini menetapkan keputusan produk dan kontrak desain, bukan klaim fitur sudah aktif.
 
-## 1. Keputusan
+## 1. Keputusan autentikasi
 
-Tahap pertama USahapintar menyediakan dua metode autentikasi:
+USahapintar menyediakan dua jalur pendaftaran klien:
 
-1. **Email atau nomor telepon + password** untuk registrasi dan login biasa.
-2. **Google OAuth** sebagai alternatif registrasi dan login.
+1. **Email + password dengan OTP email wajib**.
+2. **Nomor telepon/WhatsApp + password dengan OTP WhatsApp wajib**.
 
-OTP tidak menjadi syarat registrasi maupun login pada tahap pertama. Implementasi OTP ditunda ke tahap berikutnya. Kode OTP tidak boleh digunakan sebagai pengganti password atau autentikasi Google.
+Pengguna harus menyelesaikan verifikasi OTP pada kontak awal sebelum akun diaktifkan. Password disimpan menggunakan Argon2id; password plaintext tidak pernah disimpan atau dicatat.
 
-Password lokal wajib untuk akun yang dibuat melalui formulir email/telepon. Akun yang dibuat hanya melalui Google tidak wajib memiliki password lokal. Password disimpan menggunakan Argon2id; password plaintext tidak pernah disimpan atau dicatat.
+**Google OAuth menjadi jalur alternatif** untuk pendaftaran dan login:
+- Pendaftaran Google tidak memerlukan OTP tambahan.
+- Token/identitas Google harus divalidasi sepenuhnya; klaim email hanya dianggap terverifikasi bila token tervalidasi menyatakan `email_verified=true`.
+- Google-only account tidak wajib memiliki password lokal.
+- Login Google untuk identitas yang sudah terhubung tidak meminta OTP rutin.
+
+OTP adalah bukti penguasaan kanal kontak saat registrasi atau proses verifikasi yang memang memerlukannya; OTP bukan metode login rutin dan tidak menggantikan password atau Google OAuth.
 
 ## 2. Pemilihan role tetap wajib
 
 - Pendaftaran publik hanya menerima `business_owner` atau `investor`.
-- Untuk pendaftaran Google baru, pengguna harus memilih role secara eksplisit **sebelum** memulai alur OAuth.
-- Pilihan role diikat ke state OAuth yang diterbitkan dan divalidasi server; callback tidak boleh mengganti role.
-- Login Google ke identitas yang sudah terhubung menggunakan role yang tersimpan pada akun. Pemilihan role bukan sarana mengganti role akun.
-- Setiap akun hanya memiliki satu role utama yang immutable. Pengguna yang membutuhkan role lain harus membuat akun terpisah dengan identitas login lain.
+- Role wajib dipilih sebelum pembuatan akun, termasuk sebelum memulai Google OAuth.
+- Untuk Google OAuth, pilihan role diikat ke state OAuth yang diterbitkan dan divalidasi server; callback tidak boleh mengganti role.
+- Setiap akun hanya memiliki satu role utama yang immutable.
+- Login menggunakan role yang sudah tersimpan. Pemilihan role bukan sarana mengganti role akun.
 - Tidak ada pendaftaran Admin publik, termasuk melalui Google OAuth.
 
-## 3. Perilaku registrasi dan kontak
+## 3. Alur registrasi email/WhatsApp + password
 
-### Email/telepon + password
+1. Pengguna memilih role Owner atau Investor.
+2. Pengguna memilih tepat satu kanal kontak awal: email atau WhatsApp/nomor telepon.
+3. Pengguna mengisi nama, kontak, password, konfirmasi password, serta persetujuan Ketentuan dan Kebijakan Privasi.
+4. Backend menormalisasi kontak, memeriksa reservasi identifier, menerapkan rate limit, dan membuat akun berstatus `pending_verification`.
+5. Backend membuat sesi verifikasi dan challenge OTP dengan tujuan yang dilindungi enkripsi serta fingerprint HMAC.
+6. Provider mengirim kode melalui Resend (email) atau FlowKirim (WhatsApp) setelah kelayakan pengiriman dicatat secara atomik.
+7. Pengguna memasukkan OTP. Backend memverifikasi kode, expiry, status challenge, limit percobaan, serta status akun dalam transaksi.
+8. Setelah OTP valid, akun diaktifkan dan timestamp verifikasi kontak dicatat secara atomik.
+9. Pengguna melanjutkan onboarding Owner atau Investor.
 
-- Pengguna memilih satu identifier awal: email atau nomor telepon.
-- Pengguna menetapkan password dan menyetujui Ketentuan serta Kebijakan Privasi.
-- Akun dapat dibuat dan diaktifkan tanpa memasukkan kode OTP.
-- Kontak yang belum dibuktikan kepemilikannya harus tetap ditandai belum terverifikasi. Jangan mengisi `email_verified_at`, `phone_verified_at`, atau `initial_contact_verified_at` hanya karena pengguna mengetik suatu alamat/nomor.
-- Kontak yang belum terverifikasi tidak boleh dipakai sebagai bukti kepemilikan untuk pemulihan akun, perubahan kredensial, atau tindakan berisiko tinggi.
-- Perubahan kontak utama tetap memerlukan pembuktian kepemilikan atas kontak baru sebelum nilai tersebut menggantikan kontak aktif.
+Kegagalan atau timeout provider tidak boleh mengaktifkan akun. Respons publik untuk konflik identifier harus generik dan tidak menjadi oracle enumerasi akun.
 
-### Google OAuth
+## 4. Alur Google OAuth
 
-- Untuk akun baru, role dipilih sebelum OAuth dan disimpan pada state server yang singkat, sekali pakai, serta terlindung dari CSRF/replay.
+- Pengguna memilih Owner atau Investor sebelum memulai OAuth.
+- State OAuth singkat, sekali pakai, terikat pada role, dan terlindung dari CSRF/replay.
 - Identitas Google dikenali melalui stable provider subject, bukan alamat email.
 - Validasi issuer, audience/client ID, signature, expiry, state, nonce, redirect URI, dan subject wajib dilakukan.
-- Klaim email dari Google tidak boleh dianggap terverifikasi kecuali token tervalidasi menyatakan `email_verified=true`. Klaim ini hanya membuktikan status email menurut penyedia pada saat autentikasi; jangan menggunakannya untuk menggabungkan akun.
-- Jika email Google cocok dengan akun lokal yang sudah ada, jangan membuat tautan otomatis atau menggabungkan akun. Pengguna harus masuk ke akun yang ada dan menjalankan proses pengaitan eksplisit dengan autentikasi ulang.
-- Akun Google-only tetap dapat login melalui identitas Google yang sudah terhubung walaupun tidak memiliki password lokal.
+- Klaim email hanya dianggap terverifikasi bila token tervalidasi menyatakan `email_verified=true`.
+- Pendaftaran Google tidak meminta OTP tambahan. Jika email provider tidak terverifikasi, jangan perlakukan email sebagai kontak terverifikasi atau izinkan email itu menjadi kanal pemulihan.
+- Identitas Google yang sudah terhubung hanya dapat masuk ke akun yang sama. Jangan menghubungkan atau menggabungkan akun otomatis hanya karena email cocok.
+- Pengaitan identitas ke akun lokal yang sudah ada memerlukan autentikasi ulang dan bukti kendali atas kedua identitas.
+- Admin tidak dapat didaftarkan melalui OAuth publik.
 
-### Risiko identifier yang belum diverifikasi
+## 5. Login
 
-Tanpa pembuktian kontak saat pendaftaran, seseorang dapat mencoba mendaftarkan email/nomor milik orang lain dan menahan identifier tersebut. Ini adalah trade-off nyata dari keputusan tanpa OTP, bukan risiko yang hilang hanya karena login memakai password.
+- Akun password: email atau nomor telepon + password.
+- Akun Google-only: Google OAuth.
+- Tidak ada OTP rutin pada login biasa.
+- MFA Admin tetap wajib sesuai kebijakan akses Admin dan tidak diturunkan oleh keputusan ini.
+- Terapkan rate limit login, perlindungan brute-force/credential stuffing, respons generik, sesi server-side, cookie aman, CSRF/origin checks, TLS, dan audit event.
 
-- Terapkan rate limit dan deteksi pola registrasi massal/penyalahgunaan berdasarkan sinyal yang proporsional dan minim data.
-- Pertahankan respons generik agar sistem tidak membocorkan apakah identifier digunakan akun lain.
-- Jangan mengirim notifikasi yang mengungkap data akun atau mengizinkan pengambilalihan melalui dukungan tanpa pemeriksaan kepemilikan.
-- Rancang prosedur pelepasan reservasi dan penanganan klaim identifier yang aman sebelum pendaftaran publik dibuka luas.
-- Threat model dan uji penyalahgunaan harus secara eksplisit mengevaluasi account squatting. Jika mitigasinya tidak memadai, metode pembuktian alternatif (misalnya tautan verifikasi, bukan OTP) harus dibahas sebagai keputusan produk terpisah sebelum produksi.
+## 6. Provider OTP dan batas penggunaannya
 
-## 4. Batas pemulihan akun pada tahap pertama
+Provider awal untuk demonstrasi kompetisi:
+- **Resend** untuk email OTP.
+- **FlowKirim** untuk WhatsApp OTP.
 
-- Password reset harus menggunakan token acak, sekali pakai, kedaluwarsa, disimpan dalam bentuk hash, dan dikirim melalui kanal yang telah dibuktikan kepemilikannya.
-- Kontak yang belum terverifikasi tidak boleh menjadi tujuan pemulihan yang dipercaya.
-- Akun yang hanya memiliki nomor telepon belum terverifikasi tidak boleh menerima pemulihan melalui nomor tersebut. Sediakan jalur pemulihan yang aman setelah kanal verifikasi tersedia; jangan membuat bypass manual yang tidak diaudit.
-- Akun Google-only dapat memulihkan akses melalui proses pemulihan akun Google. Jangan membuat password lokal otomatis.
-- Jika kanal pemulihan yang aman belum tersedia, fitur reset untuk akun tersebut harus dinyatakan belum tersedia dan diarahkan ke proses bantuan yang memiliki pemeriksaan kepemilikan serta audit; jangan mengirim token ke alamat yang belum diverifikasi.
-- Recovery contact bersama tetap mengikuti kebijakan yang sudah disetujui dan harus diverifikasi secara terpisah sebelum dipakai.
+Provider merupakan adapter yang dapat diganti; business logic OTP tetap berada di backend Rust. Resend hanya mengirim email: backend membuat kode, menyimpan keyed hash, mengelola expiry/attempt/rate limit, dan memverifikasi OTP. FlowKirim diperlakukan sebagai provider pihak ketiga eksperimental untuk kebutuhan demonstrasi, bukan jaminan produksi atau jalur resmi Meta.
 
-## 5. Kontrol keamanan yang tetap wajib
+Ketentuan:
+- API key/token hanya di secret/environment server, tidak di frontend, repository, log, atau database.
+- Gunakan nomor demonstrasi dan penerima yang menyetujui pengiriman.
+- Jangan kirim password, token sesi, atau informasi sensitif lain melalui pesan.
+- Catat ID pesan, status dispatch, dan kategori kegagalan tanpa menyimpan OTP plaintext.
+- Provider timeout dengan hasil tidak pasti dicatat sebagai `unknown`; jangan mengembalikan kuota secara otomatis.
+- Siapkan provider mock untuk CI; tes tidak mengirim pesan nyata.
+- Free tier, kuota, watermark, masa token, serta ketentuan provider harus diverifikasi ulang sebelum demo karena dapat berubah.
 
-Penundaan OTP tidak menunda kontrol berikut:
+## 7. Batas pemulihan akun dan perubahan kontak
 
-- Rate limit registrasi dan login serta perlindungan brute-force/credential stuffing.
-- Respons yang tidak membocorkan keberadaan akun.
-- Hash password Argon2id dengan parameter yang diukur pada lingkungan deployment.
-- Sesi server-side opaque, penyimpanan hash token, rotasi, expiry, dan pencabutan.
-- Cookie `Secure`, `HttpOnly`, `SameSite`, perlindungan CSRF, pemeriksaan origin, dan TLS.
-- RBAC + ABAC, least privilege, deny-by-default, dan pemeriksaan kepemilikan objek di backend.
-- Audit event untuk registrasi, login, kegagalan autentikasi, pengaitan/pemutusan Google, reset password, dan tindakan sensitif.
-- Notifikasi keamanan untuk peristiwa penting sesuai kebijakan.
-- MFA Admin tetap wajib sebelum akses Admin produksi; penundaan OTP untuk pengguna klien tidak menghapus kewajiban MFA Admin.
+- OTP tetap menjadi mekanisme pembuktian kontak untuk recovery dan perubahan kontak sesuai kebijakan yang disetujui.
+- Recovery contact email/telepon yang dapat dipakai bersama beberapa akun tetap memerlukan verifikasi terpisah dan pemeriksaan kepemilikan akun sasaran; possession saja tidak membuktikan kepemilikan akun.
+- Reset password hanya dikirim ke kanal pemulihan yang telah diverifikasi.
+- Jangan membuat bypass manual yang tidak diaudit.
+- Rate limit OTP berlaku lintas sesi dan purpose; membuat sesi baru tidak boleh mengatur ulang anggaran percobaan atau pengiriman.
 
-## 6. Konsekuensi terhadap skema yang sudah ada
+## 8. Konsekuensi terhadap skema
 
-Migration Identity Core 0001 saat ini mengikat aktivasi akun pada verifikasi kontak awal, status `pending_verification`, dan deadline 30 menit. Constraint tersebut **belum sesuai** dengan keputusan autentikasi tahap pertama ini.
+Migration 0001–0005 tidak boleh diedit setelah merge. Migration 0001 memodelkan akun `pending_verification` dan aktivasi setelah verifikasi kontak. Migration 0002 menyediakan sesi, challenge, event pengiriman, dan event percobaan untuk kanal `email` dan `whatsapp`.
 
-Migration 0001–0005 yang sudah ada tidak diubah dalam keputusan ini. Sebelum runtime registrasi/login diimplementasikan, diperlukan audit dan migration lanjutan yang diuji untuk:
+**Temuan audit konkret:** fungsi `public.create_client_user` pada migration 0001 selalu membuat akun `pending_verification` dengan `pending_expires_at` 30 menit, termasuk ketika `p_google_subject` diberikan. Fungsi tersebut tidak mengisi `email_verified_at` atau `initial_contact_verified_at`. Karena itu, Google OAuth tanpa OTP belum dapat langsung menghasilkan akun aktif melalui fungsi yang ada. Akun Google-only juga tidak boleh sekadar dilewatkan ke aktivasi OTP karena tidak ada challenge registrasi. Diperlukan desain dan migration lanjutan (tanpa mengubah migration lama) untuk jalur pembuatan akun Google yang memvalidasi provider, mengikat stable subject, menetapkan status/verifikasi email yang benar, dan tetap menjaga invariant akun serta role. Sampai migration dan tes itu tersedia, Google OAuth tanpa OTP adalah keputusan produk, belum didukung oleh skema runtime saat ini.
 
-1. Mengizinkan akun email/telepon + password dibuat langsung aktif tanpa mengisi timestamp verifikasi kontak.
-2. Mempertahankan status verifikasi kontak sebagai fakta terpisah dari status aktif akun.
-3. Menyesuaikan trigger, fungsi `create_client_user`, invariant kontak, cleanup, dan pengujian PostgreSQL yang saat ini mengasumsikan registrasi pending.
-4. Mempertahankan keunikan/reservasi identifier dan mencegah race saat dua registrasi memakai identifier yang sama.
-5. Memastikan akun Google baru tetap dibuat dalam transaksi dengan role yang dipilih dan identitas provider subject yang unik.
-6. Memastikan akun terminal tidak menyisakan kredensial atau identitas provider yang tidak semestinya.
+Sebelum runtime dibuat, audit harus memastikan:
+1. Fungsi `create_client_user` dan trigger mendukung jalur password pending serta jalur Google OAuth tanpa OTP secara benar.
+2. Akun Google dengan `email_verified=true` memiliki representasi kontak/lifecycle yang konsisten dan tidak memerlukan challenge registrasi.
+3. Constraint akun, provider identity, serta trigger aktivasi tidak memungkinkan bypass OTP pada akun password.
+4. Fungsi verifikasi mengaktifkan akun hanya setelah challenge registrasi yang tepat berhasil.
+5. Batas waktu pending 30 menit, expiry challenge 10 menit, cooldown resend 60 detik, maksimal lima pengiriman per kontak per 60 menit, maksimal lima kegagalan per kontak per 60 menit, dan lock satu jam ditegakkan konsisten.
+6. Tes PostgreSQL mencakup email OTP, WhatsApp OTP, Google OAuth tanpa OTP, role wajib, race identifier, resend, expiry, lock, dan kegagalan provider.
 
-Jangan mengubah migration lama yang mungkin sudah diterapkan pada lingkungan bersama. Gunakan migration baru yang eksplisit dan strategi transisi data bila ternyata ada database yang telah memakai migration lama. Database produksi saat ini belum diprovisikan/menerapkan migration menurut status repository terakhir.
+Jika penyesuaian skema diperlukan, buat migration baru dan tes transisi; jangan mengubah migration lama. Migration/bootstrap produksi belum diterapkan dan tidak boleh dijalankan sebagai bagian dari pekerjaan dokumentasi.
 
-## 7. Tahapan berikutnya
+## 9. Di luar keputusan ini
 
-1. Selaraskan spesifikasi produk, wireframe, rancangan autentikasi, dan tinjauan skema dengan keputusan ini.
-2. Rancang kontrak API dan threat model untuk password login serta Google OAuth.
-3. Rancang migration lanjutan dan tes PostgreSQL sebelum implementasi runtime.
-4. Implementasikan autentikasi dan uji negatif/positif pada staging serta lingkungan demo juri.
-5. Tambahkan verifikasi kontak/OTP pada tahap berikutnya tanpa mengubah OTP menjadi metode login utama.
-
-## 8. Di luar keputusan ini
-
-Keputusan ini tidak memilih penyedia email, SMS, WhatsApp, Google client configuration, secret manager, atau KMS. Keputusan ini juga tidak mengaktifkan autentikasi, menjalankan migration, mengubah database produksi, atau melakukan deployment.
+Keputusan ini tidak mengaktifkan endpoint/runtime, tidak mengirim pesan nyata, tidak memprovisikan credential provider, tidak menjalankan migration pada database, dan tidak melakukan deployment.

@@ -165,7 +165,7 @@ Konten:
 
 ### Field formulir dan perilaku
 
-- Login menerima email atau nomor telepon yang terdaftar beserta kata sandi akun. OTP tidak digunakan untuk registrasi maupun login tahap pertama. Kontak yang belum diverifikasi tidak boleh dianggap sebagai bukti kepemilikan untuk pemulihan atau tindakan sensitif.
+- Login menerima email atau nomor telepon yang terdaftar beserta kata sandi akun. OTP tidak digunakan untuk login rutin. Untuk pendaftaran email/WhatsApp + password, OTP wajib diverifikasi sebelum akun aktif.
 - Field kata sandi dengan kontrol tampil/sembunyi.
 - Tautan lupa kata sandi.
 - Opsi ingat perangkat/sesi hanya boleh ditampilkan jika kebijakan sesi backend mendukungnya dengan aman; jangan memberi kesan sesi berlaku permanen.
@@ -218,18 +218,17 @@ Pertahankan tata letak visual yang konsisten agar kedua halaman terasa sebagai s
 
 - Nama lengkap.
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
-- Pendaftaran email/telepon menggunakan kontak yang dipilih dan wajib memakai kata sandi serta konfirmasi.
-- OTP tidak diminta saat membuat akun atau login. Kontak awal disimpan sebagai belum terverifikasi sampai fitur verifikasi kontak tersedia.
-- Pendaftaran Google tidak meminta kata sandi lokal terpisah.
+- Pendaftaran email/WhatsApp menggunakan kontak yang dipilih, kata sandi, dan konfirmasi.
+- Setelah data akun divalidasi, backend mengirim OTP melalui email atau WhatsApp sesuai kanal pilihan. Akun berstatus pending sampai OTP valid.
+- Pendaftaran Google tidak meminta kata sandi lokal atau OTP tambahan.
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
 **Konfirmasi — Akun dibuat**
 
-- Setelah data akun dan persetujuan tervalidasi, akun dapat dibuat tanpa OTP.
-- Kontak awal tetap berstatus belum terverifikasi; jangan menampilkan badge terverifikasi.
-- Jelaskan bahwa pembuktian kontak dan OTP akan tersedia pada tahap berikutnya.
-- Jangan izinkan kontak yang belum terverifikasi digunakan sebagai bukti pemulihan atau perubahan kredensial.
+- Setelah data akun dan persetujuan tervalidasi, akun dibuat dalam status pending dan OTP dikirim ke kanal pilihan.
+- Akun baru aktif setelah OTP valid. Tampilkan status pengiriman, masa berlaku, cooldown resend, dan jalur ubah kontak yang aman.
+- Jangan tampilkan badge terverifikasi sebelum backend mengonfirmasi keberhasilan.
 
 **Langkah 2 — Tahap usaha**
 
@@ -263,15 +262,15 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 - Nama lengkap.
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
-- Pendaftaran email/telepon tidak meminta OTP pada tahap pertama. Kontak awal tetap ditandai belum terverifikasi.
-- Pendaftaran dengan email/telepon wajib memakai kata sandi dan field konfirmasi.
+- Pendaftaran email/WhatsApp wajib memakai kata sandi dan field konfirmasi.
+- OTP wajib diverifikasi sebelum akun aktif; kanal mengikuti kontak awal yang dipilih.
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
 **Konfirmasi — Akun dibuat**
 
-- Akun dibuat setelah data dan persetujuan tervalidasi, tanpa OTP.
-- Kontak yang belum diverifikasi tidak dapat dipakai sebagai bukti pemulihan atau tindakan sensitif.
+- Akun tetap pending sampai OTP pada kanal pilihan berhasil diverifikasi.
+- Setelah berhasil, backend mengaktifkan akun dan mencatat timestamp verifikasi kontak.
 
 **Langkah 2 — Profil Investor**
 
@@ -292,7 +291,7 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 - Google OAuth tetap tersedia untuk login dan pendaftaran.
 - Sebelum memulai pendaftaran Google, pengguna harus memilih Owner atau Investor secara eksplisit; pilihan tersebut diikat ke state OAuth di server. Pendaftaran Google tidak meminta kata sandi lokal terpisah.
-- Untuk pendaftaran Google baru, role Owner/Investor wajib dipilih sebelum OAuth dan diikat ke state server. Tidak ada OTP tambahan. Identitas Google menggunakan stable subject; klaim email hanya ditandai terverifikasi bila token tervalidasi menyatakan `email_verified=true`.
+- Untuk pendaftaran Google baru, role Owner/Investor wajib dipilih sebelum OAuth dan diikat ke state server. Tidak diperlukan OTP tambahan jika identitas Google tervalidasi dan klaim email menyatakan `email_verified=true`. Identitas Google menggunakan stable subject; klaim email hanya ditandai terverifikasi bila token tervalidasi menyatakan `email_verified=true`.
 - Identitas Google yang sudah terhubung hanya dapat masuk ke akun yang sudah ada. Role utama akun tetap dan menentukan portal yang benar.
 - Jangan menghubungkan identitas secara otomatis hanya karena email cocok. Pengaitan memerlukan bukti kendali terbaru atas kedua identitas.
 - Pendaftaran Admin tidak pernah tersedia melalui Google OAuth publik.

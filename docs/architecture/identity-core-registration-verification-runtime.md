@@ -1,23 +1,23 @@
 # Desain Runtime Registrasi dan Verifikasi Identity Core
 
-> **Status: ditunda.** Dokumen ini adalah rancangan untuk tahap verifikasi kontak/OTP berikutnya dan **bukan** kontrak runtime tahap pertama. Keputusan terbaru menggunakan email/telepon + password atau Google OAuth tanpa OTP saat registrasi/login. Jangan implementasikan alur pending-verification/OTP di dokumen ini sebagai syarat registrasi tahap pertama. Sebelum runtime password/Google dibuat, selaraskan skema melalui migration lanjutan. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+> **Status: rancangan untuk implementasi berikutnya.** OTP wajib untuk pendaftaran menggunakan email/WhatsApp + password. Google OAuth merupakan jalur alternatif tanpa OTP tambahan bila identitas Google tervalidasi dan email dinyatakan verified. Login rutin menggunakan password atau Google OAuth tanpa OTP.
 
 > **Status nama produk:** Nama produk belum final. Nama yang pernah digunakan di repository hanya working title dan dapat diganti. Dokumen ini menggunakan istilah netral seperti *aplikasi*, *platform*, dan *layanan* agar keputusan teknis tidak mengikat identitas merek.
 
-- Status: rancangan teknis tahap verifikasi kontak/OTP yang ditunda
+- Status: rancangan teknis verifikasi OTP untuk pendaftaran password dan verifikasi kontak lainnya
 - Cakupan: verifikasi kontak, penerbitan OTP, aktivasi/verifikasi tambahan, dan audit; bukan registrasi/login tahap pertama
 - Basis: Identity Core migration 0001–0005 dan kebijakan registrasi/OTP yang telah disetujui
 - Bukan: persetujuan migration database produksi, provisioning credential produksi, atau deployment
 
 ## 1. Tujuan dan prinsip
 
-Runtime tahap berikutnya harus menyelesaikan verifikasi kontak Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi tahap pertama tidak menunggu verifikasi kontak/OTP.
+Runtime tahap berikutnya harus menyelesaikan verifikasi kontak Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi email/WhatsApp + password menunggu verifikasi OTP sebelum aktivasi. Pendaftaran Google OAuth yang lolos validasi provider tidak memerlukan OTP tambahan.
 
 Prinsip wajib:
 1. Backend menjadi sumber kebenaran untuk validasi, role, status akun, expiry, limit, dan aktivasi.
 2. Registrasi publik hanya menerima `business_owner` atau `investor`; Admin tidak dibuat melalui jalur ini.
-3. Akun baru berstatus `pending_verification`, berlaku maksimal 30 menit, dan belum dapat login atau memakai fitur akun aktif.
-4. Aktivasi hanya terjadi setelah challenge yang tepat berhasil diverifikasi dan seluruh syarat database terpenuhi.
+3. Pendaftaran password membuat akun `pending_verification`, berlaku maksimal 30 menit, dan belum dapat login atau memakai fitur akun aktif sampai OTP valid. Jalur Google OAuth yang tervalidasi mengikuti pengecualian tanpa OTP.
+4. Aktivasi akun password hanya terjadi setelah challenge registrasi yang tepat berhasil diverifikasi dan seluruh syarat database terpenuhi. Google OAuth dapat membuat akun aktif melalui operasi terpisah yang memvalidasi token dan email_verified.
 5. Pembuatan akun, sesi verifikasi, dan audit awal harus atomik.
 6. Challenge OTP hanya dapat dipakai sekali; resend menggantikan challenge lama.
 7. Penghitung dan batas lintas sesi disimpan serta diserialisasi di PostgreSQL, bukan hanya di memori proses.
@@ -56,10 +56,12 @@ Parameter final harus diuji dengan benchmark pada lingkungan runtime sasaran. Ja
 ### 2.3 Pembuatan akun pending
 
 Dalam satu transaksi PostgreSQL:
-1. Panggil fungsi terkontrol `create_client_user`.
-2. Buat `verification_sessions` dengan `purpose='registration'`, `user_id` wajib, kanal sesuai kontak awal, tujuan terenkripsi, fingerprint HMAC, dan expiry tidak melewati `users.pending_expires_at`.
+1. Panggil fungsi terkontrol `create_client_user` untuk akun password dengan role yang diizinkan dan status pending.
+2. Buat `verification_sessions` dengan `purpose='registration'`, `user_id` wajib, kanal email atau WhatsApp sesuai kontak awal, tujuan terenkripsi, fingerprint HMAC, dan expiry tidak melewati `users.pending_expires_at`.
 3. Buat audit event `identity.registration.requested`.
 4. Commit seluruh perubahan bersama-sama.
+
+Pendaftaran Google OAuth tidak membuat sesi OTP registrasi. Jalur itu harus memvalidasi token provider, state/nonce, stable subject, serta email_verified sebelum membuat akun dan identitas Google dalam transaksi atomik; role tetap wajib dipilih dan terikat ke state. **Migration 0001 saat ini belum mendukung hasil akhir tersebut:** `create_client_user` selalu membuat status pending dan tidak merekam email_verified. Buat migration lanjutan dan tes terpisah sebelum mengaktifkan jalur Google tanpa OTP.
 
 Jika satu langkah gagal, seluruh transaksi rollback. Unique reservation kontak utama tetap menjadi pengaman race antarregistrasi.
 
@@ -75,7 +77,7 @@ Penerbitan challenge dan kuota pengiriman direservasi atomik sebelum memanggil p
 7. Commit, lalu panggil adapter provider di luar transaksi.
 8. Catat hasil dispatch sebagai `accepted`, `failed`, atau `unknown`.
 
-Timeout provider yang hasilnya tidak diketahui diperlakukan sebagai `unknown`; kuota tidak dikembalikan otomatis. Retry harus punya identitas operasi/idempotency yang jelas dan tidak membuat challenge aktif ganda. Provider email/WhatsApp, sender, template, biaya, retry policy, dan fallback belum dipilih. Fake provider hanya untuk tes; jangan mengirim OTP nyata sebelum provider resmi dikonfigurasi.
+Timeout provider yang hasilnya tidak diketahui diperlakukan sebagai `unknown`; kuota tidak dikembalikan otomatis. Retry harus punya identitas operasi/idempotency yang jelas dan tidak membuat challenge aktif ganda. Provider demonstrasi yang dipilih untuk dievaluasi adalah Resend (email) dan FlowKirim (WhatsApp). Adapter provider harus tetap dapat diganti. Biaya/free-tier, sender, template, retry policy, dan batas provider harus diverifikasi sebelum demo; CI memakai mock provider dan tidak mengirim pesan nyata. Fake provider hanya untuk tes; jangan mengirim OTP nyata sebelum provider resmi dikonfigurasi.
 
 ### 2.5 Verifikasi dan aktivasi
 
