@@ -1,7 +1,7 @@
 # Keputusan Autentikasi Identity Core — Password dan OTP
 
 > Cakupan: registrasi, login, verifikasi kontak, pemulihan akun, dan provider OTP.
-> Status implementasi: login password Owner/Investor dan logout tersedia pada runtime; middleware sesi untuk endpoint terproteksi, registrasi HTTP publik, dan provider OTP nyata belum diaktifkan.
+> Status implementasi: login password Owner/Investor, validasi sesi pada endpoint identitas, refresh/rotasi token, logout, dan logout semua perangkat tersedia; registrasi HTTP publik, penerapan middleware ke endpoint fitur, dan provider OTP nyata belum diaktifkan.
 
 ## 1. Keputusan autentikasi
 
@@ -39,7 +39,7 @@ Kegagalan atau timeout provider tidak boleh mengaktifkan akun. Respons publik un
 
 - Pengguna masuk menggunakan email atau nomor telepon + password.
 - Login rutin tidak meminta OTP.
-- Terapkan Argon2id, rate limit PostgreSQL berbasis HMAC (10 percobaan per identifier dan 30 per IP dalam 15 menit), perlindungan brute-force/credential stuffing, respons generik, sesi server-side 30 hari dengan idle limit 7 hari, cookie `__Host-` HttpOnly/Secure/SameSite=Lax, TLS, dan audit event. Middleware untuk validasi sesi pada endpoint terproteksi serta CSRF/origin checks untuk operasi state-changing masih harus diselesaikan sebelum fitur akun lain dibuka.
+- Terapkan Argon2id, rate limit PostgreSQL berbasis HMAC (10 percobaan per identifier dan 30 per IP dalam 15 menit), perlindungan brute-force/credential stuffing, respons generik, sesi server-side 30 hari dengan idle limit 7 hari, cookie `__Host-` HttpOnly/Secure/SameSite=Lax, TLS, dan audit event. Middleware validasi sesi, pembaruan idle timeout, dan rotasi token tersedia pada endpoint identitas. Endpoint state-changing menolak Fetch Metadata cross-site; kebijakan CSRF/origin lengkap untuk API fitur tetap harus diterapkan sebelum fitur akun lain dibuka.
 - Ketidaksesuaian role ditangani backend; role tidak dapat diganti dari halaman login.
 
 ## 5. Provider OTP
@@ -75,4 +75,4 @@ Migration 0006 harus gagal secara aman bila masih ada baris identitas provider y
 
 ## 8. Hal yang belum diaktifkan
 
-Router registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Login password Owner/Investor dan logout sudah dipasang pada aplikasi HTTP utama; aktivasi production tetap memerlukan konfigurasi `AUTH_RATE_LIMIT_HMAC_KEY` dan penerapan migration secara terpisah. Middleware sesi untuk endpoint terproteksi, provider OTP nyata, credential provider, key OTP produksi, dan deployment belum aktif. Setiap aktivasi fitur berikutnya harus melalui audit, pengujian PostgreSQL, CI, dan tinjauan keamanan.
+Router registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Login password Owner/Investor dan logout sudah dipasang pada aplikasi HTTP utama; aktivasi production tetap memerlukan konfigurasi `AUTH_RATE_LIMIT_HMAC_KEY` dan penerapan migration secara terpisah. Penerapan middleware sesi pada endpoint fitur, kebijakan CSRF/origin lengkap, provider OTP nyata, credential provider, key OTP produksi, dan deployment belum aktif. Setiap aktivasi fitur berikutnya harus melalui audit, pengujian PostgreSQL, CI, dan tinjauan keamanan.
