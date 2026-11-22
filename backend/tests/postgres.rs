@@ -1233,7 +1233,7 @@ async fn assert_otp_resend_during_verification_lock(pool: &PgPool) {
     let session_id: String = sqlx::query_scalar(
         "SELECT public.create_registration_verification_session(\
             $1::uuid, $2::uuid, 'email', $3, $4, 'enc-v1', $5, 'hmac-v1', \
-            clock_timestamp() + INTERVAL '10 minutes')::text",
+            clock_timestamp() + INTERVAL '9 minutes')::text",
     )
     .bind("66666666-6666-4666-8666-666666666666")
     .bind(&user_id)
