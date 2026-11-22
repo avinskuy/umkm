@@ -73,4 +73,4 @@ Tes harus membuktikan aplikasi dapat memanggil fungsi pembuatan akun dan menulis
 
 ## 8. Belum termasuk
 
-Provisioning ini tidak mengaktifkan HTTP database startup, endpoint autentikasi, login/session runtime, OTP provider, Admin console, backup scheduler, monitoring exporter, rotasi password otomatis, RLS policy domain, production migration, atau deployment. Hak baca audit untuk Admin dan grant CRUD domain harus ditinjau secara terpisah.
+Skrip provisioning ini tidak menjalankan aplikasi atau mengubah konfigurasi HTTP runtime. Integrasi pool PostgreSQL pada HTTP startup sudah tersedia, tetapi hanya dapat digunakan setelah principal dan connection string disiapkan sesuai prosedur. Provisioning ini juga tidak mengaktifkan endpoint autentikasi, login/session runtime, OTP provider, Admin console, backup scheduler, monitoring exporter, rotasi password otomatis, RLS policy domain, migration production, atau deployment. Hak baca audit untuk Admin dan grant CRUD domain harus ditinjau secara terpisah.
