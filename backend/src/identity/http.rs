@@ -112,6 +112,38 @@ fn valid_version(value: &str) -> bool {
         && !value.chars().any(char::is_whitespace)
 }
 
+fn valid_contact_input(
+    channel: ContactChannel,
+    email: Option<&str>,
+    phone: Option<&str>,
+) -> bool {
+    match channel {
+        ContactChannel::Email => match (email, phone) {
+            (Some(email), None) => {
+                let email = email.trim();
+                let mut parts = email.split('@');
+                let local = parts.next().unwrap_or_default();
+                let domain = parts.next().unwrap_or_default();
+                email.len() <= 254
+                    && !local.is_empty()
+                    && !domain.is_empty()
+                    && parts.next().is_none()
+                    && !email.chars().any(char::is_whitespace)
+            }
+            _ => false,
+        },
+        ContactChannel::Phone => match (email, phone) {
+            (None, Some(phone)) => {
+                let digits = phone.trim().strip_prefix('+').unwrap_or_default();
+                (8..=15).contains(&digits.len())
+                    && digits.bytes().all(|byte| byte.is_ascii_digit())
+                    && !digits.starts_with('0')
+            }
+            _ => false,
+        },
+    }
+}
+
 #[derive(Clone)]
 pub struct RegistrationApiState {
     pool: PgPool,
@@ -245,13 +277,25 @@ async fn register(
         return error(StatusCode::BAD_REQUEST, "Nama tampilan tidak valid.");
     }
 
+    let role = match request.role.as_str() {
+        "business_owner" => ClientRole::BusinessOwner,
+        "investor" => ClientRole::Investor,
+        _ => return error(StatusCode::BAD_REQUEST, "Role pendaftaran tidak valid."),
+    };
+
+    let channel = match request.contact_channel.as_str() {
+        "email" => ContactChannel::Email,
+        "whatsapp" => ContactChannel::Phone,
+        _ => return error(StatusCode::BAD_REQUEST, "Kanal verifikasi tidak valid."),
+    };
+    if !valid_contact_input(channel, request.email.as_deref(), request.phone.as_deref()) {
+        return error(StatusCode::BAD_REQUEST, "Kontak pendaftaran tidak valid.");
+    }
+
     let password = Zeroizing::new(request.password);
     let confirmation = Zeroizing::new(request.password_confirmation);
     if password.is_empty() || password.as_str() != confirmation.as_str() {
         return error(StatusCode::BAD_REQUEST, "Password tidak valid atau konfirmasi tidak cocok.");
-    }
-    if !state.password_policy.accepts(password.as_str()) {
-        return error(StatusCode::BAD_REQUEST, "Password belum memenuhi ketentuan keamanan.");
     }
     if request.marketing_consent && state.policy_versions.marketing_notice.is_none() {
         return error(
@@ -268,6 +312,10 @@ async fn register(
         return response;
     }
 
+    if !state.password_policy.accepts(password.as_str()) {
+        return error(StatusCode::BAD_REQUEST, "Password belum memenuhi ketentuan keamanan.");
+    }
+
     let password_hash = match tokio::task::spawn_blocking(move || hash_password(password.as_bytes()))
         .await
     {
@@ -278,18 +326,6 @@ async fn register(
                 "Pendaftaran sementara tidak dapat diproses.",
             );
         }
-    };
-
-    let role = match request.role.as_str() {
-        "business_owner" => ClientRole::BusinessOwner,
-        "investor" => ClientRole::Investor,
-        _ => return error(StatusCode::BAD_REQUEST, "Role pendaftaran tidak valid."),
-    };
-
-    let channel = match request.contact_channel.as_str() {
-        "email" => ContactChannel::Email,
-        "whatsapp" => ContactChannel::Phone,
-        _ => return error(StatusCode::BAD_REQUEST, "Kanal verifikasi tidak valid."),
     };
 
     let registration = ClientRegistration {
@@ -471,6 +507,30 @@ mod tests {
             versions.marketing_notice.as_deref(),
             Some("marketing-2026-12-v1")
         );
+    }
+
+    #[test]
+    fn contact_input_must_match_the_selected_channel() {
+        assert!(valid_contact_input(
+            ContactChannel::Email,
+            Some(" user@example.test "),
+            None
+        ));
+        assert!(!valid_contact_input(
+            ContactChannel::Email,
+            Some("user@example.test"),
+            Some("+628123456789")
+        ));
+        assert!(valid_contact_input(
+            ContactChannel::Phone,
+            None,
+            Some("+628123456789")
+        ));
+        assert!(!valid_contact_input(
+            ContactChannel::Phone,
+            None,
+            Some("08123456789")
+        ));
     }
 
     #[test]
