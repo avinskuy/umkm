@@ -316,7 +316,7 @@ BEGIN
 
     RETURN TRUE;
 END;
-$;
+$$;
 
 REVOKE ALL ON TABLE public.account_recovery_case_signals FROM PUBLIC;
 REVOKE ALL ON TABLE public.account_recovery_review_decisions FROM PUBLIC;
