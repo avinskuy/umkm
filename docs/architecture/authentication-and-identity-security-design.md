@@ -14,9 +14,9 @@ Dokumen ini menjelaskan arsitektur autentikasi USahapintar. Migration Identity C
 - Pendaftaran publik hanya tersedia untuk Business Owner dan Investor.
 - Setiap akun hanya memiliki satu role utama klien yang tetap (`business_owner` atau `investor`).
 - Jalur login Owner dan Investor dipisahkan.
-- Pendaftaran melalui email/telepon menggunakan login berbasis kata sandi. Pendaftaran Google OAuth tidak memerlukan kata sandi lokal terpisah dan menggunakan identitas Google yang terhubung untuk autentikasi. Kode verifikasi email/WhatsApp hanya untuk aktivasi akun/verifikasi kontak dan tidak pernah menggantikan kata sandi atau autentikasi Google saat login.
+- Tahap pertama menyediakan email atau nomor telepon + password serta Google OAuth sebagai alternatif. OTP tidak menjadi syarat registrasi maupun login; implementasinya ditunda. Kontak yang belum diverifikasi tidak boleh diperlakukan sebagai bukti kepemilikan untuk pemulihan atau tindakan sensitif.
 - Kontak awal pendaftaran dipilih salah satu: email atau telepon/WhatsApp.
-- Google OAuth tetap digunakan untuk login dan pendaftaran, tetapi tidak melewati pemilihan role atau verifikasi kode pendaftaran melalui email/WhatsApp yang terpisah.
+- Google OAuth tetap tersedia untuk login dan pendaftaran. Untuk akun baru, pemilihan role Owner/Investor wajib dilakukan sebelum OAuth dan diikat ke state server. Tidak ada OTP tambahan pada tahap pertama.
 - Password recovery.
 - Siklus hidup sesi dan logout.
 - Otorisasi role dan sumber daya di sisi server.
@@ -78,6 +78,8 @@ Otorisasi dievaluasi dengan urutan berikut:
 Jangan menerapkan otorisasi sebagai kondisi frontend yang tersebar. Gunakan extractor/middleware backend bersama dan fungsi kebijakan pada tingkat domain, disertai pengujian.
 
 ## 3. Rancangan model data
+
+> **Catatan keselarasan keputusan 22 November 2026:** Migration 0001 saat ini masih mewajibkan status `pending_verification` dan bukti verifikasi kontak awal sebelum akun menjadi `active`. Ketentuan tersebut belum sesuai dengan autentikasi tahap pertama yang mengizinkan registrasi tanpa OTP. Jangan menganggap runtime dapat memakai skema sekarang tanpa penyesuaian. Sebelum runtime dibuat, siapkan migration lanjutan yang diuji untuk mengizinkan akun langsung aktif dengan kontak berstatus belum terverifikasi, tanpa mengubah migration lama. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
 
 PostgreSQL 16 merupakan dasar database relasional. Migration SQLx Identity Core 0001–0005 untuk akun, verifikasi, sesi, recovery, dan audit sudah tersedia serta tercakup dalam pengujian integrasi PostgreSQL. HTTP server menginisialisasi pool database saat startup melalui principal aplikasi; migration tetap dijalankan secara eksplisit oleh proses terpisah. Backend baru membuka operasi terbatas untuk membuat akun pending dan menambahkan audit event, belum menyediakan alur autentikasi lengkap. Migration harus berversi dan tidak boleh diubah setelah diterapkan pada database bersama. Gunakan primary key UUID dan `timestamptz`.
 
@@ -221,13 +223,13 @@ Hindari membuat tabel yang belum digunakan sebelum ada fitur konkret yang membut
 
 Nilai kebijakan produk berikut merupakan batas awal yang telah disepakati dan harus ditegakkan oleh backend. Nilai ini dapat ditinjau ulang melalui evaluasi keamanan dan bukan jaminan dari penyedia layanan.
 
-### OTP dan pendaftaran tertunda
+### OTP dan verifikasi kontak — tahap berikutnya
 
-- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode berlaku selama 10 menit, disimpan sebagai keyed hash, terikat pada tujuan dan alamat penerima, hanya dapat digunakan satu kali secara atomik, serta tidak boleh dicatat dalam log sebagai teks asli.
-- Maksimal lima percobaan gagal untuk setiap sesi verifikasi. Kegagalan kelima mengunci sesi tersebut selama satu jam. Pengiriman kode pengganti tidak boleh menghapus atau melewati penguncian.
-- Jeda sebelum pengiriman ulang adalah 60 detik. Maksimal lima pengiriman per jam untuk setiap alamat kontak. Terapkan pembatasan tambahan yang menyesuaikan IP/jaringan, akun, tujuan, dan pola aktivitas mencurigakan.
-- Kode baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama. Kegagalan pengiriman tidak boleh dianggap sebagai keberhasilan verifikasi.
-- Pendaftaran yang belum selesai kedaluwarsa setelah 30 menit, terpisah dari masa berlaku OTP. Pembersihan harus aman dijalankan berulang kali dan saat terjadi proses bersamaan, serta tidak boleh menghapus akun yang sudah aktif.
+- OTP tidak digunakan untuk registrasi maupun login pada tahap pertama. Runtime OTP dan provider pengiriman belum diimplementasikan.
+- Aturan masa berlaku, keyed hash, batas percobaan, lock, resend, serta rate limit di bawah ini merupakan baseline untuk tahap verifikasi kontak berikutnya; aturan tersebut tidak boleh ditafsirkan sebagai syarat aktivasi akun tahap pertama.
+- Kontak yang belum diverifikasi tetap berstatus belum terverifikasi. Jangan mengisi timestamp verifikasi hanya karena kontak diberikan saat registrasi.
+- Pendaftaran tahap pertama tidak menggunakan masa tunggu `pending_verification` selama 30 menit. Migration lanjutan harus menyelaraskan lifecycle dan constraint sebelum runtime registrasi diaktifkan.
+- Saat OTP kelak diaktifkan, kode baru harus membatalkan kode sebelumnya dan kegagalan pengiriman tidak boleh dianggap sebagai keberhasilan verifikasi.
 
 ### Sesi
 
@@ -250,22 +252,20 @@ Jika kontak utama dan seluruh kontak pemulihan sama-sama tidak dapat diakses, gu
 
 Semua rute menggunakan versi `/api/v1`. Bentuk permintaan/respons JSON harus ditetapkan dalam OpenAPI sebelum implementasi. Tabel di bawah merupakan inventaris rute, bukan dokumentasi format data final.
 
-### Pendaftaran dan verifikasi
+### Pendaftaran tahap pertama
 
 | Metode | Rute | Tujuan |
 | --- | --- | --- |
-| POST | `/auth/register/owner` | Membuat akun Owner dengan status menunggu verifikasi |
-| POST | `/auth/register/investor` | Membuat akun Investor dengan status menunggu verifikasi |
-| POST | `/auth/verification/email/request` | Meminta/mengirim ulang verifikasi email |
-| POST | `/auth/verification/email/confirm` | Mengonfirmasi challenge email |
-| POST | `/auth/verification/whatsapp/request` | Meminta/mengirim ulang kode verifikasi nomor telepon melalui WhatsApp |
-| POST | `/auth/verification/whatsapp/confirm` | Mengonfirmasi kode verifikasi nomor telepon yang dikirim melalui WhatsApp |
+| POST | `/auth/register/owner` | Membuat akun Owner dengan password dan kontak awal yang belum harus diverifikasi |
+| POST | `/auth/register/investor` | Membuat akun Investor dengan password dan kontak awal yang belum harus diverifikasi |
+
+Endpoint verifikasi email/WhatsApp tidak termasuk tahap pertama. Tambahkan rute verifikasi kontak pada tahap berikutnya setelah metode pembuktian kepemilikan dan provider pengiriman siap.
 
 There is intentionally no `/auth/register/admin` endpoint.
 
 ### Autentikasi kata sandi dan sesi
 
-Pendaftaran melalui email atau telepon wajib membuat kata sandi lokal. Pendaftaran Google OAuth tidak perlu membuat atau memasukkan kata sandi lokal terpisah; autentikasi dilakukan melalui identitas Google yang terhubung. Kode verifikasi email/WhatsApp hanya mengaktifkan akun dan membuktikan kendali atas kontak terpilih; kode tersebut tidak pernah diterima sebagai kredensial login.
+Registrasi melalui email atau telepon wajib membuat kata sandi lokal. Registrasi Google OAuth tidak memerlukan kata sandi lokal; autentikasi dilakukan melalui stable provider subject Google yang terhubung. OTP tidak diminta pada registrasi atau login tahap pertama. Kontak yang belum diverifikasi tidak boleh digunakan untuk pemulihan atau tindakan sensitif.
 
 | Metode | Rute | Tujuan |
 | --- | --- | --- |
@@ -279,9 +279,9 @@ Pendaftaran melalui email atau telepon wajib membuat kata sandi lokal. Pendaftar
 
 Login menerima email atau nomor telepon terdaftar beserta kata sandi akun. Endpoint login tidak menerima kode verifikasi. Endpoint login wajib memeriksa role yang diharapkan di server. Ketidaksesuaian role menghasilkan respons panduan portal yang umum tanpa mengungkap detail akun tambahan.
 
-### Google OAuth — tetap digunakan
+### Google OAuth — alternatif tahap pertama
 
-Google OAuth didukung untuk login dan pendaftaran. Metode ini tidak menggantikan kewajiban pemilihan role atau verifikasi kontak; pengguna yang mendaftar dengan Google tidak perlu membuat atau memasukkan kata sandi lokal terpisah.
+Google OAuth didukung untuk login dan pendaftaran. Untuk pendaftaran baru, pengguna wajib memilih Owner atau Investor sebelum memulai OAuth; role tersebut diikat pada state server dan tidak dapat diubah melalui callback. Akun Google-only tidak memerlukan password lokal. OTP tambahan tidak diminta pada tahap pertama.
 
 | Metode | Rute | Tujuan |
 | --- | --- | --- |
@@ -289,7 +289,7 @@ Google OAuth didukung untuk login dan pendaftaran. Metode ini tidak menggantikan
 | GET | `/auth/oauth/google/start?role=investor` | Memulai OAuth dengan konteks Investor |
 | GET | `/auth/oauth/google/callback` | Memvalidasi respons penyedia dan melanjutkan alur yang terikat pada role |
 
-Untuk identitas Google baru, pengguna harus memilih Owner atau Investor terlebih dahulu, menyelesaikan Google OAuth, lalu memilih tepat satu metode kontak (kode email atau kode telepon melalui WhatsApp) untuk diverifikasi secara terpisah sebelum akun diaktifkan. Kata sandi lokal terpisah tidak diwajibkan. Email yang dinyatakan Google tidak menggantikan verifikasi ini. Konteks role diikat pada state di sisi server dan tidak dapat diubah melalui input callback. Identitas yang sudah terhubung hanya dapat login ke akun lamanya dengan role yang tetap. Jangan mengaitkan akun secara otomatis hanya karena email cocok; pengaitan memerlukan bukti terbaru atas kendali kedua identitas. Akun Admin tidak dapat dibuat melalui OAuth publik. Validasi state, nonce, issuer, audience, signature, expiry, dan redirect URI yang tepat.
+Untuk identitas Google baru, pengguna memilih Owner atau Investor sebelum OAuth. Setelah callback tervalidasi, buat akun dengan role yang terikat pada state dan simpan stable provider subject dalam transaksi yang sama. Jangan menyimpulkan email terverifikasi kecuali token tervalidasi menyatakan `email_verified=true`. Identitas yang sudah terhubung hanya dapat login ke akun lamanya dengan role yang tersimpan. Jika email Google cocok dengan akun lokal yang sudah ada, jangan menautkan atau menggabungkan akun otomatis; minta pengguna masuk ke akun lama dan menjalankan pengaitan eksplisit dengan autentikasi ulang. Akun Admin tidak dapat dibuat melalui OAuth publik. Validasi state, nonce, issuer, audience, signature, expiry, dan redirect URI yang tepat.
 
 ### Autentikasi Admin
 
@@ -349,7 +349,7 @@ Tegakkan batas sesi yang telah disetujui: 7 hari tanpa aktivitas dan 30 hari sec
 
 Parameter Argon2id dan nilai kebijakan kata sandi yang tepat harus ditetapkan melalui tinjauan konfigurasi/keamanan, bukan ditebak sebagai konstanta dalam kode UI.
 
-## 7. Kontrol penyalahgunaan OTP dan verifikasi
+## 7. Kontrol penyalahgunaan OTP dan verifikasi — tahap berikutnya
 
 Apply layered limits:
 - Per destination (email/phone).
@@ -379,7 +379,7 @@ On callback, validate at minimum:
 - Subject dari penyedia tersedia dan stabil.
 - Konteks role yang diminta sama dengan alur yang dimulai.
 
-Untuk identitas Google baru, lanjutkan hanya alur pendaftaran yang terikat pada role dan wajibkan verifikasi kontak terpisah melalui email atau WhatsApp sebelum aktivasi. Identitas penyedia yang sudah terhubung hanya dapat mengautentikasi akun yang sudah ada. Jangan mengubah role atau mengaitkan akun otomatis berdasarkan kecocokan email.
+Untuk identitas Google baru, lanjutkan hanya alur pendaftaran yang terikat pada role. Verifikasi kontak tambahan bukan syarat registrasi/login tahap pertama. Identitas penyedia yang sudah terhubung hanya dapat mengautentikasi akun yang sudah ada. Jangan mengubah role atau mengaitkan akun otomatis berdasarkan kecocokan email.
 
 Aturan pengaitan akun:
 1. Wajibkan sesi terautentikasi pada akun yang sudah ada.
@@ -439,7 +439,7 @@ Requirements:
 | --- | --- |
 | Credential stuffing | Rate limit, pemantauan, penguncian aman/kontrol bertahap, pemeriksaan kata sandi yang telah bocor |
 | Enumerasi akun | Respons pendaftaran/pemulihan/login yang seragam jika sesuai |
-| OTP brute force | Short expiry, keyed hash, attempt cap, resend limits, destination/IP controls |
+| OTP brute force (tahap berikutnya) | Short expiry, keyed hash, attempt cap, resend limits, destination/IP controls |
 | Pencurian sesi | Cookie HttpOnly/Secure, hashing token saat tersimpan, rotasi, pencabutan, TLS |
 | CSRF | Kebijakan SameSite serta perlindungan CSRF/origin untuk perubahan yang diautentikasi melalui cookie |
 | CSRF pada login OAuth | State sekali pakai, nonce, redirect URI yang tepat, validasi callback yang ketat |
