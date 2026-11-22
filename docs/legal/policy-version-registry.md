@@ -8,7 +8,7 @@ Dokumen ini menjadi satu sumber rujukan untuk versi dokumen yang ditampilkan kep
 |---|---|---|---|
 | Ketentuan Layanan | `draft-terms-0.1` | Draf; belum disetujui | Tidak ada |
 | Kebijakan Privasi | `draft-privacy-0.1` | Draf; belum disetujui | Tidak ada |
-| Pemberitahuan Marketing | Belum dibuat | Belum ditetapkan | Tidak ada |
+| Pemberitahuan Marketing | `draft-marketing-0.1` | Draf; belum disetujui | Tidak ada |
 
 **Penting:** Backend belum boleh mengaktifkan registrasi publik dengan label versi draf. Fungsi database migration 0010 menerima versi sebagai parameter dari backend; versi final harus dipilih dari konfigurasi server-side, tidak dari input browser.
 
@@ -34,7 +34,7 @@ Jangan mengubah isi dokumen setelah versi aktif diterbitkan. Perubahan substanti
 ## Jejak rujukan implementasi
 
 - Skema dan kontrak persistence: [Migration 0010 — Profil Publik dan Penerimaan Kebijakan](../architecture/identity-core-migration-0010-contract.md).
-- Baseline consent: [Kebijakan Persetujuan & Pemrosesan Data](../security/consent-data-processing.md).
+- Baseline consent: [Kebijakan Persetujuan & Pemrosesan Data](../security/consent-data-processing.md).\n- Draf pilihan marketing: [Pemberitahuan Persetujuan Marketing](marketing-consent-notice-draft.md).
 - Baseline privasi: [Kebijakan Privasi & Kendali Data](../security/privacy-data-control.md).
 - Keputusan registrasi: [Keputusan Autentikasi Identity Core](../architecture/identity-core-authentication-stage-one-decision.md).
 
