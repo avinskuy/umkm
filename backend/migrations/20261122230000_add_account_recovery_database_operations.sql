@@ -86,7 +86,7 @@ BEGIN
             'channel', p_channel,
             'purpose', 'account_recovery',
             'session_id', p_session_id::text,
-            'recovery_case_id', p_case_id::text,
+            'recovery_case_id', p_case_id::text
         )
     );
 
@@ -528,7 +528,7 @@ BEGIN
         'system', p_target_user_id, 'identity.recovery.account_selected', 'success',
         pg_catalog.jsonb_build_object(
             'recovery_case_id', p_case_id::text,
-            'channel', v_session.channel,
+            'channel', v_session.channel
         )
     );
 
