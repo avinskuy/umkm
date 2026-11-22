@@ -2900,7 +2900,10 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .fetch_one(app_pool)
     .await
     .expect("application may load the verified recovery selection context");
-    assert_eq!(recovery_context, (recovery_session_id.clone(), "email".to_owned()));
+    assert_eq!(
+        recovery_context,
+        (recovery_session_id.clone(), "email".to_owned())
+    );
 
     let candidates: Vec<(String, String, String)> = sqlx::query_as(
         "SELECT user_id::text, primary_role, display_name \
