@@ -382,7 +382,6 @@ impl<'a> AuthenticationService<'a> {
             return Err(AuthenticationError::InvalidSession);
         }
         let count_bucket = match revoked_count {
-            0 => "0",
             1 => "1",
             2..=5 => "2-5",
             _ => "6+",
