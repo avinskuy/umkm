@@ -1,7 +1,6 @@
 use axum::{
     extract::{ConnectInfo, Json, State},
     http::{HeaderMap, Response, StatusCode},
-    response::IntoResponse,
 };
 use serde::Deserialize;
 use zeroize::Zeroizing;
@@ -16,7 +15,7 @@ use super::{
         clear_session_cookie, is_cross_site_request, resolved_client_ip,
     },
     recovery::{error, message, no_store, rate_limit_response},
-    AbuseDecision, RecoveryApiState, RegistrationAction,
+    RecoveryApiState, RegistrationAction,
 };
 
 #[derive(Deserialize)]
@@ -93,13 +92,6 @@ pub(super) async fn complete(
         no_store(&mut response);
         return response;
     }
-    if decision == AbuseDecision::Deny {
-        return secure_error(
-            StatusCode::FORBIDDEN,
-            "Permintaan reset password tidak diizinkan.",
-        );
-    }
-
     match PasswordResetService::new(&state.pool)
         .complete(&token, &new_password, policy.as_ref())
         .await
@@ -159,11 +151,3 @@ fn secure_error(status: StatusCode, text: &'static str) -> Response<axum::body::
     response
 }
 
-impl IntoResponse for PasswordResetError {
-    fn into_response(self) -> axum::response::Response {
-        secure_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Reset password belum dapat diproses.",
-        )
-    }
-}
