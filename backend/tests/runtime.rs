@@ -615,7 +615,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         },
         delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
         password::hash_password,
-        ContactChannel, ClientRegistration, ClientRole, RecoveryAction, RecoveryService,
+        ClientRegistration, ClientRole, ContactChannel, RecoveryAction, RecoveryService,
         VerificationService,
     };
 
@@ -700,12 +700,10 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .expect("recovery test delivery lock should be available")
         .clone()
         .expect("registration OTP should be captured");
-    assert!(
-        verification
-            .verify(&registered.session_id, &registration_code)
-            .await
-            .expect("registration OTP should be verified")
-    );
+    assert!(verification
+        .verify(&registered.session_id, &registration_code)
+        .await
+        .expect("registration OTP should be verified"));
 
     let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL")
         .expect("CI must provide a disposable DBA connection");
@@ -771,12 +769,10 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .expect("recovery test delivery lock should be available")
         .clone()
         .expect("recovery OTP should be captured");
-    assert!(
-        recovery
-            .verify(&started.session_id, &recovery_code)
-            .await
-            .expect("account recovery OTP should be verified")
-    );
+    assert!(recovery
+        .verify(&started.session_id, &recovery_code)
+        .await
+        .expect("account recovery OTP should be verified"));
 
     let candidates = recovery
         .list_candidates(&started.case_id)
@@ -792,13 +788,12 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .expect("selected account should pass the database ownership check");
     assert_eq!(selected_user_id, registered.user_id);
 
-    let case_status: String = sqlx::query_scalar(
-        "SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid",
-    )
-    .bind(&started.case_id)
-    .fetch_one(&admin_pool)
-    .await
-    .expect("DBA should inspect recovery case state");
+    let case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&started.case_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("DBA should inspect recovery case state");
     assert_eq!(case_status, "under_review");
 
     admin_pool.close().await;
