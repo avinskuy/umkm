@@ -924,7 +924,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
 
     let case_status: String =
         sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
-            .bind(&started.case_id)
+            .bind(&recovery_case_id)
             .fetch_one(&admin_pool)
             .await
             .expect("DBA should inspect recovery case state");
