@@ -1609,6 +1609,29 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     .expect("cleared identifier should be eligible again");
     assert!(allowed_after_clear);
 
+    let ip_only_hash = vec![61_u8; 32];
+    let identifier_only_hash = vec![62_u8; 32];
+    for attempt in 1..=30 {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_password_login_attempt($1, $2)",
+        )
+        .bind(&identifier_only_hash)
+        .bind(&ip_only_hash)
+        .fetch_one(pool)
+        .await
+        .expect("IP bucket should accept requests through its threshold");
+        assert!(allowed, "IP attempt {attempt} should be inside the threshold");
+    }
+    let ip_blocked: bool = sqlx::query_scalar(
+        "SELECT public.reserve_password_login_attempt($1, $2)",
+    )
+    .bind(vec![63_u8; 32])
+    .bind(&ip_only_hash)
+    .fetch_one(pool)
+    .await
+    .expect("IP limit should return a decision after its threshold");
+    assert!(!ip_blocked, "the thirty-first IP attempt must be limited");
+
     let revoked: bool = sqlx::query_scalar(
         "SELECT public.revoke_password_login_session($1)",
     )
