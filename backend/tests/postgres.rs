@@ -83,6 +83,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_otp_resend_during_verification_lock(&pool).await;
     assert_authentication_session_invariants(&pool).await;
     assert_authentication_database_operations(&pool).await;
+    assert_registration_http_rate_limits(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
@@ -1802,6 +1803,93 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
         .expect("revoked session validation should execute");
         assert!(revoked_session.is_none());
     }
+}
+
+async fn assert_registration_http_rate_limits(pool: &PgPool) {
+    let create_ip_hash = vec![71_u8; 32];
+    for attempt in 1..=5 {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_registration_http_attempt('create', $1, NULL)",
+        )
+        .bind(&create_ip_hash)
+        .fetch_one(pool)
+        .await
+        .expect("registration IP rate limit should return a decision");
+        assert!(allowed, "create attempt {attempt} should be within the limit");
+    }
+    let create_blocked: bool = sqlx::query_scalar(
+        "SELECT public.reserve_registration_http_attempt('create', $1, NULL)",
+    )
+    .bind(&create_ip_hash)
+    .fetch_one(pool)
+    .await
+    .expect("registration IP limit should return a blocked decision");
+    assert!(!create_blocked, "sixth registration attempt should be limited");
+
+    let resend_ip_hash = vec![72_u8; 32];
+    let resend_subject_hash = vec![73_u8; 32];
+    for attempt in 1..=5 {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_registration_http_attempt('resend', $1, $2)",
+        )
+        .bind(&resend_ip_hash)
+        .bind(&resend_subject_hash)
+        .fetch_one(pool)
+        .await
+        .expect("resend rate limit should return a decision");
+        assert!(allowed, "resend attempt {attempt} should be within the subject limit");
+    }
+    let resend_blocked: bool = sqlx::query_scalar(
+        "SELECT public.reserve_registration_http_attempt('resend', $1, $2)",
+    )
+    .bind(&resend_ip_hash)
+    .bind(&resend_subject_hash)
+    .fetch_one(pool)
+    .await
+    .expect("resend subject limit should return a blocked decision");
+    assert!(!resend_blocked, "sixth resend attempt for one session should be limited");
+
+    sqlx::query(
+        "UPDATE public.registration_http_rate_limits \
+         SET window_started_at = clock_timestamp() - INTERVAL '20 minutes' \
+         WHERE action = 'resend' AND scope = 'subject' AND key_hash = $1",
+    )
+    .bind(&resend_subject_hash)
+    .execute(pool)
+    .await
+    .expect("test should age the resend window without expiring its active block");
+    let resend_still_blocked: bool = sqlx::query_scalar(
+        "SELECT public.reserve_registration_http_attempt('resend', $1, $2)",
+    )
+    .bind(&resend_ip_hash)
+    .bind(&resend_subject_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active resend block should remain enforceable");
+    assert!(!resend_still_blocked, "active resend block must not reset early");
+
+    let verify_ip_hash = vec![74_u8; 32];
+    let verify_subject_hash = vec![75_u8; 32];
+    for attempt in 1..=10 {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_registration_http_attempt('verify', $1, $2)",
+        )
+        .bind(&verify_ip_hash)
+        .bind(&verify_subject_hash)
+        .fetch_one(pool)
+        .await
+        .expect("verification rate limit should return a decision");
+        assert!(allowed, "verify attempt {attempt} should be within the subject limit");
+    }
+    let verify_blocked: bool = sqlx::query_scalar(
+        "SELECT public.reserve_registration_http_attempt('verify', $1, $2)",
+    )
+    .bind(&verify_ip_hash)
+    .bind(&verify_subject_hash)
+    .fetch_one(pool)
+    .await
+    .expect("verification subject limit should return a blocked decision");
+    assert!(!verify_blocked, "eleventh verification HTTP attempt should be limited");
 }
 
 async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
