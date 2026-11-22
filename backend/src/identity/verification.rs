@@ -17,6 +17,7 @@ const UUID_LEN: usize = 16;
 
 type SessionRow = (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String);
 type ChallengeRow = (String, Vec<u8>, String);
+type NormalizedContact = (&'static str, String, Option<String>, Option<String>);
 
 pub struct VerificationService<'a> {
     pool: &'a PgPool,
@@ -98,7 +99,7 @@ impl<'a> VerificationService<'a> {
         };
 
         let mut transaction = self.pool.begin().await?;
-        let user_id = create_client_user(&mut *transaction, &normalized_registration).await?;
+        let user_id = create_client_user(&mut transaction, &normalized_registration).await?;
 
         let persisted_session_id = sqlx::query_scalar::<_, String>(
             "SELECT public.create_registration_verification_session(                $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8,                 clock_timestamp() + INTERVAL '10 minutes')::text",
@@ -290,9 +291,9 @@ impl<'a> VerificationService<'a> {
     }
 }
 
-fn normalized_registration_contact<'a>(
-    registration: &'a ClientRegistration<'_>,
-) -> Result<(&'static str, String, Option<String>, Option<String>), VerificationError> {
+fn normalized_registration_contact(
+    registration: &ClientRegistration<'_>,
+) -> Result<NormalizedContact, VerificationError> {
     match registration.initial_contact_channel {
         ContactChannel::Email => {
             if registration.phone_e164.is_some() {
