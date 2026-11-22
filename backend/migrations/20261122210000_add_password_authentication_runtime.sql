@@ -140,12 +140,15 @@ BEGIN
     ON CONFLICT (scope, key_hash) DO UPDATE
        SET window_started_at = CASE
                WHEN password_login_rate_limits.window_started_at <= v_now - INTERVAL '15 minutes'
+               AND (password_login_rate_limits.blocked_until IS NULL OR password_login_rate_limits.blocked_until <= v_now)
                THEN v_now ELSE password_login_rate_limits.window_started_at END,
            attempt_count = CASE
                WHEN password_login_rate_limits.window_started_at <= v_now - INTERVAL '15 minutes'
+               AND (password_login_rate_limits.blocked_until IS NULL OR password_login_rate_limits.blocked_until <= v_now)
                THEN 1 ELSE password_login_rate_limits.attempt_count + 1 END,
            blocked_until = CASE
                WHEN password_login_rate_limits.window_started_at <= v_now - INTERVAL '15 minutes'
+               AND (password_login_rate_limits.blocked_until IS NULL OR password_login_rate_limits.blocked_until <= v_now)
                THEN NULL
                WHEN password_login_rate_limits.blocked_until > v_now
                THEN password_login_rate_limits.blocked_until
@@ -163,12 +166,15 @@ BEGIN
     ON CONFLICT (scope, key_hash) DO UPDATE
        SET window_started_at = CASE
                WHEN password_login_rate_limits.window_started_at <= v_now - INTERVAL '15 minutes'
+               AND (password_login_rate_limits.blocked_until IS NULL OR password_login_rate_limits.blocked_until <= v_now)
                THEN v_now ELSE password_login_rate_limits.window_started_at END,
            attempt_count = CASE
                WHEN password_login_rate_limits.window_started_at <= v_now - INTERVAL '15 minutes'
+               AND (password_login_rate_limits.blocked_until IS NULL OR password_login_rate_limits.blocked_until <= v_now)
                THEN 1 ELSE password_login_rate_limits.attempt_count + 1 END,
            blocked_until = CASE
                WHEN password_login_rate_limits.window_started_at <= v_now - INTERVAL '15 minutes'
+               AND (password_login_rate_limits.blocked_until IS NULL OR password_login_rate_limits.blocked_until <= v_now)
                THEN NULL
                WHEN password_login_rate_limits.blocked_until > v_now
                THEN password_login_rate_limits.blocked_until
