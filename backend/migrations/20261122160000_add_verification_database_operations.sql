@@ -68,7 +68,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
     RETURN QUERY
     SELECT s.channel, s.destination_ciphertext, s.destination_nonce,
@@ -85,14 +85,14 @@ BEGIN
             USING ERRCODE = 'P0002';
     END IF;
 END;
-$;
+$$;
 
 CREATE FUNCTION public.get_pending_otp_challenge(p_session_id UUID)
 RETURNS TABLE (challenge_id UUID, code_hash BYTEA, hash_key_version TEXT, expires_at TIMESTAMPTZ)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
     RETURN QUERY
     SELECT c.id, c.code_hash, c.hash_key_version, c.expires_at
@@ -113,7 +113,7 @@ BEGIN
             USING ERRCODE = 'P0002';
     END IF;
 END;
-$;
+$$;
 
 CREATE FUNCTION public.reserve_otp_challenge(
     p_session_id UUID,
