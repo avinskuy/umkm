@@ -3,17 +3,17 @@
 > Status: baseline teknis yang direkomendasikan untuk implementasi bertahap
 > Tanggal: 22 November 2026
 > Cakupan: keputusan teknis lintas migration Identity Core
-> Keputusan autentikasi terbaru: OTP wajib untuk registrasi email/WhatsApp + password; Google OAuth tanpa OTP tambahan; login rutin tanpa OTP.
+> Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
 Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak menjalankan migration otomatis pada HTTP startup. Migration 0001–0005 telah dibuat, diuji, dan di-merge. Runtime HTTP kini menginisialisasi pool PostgreSQL menggunakan principal aplikasi; operasi Identity Core yang tersedia masih terbatas pada pembuatan akun pending dan penambahan audit event.
 
-> **Amendemen keputusan 22 November 2026:** OTP diwajibkan untuk pendaftaran email/WhatsApp + password. Google OAuth tidak memerlukan OTP tambahan setelah token tervalidasi dan email_verified=true. Login rutin tidak menggunakan OTP. Migration 0001 dan 0002 telah menyediakan lifecycle pending dan tabel challenge yang relevan; tetap audit fungsi, trigger, provider adapter, dan tes sebelum runtime dibuat. Provider demonstrasi yang dievaluasi: Resend untuk email dan FlowKirim untuk WhatsApp. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Registrasi OTP dan Google OAuth](identity-core-authentication-stage-one-decision.md).
+> **Keputusan terbaru 22 November 2026:** registrasi email/WhatsApp + password wajib OTP; login rutin tidak memakai OTP. Migration 0001–0002 menyediakan lifecycle pending dan struktur challenge. Migration 0006 menghapus dukungan identitas provider yang tidak digunakan dan membatasi fungsi pembuatan akun pada password lokal. Provider demonstrasi yang dievaluasi: Resend untuk email dan FlowKirim untuk WhatsApp. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Perlindungan tujuan pengiriman OTP — tahap berikutnya
 
 ### Keputusan
 
-Bagian ini menjadi baseline untuk OTP registrasi email/WhatsApp + password dan verifikasi kontak lainnya. OTP tidak digunakan untuk login rutin atau pendaftaran Google OAuth yang tervalidasi.
+Bagian ini menjadi baseline untuk OTP registrasi email/WhatsApp + password dan verifikasi kontak lainnya. OTP tidak digunakan untuk login rutin.
 
 Gunakan dua representasi yang berbeda untuk dua kebutuhan berbeda:
 
@@ -201,7 +201,7 @@ Gerbang migration akun pertama telah dipenuhi dan hasilnya sudah di-merge ke `ma
 
 - [x] Kontrak kolom, tipe PostgreSQL, CHECK constraint, partial unique index, foreign key, dan lifecycle ditinjau.
 - [x] Principal migration dipisahkan secara konseptual dari runtime application dan provisioning Admin; GRANT lingkungan tetap belum dibuka.
-- [x] Tes PostgreSQL nyata untuk role immutable, penolakan pembuatan Admin melalui jalur klien, reservasi kontak, cleanup pending, provider identity, dan konkurensi berhasil di CI.
+- [x] Tes PostgreSQL nyata untuk role immutable, penolakan pembuatan Admin melalui jalur klien, reservasi kontak, cleanup pending, invariant password-only, dan konkurensi berhasil di CI.
 - [x] Migration tidak memuat key, data pribadi, atau kredensial.
 - [x] HTTP runtime menginisialisasi pool PostgreSQL menggunakan principal aplikasi dengan hak minimum; proses startup tidak menjalankan migration otomatis.
 - [x] Migration tidak dijalankan pada database produksi sebagai bagian dari pekerjaan ini.
@@ -245,6 +245,6 @@ Provisioning role PostgreSQL tidak dimasukkan ke SQLx schema migration. Database
 
 Semua migration harus dijalankan oleh `usahapintar_migrator`. Hal ini kritis karena fungsi `create_client_user` menggunakan SECURITY DEFINER: owner fungsi harus migrator non-superuser, tidak memiliki role membership lain, dan fungsi harus memakai `search_path=pg_catalog`. Grant aplikasi gagal tertutup jika ownership atau konfigurasi ini tidak cocok.
 
-Aplikasi hanya mendapat USAGE schema, EXECUTE fungsi pembuatan akun, INSERT audit event, dan EXECUTE validator metadata. Tidak ada akses langsung ke tabel akun, identitas provider, verifikasi, sesi, kontak recovery, kasus recovery, token reset, atau SELECT audit. Backup menggunakan `pg_read_all_data` tanpa BYPASSRLS; monitoring menggunakan `pg_monitor`; keduanya memakai login dan credential terpisah. Audit reader NOLOGIN belum diberikan ke Admin mana pun.
+Aplikasi hanya mendapat USAGE schema, EXECUTE fungsi pembuatan akun, INSERT audit event, dan EXECUTE validator metadata. Tidak ada akses langsung ke tabel akun, verifikasi, sesi, kontak recovery, kasus recovery, token reset, atau SELECT audit. Backup menggunakan `pg_read_all_data` tanpa BYPASSRLS; monitoring menggunakan `pg_monitor`; keduanya memakai login dan credential terpisah. Audit reader NOLOGIN belum diberikan ke Admin mana pun.
 
 Skrip dan runbook: [Database Principal Bootstrap](../security/database-principal-bootstrap.md). Bootstrap belum dijalankan pada database produksi.
