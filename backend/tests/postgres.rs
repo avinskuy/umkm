@@ -998,16 +998,15 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .await
     .expect("controlled function should create a registration verification session");
 
-    let session_destination: (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String) =
-        sqlx::query_as(
-            "SELECT channel, destination_ciphertext, destination_nonce, encryption_key_version, \
-                    destination_hmac, hmac_key_version \
-             FROM public.get_registration_verification_session($1::uuid)",
-        )
-        .bind(&session_id)
-        .fetch_one(pool)
-        .await
-        .expect("runtime should read the pending session through a controlled function");
+    let session_destination: (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String) = sqlx::query_as(
+        "SELECT channel, destination_ciphertext, destination_nonce, encryption_key_version, \
+                 destination_hmac, hmac_key_version \
+          FROM public.get_registration_verification_session($1::uuid)",
+    )
+    .bind(&session_id)
+    .fetch_one(pool)
+    .await
+    .expect("runtime should read the pending session through a controlled function");
     assert_eq!(session_destination.0, "email");
     assert_eq!(session_destination.1, vec![1_u8]);
     assert_eq!(session_destination.2, vec![2_u8]);
@@ -1047,11 +1046,11 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     assert!(
         sqlx::query("SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",)
             .bind(&session_id)
-        .bind(vec![5_u8; 32])
-        .bind(vec![vec![3_u8; 32]])
-        .fetch_one(pool)
-        .await
-        .is_err(),
+            .bind(vec![5_u8; 32])
+            .bind(vec![vec![3_u8; 32]])
+            .fetch_one(pool)
+            .await
+            .is_err(),
         "resend must respect the 60-second cooldown"
     );
 
