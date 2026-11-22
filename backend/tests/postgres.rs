@@ -1825,6 +1825,17 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .await
     .expect("active Admin reviewer should be created");
 
+    let reviewer_session_hash = vec![61_u8; 32];
+    let reviewer_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days') RETURNING id::text",
+    )
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active Admin session should be created for recovery review");
+
     let first_contact_session: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at)  VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
     )
@@ -2035,10 +2046,11 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
 
     assert!(
         sqlx::query_scalar::<_, bool>(
-            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, 'approved', 'ownership_confirmed')",
+            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
         )
         .bind(&recovery_case_id)
         .bind(&first_user_id)
+        .bind(&reviewer_session_hash)
         .fetch_one(pool)
         .await
         .is_err(),
@@ -2046,17 +2058,18 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     );
 
     let approved: bool = sqlx::query_scalar(
-        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, 'approved', 'ownership_confirmed')",
+        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
     )
     .bind(&recovery_case_id)
     .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
     .fetch_one(pool)
     .await
     .expect("active Admin may approve an eligible recovery case");
     assert!(approved);
 
     let review_row: (String, String, String) = sqlx::query_as(
-        "SELECT decision, reason_code, reviewer_user_id::text \
+        "SELECT decision, reason_code, reviewer_session_id::text \
            FROM public.account_recovery_review_decisions WHERE recovery_case_id = $1::uuid",
     )
     .bind(&recovery_case_id)
@@ -2065,7 +2078,7 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("review decision should be persisted");
     assert_eq!(review_row.0, "approved");
     assert_eq!(review_row.1, "ownership_confirmed");
-    assert_eq!(review_row.2, reviewer_user_id);
+    assert_eq!(review_row.2, reviewer_session_id);
 
     assert!(
         sqlx::query(
@@ -2217,10 +2230,11 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("second recovery case should enter review");
 
     let rejected: bool = sqlx::query_scalar(
-        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, 'rejected', 'insufficient_evidence')",
+        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'rejected', 'insufficient_evidence')",
     )
     .bind(&rejected_case_id)
     .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
     .fetch_one(pool)
     .await
     .expect("active Admin may reject an eligible recovery case");
@@ -2574,7 +2588,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.record_account_recovery_session_signal(uuid,bytea)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.review_account_recovery_case(uuid,uuid,text,text)', 'EXECUTE')",
+                    'public.review_account_recovery_case(uuid,uuid,bytea,text,text)', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
