@@ -304,16 +304,12 @@ impl<'a> AuthenticationService<'a> {
         Ok(AuthenticatedSession {
             session_id: row.0,
             user_id: row.1,
-            role: LoginRole::from_db_value(&row.2)
-                .ok_or(AuthenticationError::InvalidSession)?,
+            role: LoginRole::from_db_value(&row.2).ok_or(AuthenticationError::InvalidSession)?,
             expires_in_seconds: row.3,
         })
     }
 
-    pub async fn rotate_session(
-        &self,
-        token: &str,
-    ) -> Result<RotatedSession, AuthenticationError> {
+    pub async fn rotate_session(&self, token: &str) -> Result<RotatedSession, AuthenticationError> {
         let old_token_hash = session_token_hash(token)?;
         let new_token = random_session_token()?;
         let new_token_hash = hash_session_token(&new_token);
