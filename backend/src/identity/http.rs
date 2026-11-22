@@ -168,7 +168,6 @@ impl RegistrationApiState {
     }
 }
 
-
 #[derive(Clone)]
 pub struct RecoveryApiState {
     pub(super) pool: PgPool,
