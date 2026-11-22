@@ -222,7 +222,7 @@ Migration 0005 menambahkan `identity_audit_events` sebagai jejak audit Identity 
 
 Runtime saat ini menyediakan operasi terbatas `append_audit_event` dan principal aplikasi memperoleh hak INSERT-only sesuai bootstrap privilege. Pemanggil tetap wajib memvalidasi aktor dan action-specific metadata serta menulis event dalam transaksi bersama perubahan penting. Integrasi audit untuk seluruh lifecycle identitas, principal pembaca, dan retensi/forwarding eksternal masih perlu diselesaikan. Fungsi validasi metadata hanya melakukan pemeriksaan struktur dan tidak memberi akses ke tabel audit.
 
-Jangan menjalankan migration 0001–0005 pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
+Jalankan migration melalui principal migrator dalam prosedur perubahan database yang terkendali. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
 
 ## 8. Keputusan yang tetap ditunda
 
