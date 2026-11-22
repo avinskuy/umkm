@@ -122,6 +122,7 @@ Pada snapshot keputusan ini:
 
 - [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 - [Runtime Registrasi & Verifikasi](identity-core-registration-verification-runtime.md).
+- [Kontrak HTTP Registrasi Identity Core](identity-core-registration-http-api.md).
 - [Tinjauan Kontak Pemulihan Bersama](identity-core-shared-recovery-contacts.md).
 - [Keputusan Teknis Identity Core](identity-core-technical-decisions.md).
 - [Kontrak Migration 0001–0005](identity-core-migration-0001-contract.md).

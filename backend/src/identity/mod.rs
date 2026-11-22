@@ -2,11 +2,13 @@
 //!
 //! Modul ini tidak memberi akses tabel langsung. Registrasi menggunakan fungsi
 //! SECURITY DEFINER yang dikendalikan database; audit menggunakan hak INSERT
-//! append-only. Endpoint HTTP dan autentikasi belum termasuk dalam modul ini.
+//! append-only. Router HTTP registrasi tersedia sebagai komponen terinjeksi, tetapi
+//! sengaja belum dipasang pada aplikasi runtime.
 
 mod audit;
 pub mod crypto;
 pub mod delivery;
+pub mod http;
 pub mod password;
 mod registration;
 pub mod verification;
