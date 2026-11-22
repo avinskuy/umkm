@@ -1,13 +1,11 @@
 # Keputusan Teknis Identity Core
 
-> Status: baseline teknis yang direkomendasikan untuk implementasi bertahap
-> Tanggal: 22 November 2026
-> Cakupan: keputusan teknis lintas migration Identity Core
-> Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
+> Cakupan: baseline teknis lintas migration Identity Core.
+> Registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
-Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak menjalankan migration otomatis pada HTTP startup. Migration 0001–0005 telah dibuat, diuji, dan di-merge. Runtime HTTP kini menginisialisasi pool PostgreSQL menggunakan principal aplikasi; operasi Identity Core yang tersedia masih terbatas pada pembuatan akun pending dan penambahan audit event.
+Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0010 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP dan router registrasi yang belum dipasang pada aplikasi HTTP default. Login/logout, sesi HTTP, provider nyata, key produksi, dan recovery runtime belum tersedia. HTTP startup tidak menjalankan migration otomatis.
 
-> **Keputusan terbaru 22 November 2026:** registrasi email/WhatsApp + password wajib OTP; login rutin tidak memakai OTP. Migration 0001–0002 menyediakan lifecycle pending dan struktur challenge. Migration 0006 menghapus dukungan identitas provider yang tidak digunakan dan membatasi fungsi pembuatan akun pada password lokal. Provider demonstrasi yang dievaluasi: Resend untuk email dan FlowKirim untuk WhatsApp. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0006 menghapus dukungan Google OAuth dari skema aktif. Resend dan FlowKirim menjadi target adapter pengiriman; integrasi nyata belum tersedia. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Perlindungan tujuan pengiriman OTP — tahap berikutnya
 
