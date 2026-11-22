@@ -23,3 +23,6 @@ Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backen
 Pengujian PostgreSQL untuk migration, invariant identitas, dan privilege principal berada di `backend/tests/postgres.rs`. Pengujian readiness runtime berada di `backend/tests/runtime.rs` dan memakai `APP_DATABASE_URL` melalui principal aplikasi. Keduanya dijalankan terhadap database disposable di CI.
 
 Jangan pernah mengubah migration setelah diterapkan pada database bersama. Perubahan skema berikutnya harus menggunakan migration baru dengan versi SQLx berikutnya. Migration, provisioning principal, dan deployment produksi tetap merupakan operasi terpisah yang memerlukan prosedur serta persetujuan masing-masing.
+
+
+Migration 0008 (`20261122170000_bind_verification_ids_from_runtime.sql`) mengikat UUID sesi verifikasi dan challenge yang dibuat runtime ke ciphertext/AAD dan keyed OTP digest. UUID harus dibuat backend sebelum enkripsi atau hashing; database tetap memvalidasi binding dan lifecycle melalui fungsi terkontrol. Bootstrap privilege menggunakan signature baru dan tidak membuka akses tabel langsung.
