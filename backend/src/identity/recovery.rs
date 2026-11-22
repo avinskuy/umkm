@@ -6,8 +6,8 @@ use super::{
     registration::ContactChannel,
     verification::{
         contact_aliases, decrypt_destination, destination_associated_data, dispatch_otp_challenge,
-        new_uuid, normalize_contact, validate_uuid, verify_otp_session,
-        SessionRow, VerificationError,
+        new_uuid, normalize_contact, validate_uuid, verify_otp_session, SessionRow,
+        VerificationError,
     },
 };
 
@@ -130,14 +130,7 @@ impl<'a> RecoveryService<'a> {
     }
 
     pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
-        verify_otp_session(
-            self.pool,
-            self.keys,
-            session_id,
-            "account_recovery",
-            code,
-        )
-        .await
+        verify_otp_session(self.pool, self.keys, session_id, "account_recovery", code).await
     }
 
     /// Menampilkan kandidat hanya setelah OTP valid; identitas akun tetap diperiksa DB saat dipilih.
@@ -213,19 +206,9 @@ impl<'a> RecoveryService<'a> {
         .await?;
 
         let session: SessionRow = (
-            context.1,
-            context.2,
-            context.3,
-            context.4,
-            context.5,
-            context.6,
+            context.1, context.2, context.3, context.4, context.5, context.6,
         );
-        let destination = decrypt_destination(
-            self.keys,
-            &context.0,
-            "account_recovery",
-            &session,
-        )?;
+        let destination = decrypt_destination(self.keys, &context.0, "account_recovery", &session)?;
         let channel = match session.0.as_str() {
             "email" => "email",
             "whatsapp" => "whatsapp",
