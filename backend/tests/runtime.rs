@@ -1206,7 +1206,9 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .1
         .to_owned();
     assert_eq!(reset_token.len(), 64);
-    assert!(reset_token.chars().all(|character| character.is_ascii_hexdigit()));
+    assert!(reset_token
+        .chars()
+        .all(|character| character.is_ascii_hexdigit()));
 
     assert_eq!(
         reset_destination_capture
@@ -1222,12 +1224,11 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         Some(issue_result.expires_at_unix)
     );
 
-    let database_now: i64 = sqlx::query_scalar(
-        "SELECT floor(extract(epoch FROM clock_timestamp()))::bigint",
-    )
-    .fetch_one(&admin_pool)
-    .await
-    .expect("database clock should be readable");
+    let database_now: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()))::bigint")
+            .fetch_one(&admin_pool)
+            .await
+            .expect("database clock should be readable");
     assert!(issue_result.expires_at_unix > database_now);
     assert!(issue_result.expires_at_unix <= database_now + 15 * 60);
 
@@ -1286,12 +1287,12 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         ))
         .await
         .expect("cross-site reset request should respond");
+    assert_eq!(cross_site_reset.status(), axum::http::StatusCode::FORBIDDEN);
     assert_eq!(
-        cross_site_reset.status(),
-        axum::http::StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        cross_site_reset.headers().get(header::CACHE_CONTROL).unwrap(),
+        cross_site_reset
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
         "no-store"
     );
 
@@ -1323,7 +1324,10 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         second_reset
     };
     assert_eq!(
-        success_response.headers().get(header::CACHE_CONTROL).unwrap(),
+        success_response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
         "no-store"
     );
     assert!(
@@ -1331,7 +1335,8 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             .headers()
             .get(header::SET_COOKIE)
             .and_then(|value| value.to_str().ok())
-            .is_some_and(|value| value.contains("__Host-usahapintar_session=") && value.contains("Max-Age=0")),
+            .is_some_and(|value| value.contains("__Host-usahapintar_session=")
+                && value.contains("Max-Age=0")),
         "successful password reset should clear the current browser cookie"
     );
 
@@ -1346,15 +1351,16 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         "no-store"
     );
 
-    let updated_password_hash: String = sqlx::query_scalar(
-        "SELECT password_hash FROM public.users WHERE id = $1::uuid",
-    )
-    .bind(&registered.user_id)
-    .fetch_one(&admin_pool)
-    .await
-    .expect("updated password hash should be present");
-    assert!(verify_password(reset_password.as_bytes(), &updated_password_hash)
-        .expect("updated Argon2id password hash should be valid"));
+    let updated_password_hash: String =
+        sqlx::query_scalar("SELECT password_hash FROM public.users WHERE id = $1::uuid")
+            .bind(&registered.user_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("updated password hash should be present");
+    assert!(
+        verify_password(reset_password.as_bytes(), &updated_password_hash)
+            .expect("updated Argon2id password hash should be valid")
+    );
 
     let active_session_count: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM public.sessions WHERE user_id = $1::uuid AND revoked_at IS NULL",
@@ -1374,13 +1380,12 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .expect("password-reset session revocations should be queryable");
     assert_eq!(reset_revoked_session_count, 1);
 
-    let completed_case_status: String = sqlx::query_scalar(
-        "SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid",
-    )
-    .bind(&recovery_case_id)
-    .fetch_one(&admin_pool)
-    .await
-    .expect("completed recovery case should be queryable");
+    let completed_case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&recovery_case_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("completed recovery case should be queryable");
     assert_eq!(completed_case_status, "completed");
 
     let consumed_token_count: i64 = sqlx::query_scalar(
