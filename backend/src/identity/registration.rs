@@ -54,7 +54,9 @@ pub async fn create_client_user(
     connection: &mut PgConnection,
     registration: &ClientRegistration<'_>,
 ) -> Result<String, sqlx::Error> {
-    sqlx::query_scalar::<_, String>(\n        "SELECT public.create_client_user_with_profile_and_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)::text",\n    )
+    sqlx::query_scalar::<_, String>(
+        "SELECT public.create_client_user_with_profile_and_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)::text",
+    )
         .bind(registration.display_name)
         .bind(registration.role.as_db_value())
         .bind(registration.initial_contact_channel.as_db_value())
