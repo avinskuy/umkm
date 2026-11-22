@@ -449,7 +449,6 @@ mod tests {
                 (KeyPurpose::ContactFingerprint, KeyVersion(7)) => 0x77,
                 (KeyPurpose::DataEncryption, _) => 0x11,
                 (KeyPurpose::OtpVerification, _) => 0x33,
-                _ => return Err(CryptoError::KeyUnavailable),
             };
             Ok(SecretKey::from_bytes([marker; KEY_LEN]))
         }
