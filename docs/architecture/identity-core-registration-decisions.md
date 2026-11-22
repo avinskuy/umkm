@@ -1,6 +1,6 @@
 # Identity Core — Keputusan Pendaftaran
 
-> **Status:** Keputusan aktif per 22 November 2026. Dokumen ini merangkum keputusan pendaftaran yang berlaku dan menggantikan rumusan lama yang bertentangan. Detail skema, runtime, recovery, dan migration dirujuk ke kontrak masing-masing.
+> Dokumen ini menetapkan kontrak pendaftaran aktif. Detail skema, runtime, recovery, dan migration dirujuk ke kontrak masing-masing.
 
 ## 1. Metode registrasi dan login
 
@@ -52,7 +52,7 @@ Penerimaan Terms dan Privacy disimpan terpisah per versi. Consent marketing hany
 
 ## 4. Baseline OTP dan masa pending
 
-Baseline runtime yang disetujui dan diuji:
+Baseline runtime:
 
 - Kode OTP numerik enam digit.
 - Masa berlaku challenge: 10 menit.
@@ -109,7 +109,7 @@ Detail lengkap berada di [Tinjauan Skema Identity Core — Verifikasi dan Pemuli
 
 ## 8. Status implementasi repository
 
-Pada snapshot keputusan ini:
+Status implementasi:
 - Migration Identity Core 0001–0010 tersedia di repository dan diuji melalui PostgreSQL CI.
 - Rust `VerificationService` mengorkestrasi registrasi, issue/resend OTP, dispatch, verifikasi, dan aktivasi dengan fake provider pada tes.
 - Migration 0010 menyimpan nama tampilan publik, penerimaan Terms/Privacy per versi, dan consent marketing opsional secara atomik dengan pembuatan akun.
