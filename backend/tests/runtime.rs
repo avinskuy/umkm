@@ -3,6 +3,7 @@ use axum::{
     extract::ConnectInfo,
     http::{header, Method, Request},
 };
+use http_body_util::BodyExt;
 use sqlx::PgPool;
 use std::{
     future::Future,
