@@ -1747,8 +1747,8 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
             .await
             .expect("active user should be able to create another device session");
     let revoked_count: i32 =
-        sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1::uuid)")
-            .bind(&user_id)
+        sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1)")
+            .bind(&second_token_hash)
             .fetch_one(pool)
             .await
             .expect("logout-all should revoke every active session for the account");
