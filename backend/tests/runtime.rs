@@ -1311,6 +1311,8 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let first_reset = recovery_router.clone().oneshot(make_valid_reset_request());
     let second_reset = recovery_router.clone().oneshot(make_valid_reset_request());
     let (first_reset, second_reset) = tokio::join!(first_reset, second_reset);
+    let first_reset = first_reset.expect("first concurrent reset request should complete");
+    let second_reset = second_reset.expect("second concurrent reset request should complete");
     let first_succeeded = first_reset.status() == axum::http::StatusCode::OK;
     let second_succeeded = second_reset.status() == axum::http::StatusCode::OK;
     assert_ne!(
