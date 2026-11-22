@@ -2138,7 +2138,7 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         role: ClientRole::Investor,
         initial_contact_channel: ContactChannel::Phone,
         email_normalized: None,
-        phone_e164: Some("+6281234567890"),
+        phone_e164: Some("+6281234567892"),
         password_hash: "test-only-encoded-password-hash",
     };
     let phone_started = service
