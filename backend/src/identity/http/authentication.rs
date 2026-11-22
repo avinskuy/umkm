@@ -1,8 +1,9 @@
 use axum::{
-    extract::{ConnectInfo, DefaultBodyLimit, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Extension, Request, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,8 @@ use std::net::{IpAddr, SocketAddr};
 use zeroize::Zeroizing;
 
 use super::super::authentication::{
-    AuthenticationError, AuthenticationRateLimitKey, AuthenticationService, LoginRole,
+    AuthenticatedSession, AuthenticationError, AuthenticationRateLimitKey, AuthenticationService,
+    LoginRole,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
@@ -88,6 +90,10 @@ fn login_error(error_value: AuthenticationError) -> Response {
             StatusCode::UNAUTHORIZED,
             "Email/nomor telepon atau password salah.",
         ),
+        AuthenticationError::InvalidSession => error(
+            StatusCode::UNAUTHORIZED,
+            "Sesi tidak valid atau sudah berakhir.",
+        ),
         AuthenticationError::RateLimited => error(
             StatusCode::TOO_MANY_REQUESTS,
             "Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.",
@@ -103,12 +109,176 @@ fn login_error(error_value: AuthenticationError) -> Response {
 }
 
 pub fn authentication_router(state: AuthenticationApiState) -> Router {
-    Router::new()
+    let public_routes = Router::new()
         .route("/api/v1/identity/login/owner", post(login_owner))
         .route("/api/v1/identity/login/investor", post(login_investor))
         .route("/api/v1/identity/logout", post(logout))
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
-        .with_state(state)
+        .with_state(state.clone());
+
+    let protected_routes = Router::new()
+        .route("/api/v1/identity/me", get(current_session))
+        .route("/api/v1/identity/session/refresh", post(refresh_session))
+        .route("/api/v1/identity/logout-all", post(logout_all))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_session,
+        ))
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
+        .with_state(state);
+
+    public_routes.merge(protected_routes)
+}
+
+#[derive(Serialize)]
+struct CurrentSessionResponse {
+    user_id: String,
+    role: &'static str,
+}
+
+fn role_label(role: LoginRole) -> &'static str {
+    match role {
+        LoginRole::BusinessOwner => "business_owner",
+        LoginRole::Investor => "investor",
+    }
+}
+
+async fn require_session(
+    State(state): State<AuthenticationApiState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let Some(token) = session_cookie(request.headers()) else {
+        return unauthorized_session();
+    };
+
+    match state.service().validate_session(token.as_str()).await {
+        Ok(session) => {
+            request.extensions_mut().insert(session);
+            next.run(request).await
+        }
+        Err(AuthenticationError::InvalidSession) => unauthorized_session(),
+        Err(AuthenticationError::Database | AuthenticationError::Internal) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Layanan sesi sementara tidak tersedia.",
+        ),
+        Err(_) => unauthorized_session(),
+    }
+}
+
+fn unauthorized_session() -> Response {
+    let mut response = error(
+        StatusCode::UNAUTHORIZED,
+        "Sesi tidak valid atau sudah berakhir.",
+    );
+    clear_session_cookie(&mut response);
+    response
+}
+
+async fn current_session(Extension(session): Extension<AuthenticatedSession>) -> Response {
+    let mut response = (
+        StatusCode::OK,
+        Json(CurrentSessionResponse {
+            user_id: session.user_id,
+            role: role_label(session.role),
+        }),
+    )
+        .into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
+async fn refresh_session(
+    State(state): State<AuthenticationApiState>,
+    Extension(_session): Extension<AuthenticatedSession>,
+    headers: HeaderMap,
+) -> Response {
+    if is_cross_site_request(&headers) {
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan pembaruan sesi lintas situs ditolak.",
+        );
+    }
+
+    let Some(token) = session_cookie(&headers) else {
+        return unauthorized_session();
+    };
+
+    match state.service().rotate_session(token.as_str()).await {
+        Ok(session) => {
+            let max_age = session
+                .expires_in_seconds
+                .clamp(1, i64::from(SESSION_MAX_AGE_SECONDS));
+            let cookie = Zeroizing::new(format!(
+                "{SESSION_COOKIE}={}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Lax",
+                session.token.as_str()
+            ));
+            let Ok(cookie_value) = HeaderValue::from_str(cookie.as_str()) else {
+                return error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Layanan sesi sementara tidak tersedia.",
+                );
+            };
+            let mut response = (
+                StatusCode::OK,
+                Json(LoginResponse {
+                    message: "Sesi berhasil diperbarui.",
+                }),
+            )
+                .into_response();
+            response
+                .headers_mut()
+                .insert(header::SET_COOKIE, cookie_value);
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            response
+        }
+        Err(AuthenticationError::InvalidSession) => unauthorized_session(),
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Layanan sesi sementara tidak tersedia.",
+        ),
+    }
+}
+
+async fn logout_all(
+    State(state): State<AuthenticationApiState>,
+    Extension(session): Extension<AuthenticatedSession>,
+    headers: HeaderMap,
+) -> Response {
+    if is_cross_site_request(&headers) {
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan logout semua perangkat lintas situs ditolak.",
+        );
+    }
+
+    let Some(token) = session_cookie(&headers) else {
+        return unauthorized_session();
+    };
+
+    match state
+        .service()
+        .logout_all(&session.user_id, session.role, token.as_str())
+        .await
+    {
+        Ok(_) => {
+            let mut response = StatusCode::NO_CONTENT.into_response();
+            clear_session_cookie(&mut response);
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            response
+        }
+        Err(AuthenticationError::InvalidSession) => unauthorized_session(),
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Sesi belum dapat dicabut. Silakan coba kembali.",
+        ),
+    }
 }
 
 async fn login_owner(
@@ -204,7 +374,7 @@ async fn logout(State(state): State<AuthenticationApiState>, headers: HeaderMap)
     }
     let token = session_cookie(&headers);
     if let Some(token) = token {
-        if state.service().logout(&token).await.is_err() {
+        if state.service().logout(token.as_str()).await.is_err() {
             let mut response = error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "Sesi lokal dibersihkan, tetapi pencabutan sesi belum dapat dikonfirmasi.",
@@ -222,7 +392,7 @@ async fn logout(State(state): State<AuthenticationApiState>, headers: HeaderMap)
     response
 }
 
-fn session_cookie(headers: &HeaderMap) -> Option<String> {
+fn session_cookie(headers: &HeaderMap) -> Option<Zeroizing<String>> {
     let cookies = headers.get(header::COOKIE)?.to_str().ok()?;
     cookies.split(';').find_map(|part| {
         let (name, value) = part.trim().split_once('=')?;
@@ -232,7 +402,7 @@ fn session_cookie(headers: &HeaderMap) -> Option<String> {
         {
             return None;
         }
-        Some(value.to_owned())
+        Some(Zeroizing::new(value.to_owned()))
     })
 }
 
@@ -254,10 +424,14 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             header::COOKIE,
-            HeaderValue::from_static("theme=dark; __Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            HeaderValue::from_static(
+                "theme=dark; __Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            ),
         );
         assert_eq!(
-            session_cookie(&headers).as_deref(),
+            session_cookie(&headers)
+                .map(|token| token.as_str().to_owned())
+                .as_deref(),
             Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         );
 

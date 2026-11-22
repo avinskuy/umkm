@@ -16,8 +16,8 @@ pub mod verification;
 
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
 pub use authentication::{
-    AuthenticationConfigError, AuthenticationError, AuthenticationRateLimitKey,
-    AuthenticationService, LoginRole, LoginSession,
+    AuthenticatedSession, AuthenticationConfigError, AuthenticationError,
+    AuthenticationRateLimitKey, AuthenticationService, LoginRole, LoginSession, RotatedSession,
 };
 pub use delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider};
 pub use registration::{create_client_user, ClientRegistration, ClientRole, ContactChannel};

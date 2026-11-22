@@ -8,7 +8,7 @@
 
 Migration ini menyediakan penyimpanan sesi autentikasi opaque yang dikelola server. Satu akun boleh memiliki beberapa sesi aktif pada perangkat berbeda. Skema mendukung daftar riwayat sesi, pencabutan satu sesi, logout semua perangkat, rotasi token, serta pembatasan waktu sesi.
 
-Migration ini **tidak** mengimplementasikan endpoint login/logout, validasi password, cookie browser, CSRF, middleware autentikasi, runtime database initialization, audit event terpisah, atau provisioning/grant principal. Implementasi login password dan logout berada pada service Rust serta migration operasi autentikasi 0012. Tidak ada secret atau token sesi plaintext yang dibuat/disimpan oleh migration.
+Migration ini **tidak** mengimplementasikan endpoint login/logout, validasi password, cookie browser, CSRF, middleware autentikasi, runtime database initialization, audit event terpisah, atau provisioning/grant principal. Implementasi login password, logout, validasi sesi, rotasi token, dan logout semua perangkat berada pada service Rust serta migration operasi autentikasi/session 0012–0013. Tidak ada secret atau token sesi plaintext yang dibuat/disimpan oleh migration.
 
 ## 2. Struktur `sessions`
 
@@ -90,5 +90,5 @@ Tes runtime terpisah tetap diperlukan untuk validasi setiap request, cookie/CSRF
 - Migration belum dijalankan pada database produksi.
 - HTTP server menginisialisasi pool PostgreSQL saat startup melalui `APP_DATABASE_URL`; migration tetap dijalankan secara eksplisit oleh proses terpisah.
 - Tidak ada GRANT yang dibuka oleh migration ini. Runtime application principal, migration principal, dan database administrator tetap harus dipisahkan sesuai least privilege.
-- Runtime login password Owner/Investor, pembuatan sesi opaque, cookie aman, dan logout tersedia melalui migration operasi autentikasi 0012 serta service HTTP. Middleware validasi sesi untuk endpoint terproteksi, rotasi token otomatis, logout semua perangkat, daftar/pencabutan sesi perangkat, cleanup/retention job, dan deployment belum tersedia.
+- Runtime login password Owner/Investor, pembuatan sesi opaque, cookie aman, middleware validasi sesi, pembaruan idle timeout, refresh/rotasi token eksplisit, logout perangkat saat ini, dan logout semua perangkat tersedia melalui service HTTP serta migration operasi 0012–0013. Daftar/pencabutan sesi perangkat melalui UI, cleanup/retention job, dan deployment belum tersedia.
 - Migration yang telah diterapkan pada database bersama tidak boleh diedit; koreksi berikutnya harus memakai migration baru.

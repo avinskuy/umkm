@@ -407,6 +407,7 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
             .expect("test socket address should be valid"),
     ));
     let logged_out = authentication
+        .clone()
         .oneshot(logout_request)
         .await
         .expect("logout route should respond");
@@ -434,6 +435,146 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
             .await
             .expect("logged-out session should remain as a revoked audit record");
     assert_eq!(revoked_reason, "logout");
+
+    let logged_in_again = authentication
+        .clone()
+        .oneshot(make_request(
+            "/api/v1/identity/login/owner".to_owned(),
+            serde_json::json!({
+                "identifier": email,
+                "password": "test-password-with-enough-length"
+            }),
+        ))
+        .await
+        .expect("second owner login should respond");
+    assert_eq!(logged_in_again.status(), axum::http::StatusCode::OK);
+    let second_cookie = logged_in_again
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("second login should set a session cookie")
+        .to_str()
+        .expect("second cookie should be valid header text")
+        .to_owned();
+    let second_token = second_cookie
+        .split(';')
+        .next()
+        .and_then(|cookie| cookie.split_once('='))
+        .map(|(_, value)| value.to_owned())
+        .expect("second cookie should contain the session token");
+
+    let make_session_request = |method: Method, uri: &str, token: &str| {
+        Request::builder()
+            .method(method)
+            .uri(uri)
+            .header(
+                header::COOKIE,
+                format!("__Host-usahapintar_session={token}"),
+            )
+            .body(Body::empty())
+            .expect("session request should be valid")
+    };
+
+    let current_session = authentication
+        .clone()
+        .oneshot(make_session_request(
+            Method::GET,
+            "/api/v1/identity/me",
+            &second_token,
+        ))
+        .await
+        .expect("session introspection should respond");
+    assert_eq!(current_session.status(), axum::http::StatusCode::OK);
+    let current_body = current_session
+        .into_body()
+        .collect()
+        .await
+        .expect("current-session body should be readable")
+        .to_bytes();
+    let current_payload: serde_json::Value =
+        serde_json::from_slice(&current_body).expect("current-session body should be JSON");
+    assert_eq!(current_payload["role"], "business_owner");
+
+    let refreshed = authentication
+        .clone()
+        .oneshot(make_session_request(
+            Method::POST,
+            "/api/v1/identity/session/refresh",
+            &second_token,
+        ))
+        .await
+        .expect("session refresh should respond");
+    assert_eq!(refreshed.status(), axum::http::StatusCode::OK);
+    let refreshed_cookie = refreshed
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("session refresh should rotate the browser cookie")
+        .to_str()
+        .expect("refreshed cookie should be valid header text")
+        .to_owned();
+    let refreshed_token = refreshed_cookie
+        .split(';')
+        .next()
+        .and_then(|cookie| cookie.split_once('='))
+        .map(|(_, value)| value.to_owned())
+        .expect("refreshed cookie should contain the new token");
+    assert_ne!(refreshed_token, second_token);
+
+    let old_token_response = authentication
+        .clone()
+        .oneshot(make_session_request(
+            Method::GET,
+            "/api/v1/identity/me",
+            &second_token,
+        ))
+        .await
+        .expect("old token validation should respond");
+    assert_eq!(
+        old_token_response.status(),
+        axum::http::StatusCode::UNAUTHORIZED
+    );
+
+    let refreshed_session = authentication
+        .clone()
+        .oneshot(make_session_request(
+            Method::GET,
+            "/api/v1/identity/me",
+            &refreshed_token,
+        ))
+        .await
+        .expect("rotated token should authenticate");
+    assert_eq!(refreshed_session.status(), axum::http::StatusCode::OK);
+
+    let logged_out_all = authentication
+        .clone()
+        .oneshot(make_session_request(
+            Method::POST,
+            "/api/v1/identity/logout-all",
+            &refreshed_token,
+        ))
+        .await
+        .expect("logout-all should respond");
+    assert_eq!(logged_out_all.status(), axum::http::StatusCode::NO_CONTENT);
+    let refreshed_hash = hash_session_token(&refreshed_token);
+    let all_revoked_reason: String =
+        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE token_hash = $1")
+            .bind(refreshed_hash.to_vec())
+            .fetch_one(&admin_pool)
+            .await
+            .expect("logout-all should persist the revocation reason");
+    assert_eq!(all_revoked_reason, "logout_all");
+
+    let after_logout_all = authentication
+        .oneshot(make_session_request(
+            Method::GET,
+            "/api/v1/identity/me",
+            &refreshed_token,
+        ))
+        .await
+        .expect("revoked token validation should respond");
+    assert_eq!(
+        after_logout_all.status(),
+        axum::http::StatusCode::UNAUTHORIZED
+    );
     admin_pool.close().await;
 
     let duplicate = router
