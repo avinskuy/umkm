@@ -604,3 +604,203 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
 
     pool.close().await;
 }
+
+#[tokio::test]
+#[ignore = "requires the disposable least-privilege PostgreSQL application principal"]
+async fn account_recovery_service_verifies_contact_and_binds_a_matching_account() {
+    use usahapintar_api::identity::{
+        crypto::{
+            contact_fingerprint, CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey,
+            VersionedKey,
+        },
+        delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
+        password::hash_password,
+        ContactChannel, ClientRegistration, ClientRole, RecoveryAction, RecoveryService,
+        VerificationService,
+    };
+
+    struct RecoveryKeys;
+
+    impl KeyProvider for RecoveryKeys {
+        fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+            self.key(purpose, KeyVersion(1))
+                .map(|key| VersionedKey::new(KeyVersion(1), key))
+        }
+
+        fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+            if version != KeyVersion(1) {
+                return Err(CryptoError::KeyUnavailable);
+            }
+            let marker = match purpose {
+                KeyPurpose::DataEncryption => 0x11,
+                KeyPurpose::ContactFingerprint => 0x22,
+                KeyPurpose::OtpVerification => 0x33,
+            };
+            Ok(SecretKey::from_bytes([marker; 32]))
+        }
+    }
+
+    struct RecoveryDelivery {
+        last_code: Arc<Mutex<Option<String>>>,
+    }
+
+    impl OtpDeliveryProvider for RecoveryDelivery {
+        fn dispatch<'a>(
+            &'a self,
+            message: OtpDeliveryMessage,
+        ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>> {
+            Box::pin(async move {
+                *self
+                    .last_code
+                    .lock()
+                    .expect("recovery test delivery lock should be available") =
+                    Some(message.code.to_string());
+                match message.channel {
+                    DeliveryChannel::Email | DeliveryChannel::WhatsApp => DispatchStatus::Accepted,
+                }
+            })
+        }
+    }
+
+    let pool = application_pool().await;
+    let keys = RecoveryKeys;
+    let last_code = Arc::new(Mutex::new(None));
+    let delivery = RecoveryDelivery {
+        last_code: last_code.clone(),
+    };
+    let email = format!(
+        "recovery-runtime-{}-{}@example.test",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after epoch")
+            .as_nanos()
+    );
+    let password_hash = hash_password(b"recovery-runtime-password-strong").unwrap();
+
+    let registration = ClientRegistration {
+        display_name: "Recovery Runtime User",
+        role: ClientRole::BusinessOwner,
+        initial_contact_channel: ContactChannel::Email,
+        email_normalized: Some(&email),
+        phone_e164: None,
+        password_hash: &password_hash,
+        terms_of_service_version: "terms-test-v1",
+        privacy_policy_version: "privacy-test-v1",
+        marketing_consent: false,
+        marketing_notice_version: None,
+    };
+    let verification = VerificationService::new(&pool, &keys, &delivery);
+    let registered = verification
+        .register(&registration)
+        .await
+        .expect("runtime should register a pending account");
+    let registration_code = last_code
+        .lock()
+        .expect("recovery test delivery lock should be available")
+        .clone()
+        .expect("registration OTP should be captured");
+    assert!(
+        verification
+            .verify(&registered.session_id, &registration_code)
+            .await
+            .expect("registration OTP should be verified")
+    );
+
+    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL")
+        .expect("CI must provide a disposable DBA connection");
+    let admin_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&admin_url)
+        .await
+        .expect("disposable DBA connection should succeed");
+    let fingerprint = contact_fingerprint(&keys, "email", &email)
+        .expect("recovery contact fingerprint should be generated");
+    let contact_session_id: String = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions ( \
+             id, user_id, purpose, channel, destination_ciphertext, destination_nonce, \
+             encryption_key_version, destination_hmac, hmac_key_version, expires_at \
+         ) VALUES ( \
+             gen_random_uuid(), $1::uuid, 'recovery_contact_add', 'email', \
+             decode('0102','hex'), decode('010203040506070809101112','hex'), \
+             'v1', $2, 'v1', clock_timestamp() + INTERVAL '10 minutes' \
+         ) RETURNING id::text",
+    )
+    .bind(&registered.user_id)
+    .bind(fingerprint.digest.to_vec())
+    .fetch_one(&admin_pool)
+    .await
+    .expect("verified recovery-contact session should be created for test setup");
+
+    sqlx::query(
+        "UPDATE public.verification_sessions \
+            SET status = 'verified', verified_at = clock_timestamp() \
+          WHERE id = $1::uuid",
+    )
+    .bind(&contact_session_id)
+    .execute(&admin_pool)
+    .await
+    .expect("test recovery-contact session should be verified");
+
+    sqlx::query(
+        "INSERT INTO public.recovery_contacts ( \
+             id, user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, \
+             contact_hmac, hmac_key_version, verification_session_id, verified_at \
+         ) \
+         SELECT gen_random_uuid(), user_id, channel, destination_ciphertext, destination_nonce, \
+                encryption_key_version, destination_hmac, hmac_key_version, id, verified_at \
+           FROM public.verification_sessions WHERE id = $1::uuid AND status = 'verified'",
+    )
+    .bind(&contact_session_id)
+    .execute(&admin_pool)
+    .await
+    .expect("test account should have a verified recovery contact");
+
+    let recovery = RecoveryService::new(&pool, &keys, &delivery);
+    let started = recovery
+        .start(
+            ContactChannel::Email,
+            Some(&email),
+            None,
+            RecoveryAction::PasswordReset,
+        )
+        .await
+        .expect("account recovery should create an unbound session");
+    let recovery_code = last_code
+        .lock()
+        .expect("recovery test delivery lock should be available")
+        .clone()
+        .expect("recovery OTP should be captured");
+    assert!(
+        recovery
+            .verify(&started.session_id, &recovery_code)
+            .await
+            .expect("account recovery OTP should be verified")
+    );
+
+    let candidates = recovery
+        .list_candidates(&started.case_id)
+        .await
+        .expect("verified contact should list matching active accounts");
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0].user_id, registered.user_id);
+    assert_eq!(candidates[0].role, "business_owner");
+
+    let selected_user_id = recovery
+        .select_account(&started.case_id, &registered.user_id)
+        .await
+        .expect("selected account should pass the database ownership check");
+    assert_eq!(selected_user_id, registered.user_id);
+
+    let case_status: String = sqlx::query_scalar(
+        "SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid",
+    )
+    .bind(&started.case_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("DBA should inspect recovery case state");
+    assert_eq!(case_status, "under_review");
+
+    admin_pool.close().await;
+    pool.close().await;
+}
