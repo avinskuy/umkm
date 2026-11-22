@@ -55,6 +55,66 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION public.get_registration_verification_session(p_session_id UUID)
+RETURNS TABLE (
+    channel TEXT,
+    destination_ciphertext BYTEA,
+    destination_nonce BYTEA,
+    encryption_key_version TEXT,
+    destination_hmac BYTEA,
+    hmac_key_version TEXT,
+    expires_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $
+BEGIN
+    RETURN QUERY
+    SELECT s.channel, s.destination_ciphertext, s.destination_nonce,
+           s.encryption_key_version, s.destination_hmac, s.hmac_key_version,
+           s.expires_at
+      FROM public.verification_sessions AS s
+     WHERE s.id = p_session_id
+       AND s.purpose = 'registration'
+       AND s.status = 'pending'
+       AND s.expires_at > clock_timestamp();
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'pending registration verification session was not found'
+            USING ERRCODE = 'P0002';
+    END IF;
+END;
+$;
+
+CREATE FUNCTION public.get_pending_otp_challenge(p_session_id UUID)
+RETURNS TABLE (challenge_id UUID, code_hash BYTEA, hash_key_version TEXT, expires_at TIMESTAMPTZ)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $
+BEGIN
+    RETURN QUERY
+    SELECT c.id, c.code_hash, c.hash_key_version, c.expires_at
+      FROM public.verification_challenges AS c
+      JOIN public.verification_sessions AS s
+        ON s.id = c.verification_session_id
+     WHERE c.verification_session_id = p_session_id
+       AND c.status = 'pending'
+       AND c.expires_at > clock_timestamp()
+       AND s.purpose = 'registration'
+       AND s.status = 'pending'
+       AND s.expires_at > clock_timestamp()
+     ORDER BY c.created_at DESC
+     LIMIT 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'pending OTP challenge was not found'
+            USING ERRCODE = 'P0002';
+    END IF;
+END;
+$;
+
 CREATE FUNCTION public.reserve_otp_challenge(
     p_session_id UUID,
     p_code_hash BYTEA,
@@ -302,12 +362,18 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_registration_verification_session(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_pending_otp_challenge(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT, BYTEA[]) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[]) FROM PUBLIC;
 
 COMMENT ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) IS
     'Membuat sesi OTP registrasi untuk akun pending melalui transaksi aplikasi.';
+COMMENT ON FUNCTION public.get_registration_verification_session(UUID) IS
+    'Membaca tujuan terenkripsi dan metadata sesi registrasi pending untuk dispatch OTP.';
+COMMENT ON FUNCTION public.get_pending_otp_challenge(UUID) IS
+    'Membaca hash challenge pending untuk verifikasi constant-time di backend.';
 COMMENT ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT, BYTEA[]) IS
     'Merotasi challenge dan mereservasi kuota pengiriman OTP secara atomik.';
 COMMENT ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) IS
