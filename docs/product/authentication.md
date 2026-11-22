@@ -1,5 +1,7 @@
 # Aturan Produk Autentikasi
 
+> Keputusan tahap pertama (22 November 2026): email/telepon + password atau Google OAuth. OTP tidak diminta saat registrasi maupun login; verifikasi kontak ditunda. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](../architecture/identity-core-authentication-stage-one-decision.md).
+
 ## Model akun
 
 - Akun publik hanya memiliki satu role utama: `business_owner` atau `investor`.
@@ -25,21 +27,23 @@ Halaman login klien yang terpisah merupakan kebutuhan pengalaman pengguna. Kedua
 ## Metode autentikasi dan verifikasi
 
 - Pendaftaran email atau nomor HP wajib menggunakan kata sandi lokal.
-- Pengguna memilih satu kontak pendaftaran: email dengan kode verifikasi email, atau nomor HP dengan kode yang dikirim melalui WhatsApp.
-- Pendaftaran Google OAuth tidak memerlukan kata sandi lokal, tetapi pengguna baru tetap wajib memilih role sebelum OAuth dan memverifikasi satu kontak pendaftaran secara terpisah.
-- Kode OTP hanya untuk verifikasi kontak/aktivasi dan tidak dapat digunakan sebagai kredensial login atau reset password.
+- Pengguna memilih satu identifier awal: email atau nomor HP. Pada tahap pertama, kontak tidak harus diverifikasi dengan OTP sebelum akun dibuat atau digunakan untuk login.
+- Pendaftaran Google OAuth tidak memerlukan kata sandi lokal. Pengguna baru wajib memilih role sebelum OAuth; pilihan role diikat pada state server.
+- OTP ditunda ke tahap berikutnya dan tidak dapat digunakan sebagai kredensial login atau reset password.
+- Kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan atau tindakan sensitif.
+- Klaim email Google hanya ditandai terverifikasi jika token tervalidasi menyatakan `email_verified=true`; kecocokan email tidak menggabungkan akun otomatis.
 - Password harus disimpan menggunakan Argon2id.
 - Google OAuth harus terikat pada identitas penyedia yang stabil; jangan menghubungkan akun hanya berdasarkan kecocokan email.
 - MFA Admin wajib tersedia sebelum sistem digunakan di produksi. Metode dan penyedianya masih merupakan keputusan implementasi.
 
-Baseline OTP: masa berlaku 10 menit, maksimal lima percobaan gagal per sesi verifikasi, penguncian satu jam setelah kegagalan kelima, jeda kirim ulang 60 detik, dan maksimal lima pengiriman per alamat kontak per jam. Pengiriman OTP baru tidak menghapus atau memperpendek penguncian. Detail status sesi dan challenge mengikuti [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md).
+Baseline masa berlaku, batas percobaan, lock, dan resend OTP pada [Keputusan Pendaftaran Identity Core](../architecture/identity-core-registration-decisions.md) berlaku untuk tahap verifikasi kontak berikutnya, bukan registrasi/login tahap pertama.
 
 ## Sesi dan pemulihan akun
 
 - Sesi mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut.
 - Pengguna dapat melihat sesi aktif, mencabut sesi tertentu, dan logout dari semua perangkat.
 - Fitur “Ingat perangkat ini” tidak melewati batas sesi atau pencabutan server.
-- Pemulihan akun mendukung kontak pemulihan email dan nomor HP yang diverifikasi, termasuk kontak pemulihan yang digunakan bersama beberapa akun.
+- Pemulihan akun hanya boleh menggunakan kanal yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset; fitur reset tidak boleh dirilis sebelum pengiriman token aman tersedia. Akun Google-only menggunakan pemulihan Google.
 - Kepemilikan kontak bersama tidak membuktikan kepemilikan seluruh akun yang terhubung. Pemilihan akun dan pemeriksaan risiko tetap diperlukan.
 - Jika kontak utama dan pemulihan tidak tersedia, gunakan pemulihan alternatif berbasis risiko dan pemeriksaan manual oleh petugas khusus jika diperlukan.
 - Pemulihan berisiko tinggi dapat ditunda atau ditolak; role utama tidak pernah berubah.
