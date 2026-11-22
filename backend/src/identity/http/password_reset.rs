@@ -12,9 +12,7 @@ use crate::identity::{
 };
 
 use super::{
-    authentication::{
-        clear_session_cookie, is_cross_site_request, resolved_client_ip,
-    },
+    authentication::{clear_session_cookie, is_cross_site_request, resolved_client_ip},
     recovery::{error, message, no_store, rate_limit_response},
     RecoveryApiState, RegistrationAction,
 };
@@ -154,4 +152,3 @@ fn secure_error(status: StatusCode, text: &'static str) -> Response<axum::body::
     no_store(&mut response);
     response
 }
-
