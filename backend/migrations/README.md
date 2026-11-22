@@ -1,6 +1,6 @@
 # Migrasi Database
 
-Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0014):
+Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0015):
 
 - `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
 - `20261122100000_create_identity_verification.sql` — membuat `verification_sessions`, `verification_challenges`, `otp_verification_attempt_events`, dan `otp_delivery_events`, termasuk state constraints, batas umur challenge 10 menit, satu challenge pending per sesi, binding recovery pra-pemilihan akun, serta indeks event lintas sesi.
@@ -16,6 +16,7 @@ Direktori ini berisi migration SQLx berversi. Migration Identity Core yang terse
 - `20261122210000_add_password_authentication_runtime.sql` — menambahkan operasi login berbasis role, pembuatan/pencabutan sesi opaque, dan rate limit HMAC per identifier/IP.
 - `20261122220000_add_session_runtime_operations.sql` — menambahkan validasi sesi aktif, pembaruan `last_seen_at`, rotasi token, dan pencabutan semua sesi satu akun.
 - `20261122230000_add_account_recovery_database_operations.sql` — menambahkan pembuatan sesi recovery tanpa akun terikat, memakai ulang mekanisme OTP dan rate limit lintas sesi yang sama, serta pemilihan akun secara atomik hanya jika akun aktif memiliki kontak pemulihan terverifikasi dengan kanal dan fingerprint yang cocok.
+- `20261122240000_add_account_recovery_account_candidates.sql` — menyediakan konteks recovery dan daftar akun aktif yang berbagi kontak pemulihan terverifikasi, hanya setelah sesi OTP diverifikasi dan dengan kecocokan fingerprint yang sama.
 
 ## Status runtime
 
@@ -33,7 +34,7 @@ HTTP runtime membuat pool PostgreSQL melalui `DatabaseConfig::from_app_env()` da
 
 Endpoint `GET /api/v1/health` merupakan liveness check yang tidak bergantung pada database. Endpoint `GET /api/v1/readyz` menjalankan `SELECT 1` melalui pool runtime dan mengembalikan HTTP 503 jika database tidak siap.
 
-Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0014 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
+Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0015 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
 
 Pengujian PostgreSQL untuk migration, invariant identitas, privilege principal, dan orchestration OTP berada di `backend/tests/postgres.rs`. Pengujian readiness runtime berada di `backend/tests/runtime.rs` dan memakai `APP_DATABASE_URL` melalui principal aplikasi. Keduanya dijalankan terhadap database disposable di CI.
 
