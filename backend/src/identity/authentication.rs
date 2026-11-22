@@ -7,6 +7,7 @@ use zeroize::Zeroizing;
 
 use super::{
     audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome},
+    crypto::{device_ip_fingerprint, key_version_label, KeyProvider},
     password::{hash_password, verify_password},
 };
 
@@ -140,16 +141,28 @@ pub struct RotatedSession {
     pub expires_in_seconds: i64,
 }
 
+pub struct LoginDeviceContext<'a> {
+    pub peer_ip: IpAddr,
+    pub user_agent: Option<&'a str>,
+    pub remember_device: bool,
+}
+
 pub struct AuthenticationService<'a> {
     pool: &'a PgPool,
     rate_limit_key: &'a AuthenticationRateLimitKey,
+    device_keys: &'a dyn KeyProvider,
 }
 
 impl<'a> AuthenticationService<'a> {
-    pub fn new(pool: &'a PgPool, rate_limit_key: &'a AuthenticationRateLimitKey) -> Self {
+    pub fn new(
+        pool: &'a PgPool,
+        rate_limit_key: &'a AuthenticationRateLimitKey,
+        device_keys: &'a dyn KeyProvider,
+    ) -> Self {
         Self {
             pool,
             rate_limit_key,
+            device_keys,
         }
     }
 
@@ -158,7 +171,7 @@ impl<'a> AuthenticationService<'a> {
         identifier: &str,
         password: &str,
         role: LoginRole,
-        peer_ip: IpAddr,
+        device: LoginDeviceContext<'_>,
     ) -> Result<LoginSession, AuthenticationError> {
         let normalized = normalize_identifier(identifier)?;
         if password.is_empty() || password.len() > 1024 {
@@ -168,7 +181,7 @@ impl<'a> AuthenticationService<'a> {
         let identifier_hash = self
             .rate_limit_key
             .fingerprint(b"usahapintar:login-identifier:v1", normalized.as_bytes());
-        let ip_subject = ip_rate_limit_subject(peer_ip);
+        let ip_subject = ip_rate_limit_subject(device.peer_ip);
         let ip_hash = self
             .rate_limit_key
             .fingerprint(b"usahapintar:login-ip:v1", &ip_subject);
@@ -217,19 +230,30 @@ impl<'a> AuthenticationService<'a> {
 
         let raw_token = Zeroizing::new(random_session_token()?);
         let token_hash = hash_session_token(raw_token.as_str());
+        let device_fingerprint = device_ip_fingerprint(self.device_keys, device.peer_ip)
+            .map_err(|_| AuthenticationError::Internal)?;
+        let device_key_version =
+            key_version_label(device_fingerprint.key_version).map_err(|_| AuthenticationError::Internal)?;
+        let user_agent_summary = normalize_user_agent_summary(device.user_agent);
 
         let mut transaction = self
             .pool
             .begin()
             .await
             .map_err(|_| AuthenticationError::Database)?;
-        let session_id: String =
-            sqlx::query_scalar("SELECT public.create_password_login_session($1::uuid, $2)::text")
-                .bind(&user_id)
-                .bind(token_hash.to_vec())
-                .fetch_one(&mut *transaction)
-                .await
-                .map_err(|_| AuthenticationError::Database)?;
+        let session_id: String = sqlx::query_scalar(
+            "SELECT public.create_password_login_session( \
+                $1::uuid, $2, $3, $4, $5, $6)::text",
+        )
+        .bind(&user_id)
+        .bind(token_hash.to_vec())
+        .bind(device.remember_device)
+        .bind(user_agent_summary)
+        .bind(device_fingerprint.digest.to_vec())
+        .bind(device_key_version)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|_| AuthenticationError::Database)?;
 
         sqlx::query("SELECT public.clear_password_login_identifier_limit($1)")
             .bind(identifier_hash.to_vec())
@@ -457,6 +481,20 @@ pub fn normalize_identifier(value: &str) -> Result<String, AuthenticationError> 
         return Err(AuthenticationError::InvalidInput);
     }
     Ok(compact)
+}
+
+fn normalize_user_agent_summary(value: Option<&str>) -> Option<String> {
+    let summary = value?
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(256)
+        .collect::<String>();
+    let summary = summary.trim();
+    if summary.is_empty() {
+        None
+    } else {
+        Some(summary.to_owned())
+    }
 }
 
 fn ip_rate_limit_subject(ip: IpAddr) -> Vec<u8> {
