@@ -100,7 +100,7 @@ impl<'a> VerificationService<'a> {
         let mut transaction = self.pool.begin().await?;
         let user_id = create_client_user(&mut *transaction, &normalized_registration).await?;
 
-        sqlx::query_scalar::<_, String>(
+        let persisted_session_id = sqlx::query_scalar::<_, String>(
             "SELECT public.create_registration_verification_session(                $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8,                 clock_timestamp() + INTERVAL '10 minutes')::text",
         )
         .bind(&session_id)
@@ -113,6 +113,9 @@ impl<'a> VerificationService<'a> {
         .bind(key_version_label(fingerprint.key_version))
         .fetch_one(&mut *transaction)
         .await?;
+        if persisted_session_id != session_id {
+            return Err(VerificationError::InvalidStoredData);
+        }
 
         transaction.commit().await?;
 
@@ -145,7 +148,7 @@ impl<'a> VerificationService<'a> {
         let session = self.load_session(session_id).await?;
         let channel = parse_delivery_channel(&session.0)?;
         let destination = self.decrypt_destination(session_id, &session)?;
-        let aliases = self.contact_aliases(channel, &destination)?;
+        let aliases = self.contact_aliases(channel, &destination, &session)?;
         let (challenge_id, stored_hash, hash_version) = sqlx::query_as::<_, ChallengeRow>(
             "SELECT challenge_id::text, code_hash, hash_key_version              FROM public.get_pending_otp_challenge($1::uuid)",
         )
@@ -277,8 +280,17 @@ impl<'a> VerificationService<'a> {
         &self,
         channel: &str,
         destination: &str,
+        session: &SessionRow,
     ) -> Result<Vec<super::crypto::KeyedDigest>, VerificationError> {
-        contact_fingerprint_aliases(self.keys, channel, destination).map_err(Into::into)
+        let aliases = contact_fingerprint_aliases(self.keys, channel, destination)?;
+        let stored_version = parse_key_version(&session.5)?;
+        let stored_fingerprint_matches = aliases.iter().any(|alias| {
+            alias.key_version == stored_version && alias.digest.as_slice() == session.4.as_slice()
+        });
+        if !stored_fingerprint_matches {
+            return Err(VerificationError::InvalidStoredData);
+        }
+        Ok(aliases)
     }
 }
 
