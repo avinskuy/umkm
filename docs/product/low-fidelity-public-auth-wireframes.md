@@ -259,8 +259,11 @@ DIBATASI SEMENTARA
 GANGGUAN JARINGAN
   Pertahankan field yang tidak sensitif dan sediakan opsi coba lagi.
 
-KONTAK BELUM DIVERIFIKASI
-  Akun tetap dapat masuk sesuai kebijakan, tetapi kontak tidak dapat dipakai untuk pemulihan atau tindakan sensitif.
+OTP BELUM VALID
+  Akun masih pending; pengguna dapat memasukkan kode atau meminta resend setelah cooldown.
+
+OTP VALID
+  Backend mengaktifkan akun dan mengarahkan pengguna ke onboarding.
 ```
 
 ## 5. Pendaftaran Owner
@@ -285,7 +288,7 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 │ [ ] Saya menyetujui Ketentuan dan Kebijakan Privasi           │
 │ [ ] Saya ingin menerima kabar produk (opsional)               │
 │                                                              │
-│ [Lanjutkan]                                                   │
+│ [Kirim kode OTP]                                               │
 │ Sudah punya akun? [Masuk]                                     │
 └──────────────────────────────────────────────────────────────┘
 ```
