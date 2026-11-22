@@ -29,6 +29,8 @@ Migration pertama **tidak** membangun:
 
 Migration ini hanya membentuk skema; migration ini tidak menjalankan dirinya sendiri pada database produksi dan tidak membuat endpoint registrasi/login. Secara terpisah, HTTP server menginisialisasi pool PostgreSQL saat startup, tetapi tidak menjalankan migration secara otomatis.
 
+**Temuan untuk Google OAuth:** fungsi `create_client_user` selalu menyimpan akun sebagai `pending_verification` dan menetapkan deadline 30 menit, tanpa mengisi timestamp verifikasi email meskipun `p_google_subject` disediakan. Dengan demikian, migration 0001 belum menyediakan jalur Google tanpa OTP untuk langsung mengaktifkan akun. Perlu migration lanjutan yang eksplisit dan tes PostgreSQL untuk jalur OAuth tervalidasi; jangan mengubah migration 0001.
+
 ## 2. Tabel `users`
 
 ### 2.1 Kolom
