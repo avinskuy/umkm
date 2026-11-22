@@ -1,7 +1,6 @@
 # Kontrak Skema Migration 0004 — Pemulihan Akun
 
 > Status: diimplementasikan sebagai migration SQLx dan lulus CI, termasuk pengujian integrasi PostgreSQL.
-> Tanggal: 22 November 2026
 > Cakupan: kontak pemulihan bersama, kasus pemulihan akun, dan token reset kata sandi
 
 Dokumen ini menjelaskan kontrak PostgreSQL untuk kontak pemulihan, kasus pemulihan, dan token reset. Migration ini tidak mengaktifkan endpoint publik, provider, atau konfigurasi produksi.
