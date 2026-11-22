@@ -153,9 +153,10 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
 
 #[tokio::test]
 #[ignore = "requires the disposable least-privilege PostgreSQL application principal"]
-async fn registration_http_router_creates_and_verifies_an_account_without_being_mounted_by_default() {
+async fn registration_http_router_creates_and_verifies_an_account_without_being_mounted_by_default()
+{
     use usahapintar_api::identity::{
-        crypto::{CryptoError, KeyPurpose, KeyProvider, KeyVersion, SecretKey, VersionedKey},
+        crypto::{CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey, VersionedKey},
         delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
         http::{
             registration_router, AbuseDecision, RegistrationAbuseGuard, RegistrationAction,
@@ -194,7 +195,10 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
             message: OtpDeliveryMessage,
         ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>> {
             Box::pin(async move {
-                *self.last_code.lock().expect("test delivery lock should be available") =
+                *self
+                    .last_code
+                    .lock()
+                    .expect("test delivery lock should be available") =
                     Some(message.code.to_string());
                 match message.channel {
                     DeliveryChannel::Email | DeliveryChannel::WhatsApp => DispatchStatus::Accepted,
@@ -331,13 +335,11 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
     let duplicate_payload: serde_json::Value =
         serde_json::from_slice(&duplicate_body).expect("duplicate response should be JSON");
     assert_eq!(
-        duplicate_payload["message"],
-        created_payload["message"],
+        duplicate_payload["message"], created_payload["message"],
         "duplicate identifier must not be disclosed in the public response"
     );
     assert_ne!(
-        duplicate_payload["verification_id"],
-        created_payload["verification_id"],
+        duplicate_payload["verification_id"], created_payload["verification_id"],
         "duplicate response must not expose the original verification session"
     );
 
