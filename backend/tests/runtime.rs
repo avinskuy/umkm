@@ -352,7 +352,10 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         ))
         .await
         .expect("wrong-password login should respond");
-    assert_eq!(wrong_password.status(), axum::http::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        wrong_password.status(),
+        axum::http::StatusCode::UNAUTHORIZED
+    );
     assert!(
         wrong_password.headers().get(header::SET_COOKIE).is_none(),
         "failed login must not create a session cookie"
@@ -392,7 +395,10 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
     let mut logout_request = Request::builder()
         .method(Method::POST)
         .uri("/api/v1/identity/logout")
-        .header(header::COOKIE, format!("__Host-usahapintar_session={token}"))
+        .header(
+            header::COOKIE,
+            format!("__Host-usahapintar_session={token}"),
+        )
         .body(Body::empty())
         .expect("logout request should be valid");
     logout_request.extensions_mut().insert(ConnectInfo(
@@ -421,13 +427,12 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         .connect(&admin_url)
         .await
         .expect("disposable DBA connection should succeed");
-    let revoked_reason: String = sqlx::query_scalar(
-        "SELECT revocation_reason FROM public.sessions WHERE token_hash = $1",
-    )
-    .bind(token_hash.to_vec())
-    .fetch_one(&admin_pool)
-    .await
-    .expect("logged-out session should remain as a revoked audit record");
+    let revoked_reason: String =
+        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE token_hash = $1")
+            .bind(token_hash.to_vec())
+            .fetch_one(&admin_pool)
+            .await
+            .expect("logged-out session should remain as a revoked audit record");
     assert_eq!(revoked_reason, "logout");
     admin_pool.close().await;
 
