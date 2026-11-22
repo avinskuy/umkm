@@ -32,7 +32,7 @@ Halaman login klien yang terpisah merupakan kebutuhan pengalaman pengguna. Kedua
 - Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login.
 - Google OAuth dan jalur registrasi tanpa OTP tidak termasuk cakupan yang disetujui.
 - Kontak awal yang belum diverifikasi tidak boleh digunakan sebagai bukti pemulihan atau untuk tindakan sensitif.
-- Password harus disimpan menggunakan Argon2id.
+- Password harus disimpan menggunakan Argon2id. Usulan panjang minimum, maksimum, blocklist, dan pengalaman pengguna masih menunggu persetujuan pada [Usulan Kebijakan Password Pengguna](../security/password-authentication-policy-proposal.md).
 - OTP tidak dapat digunakan sebagai kredensial login atau pengganti password; OTP hanya untuk verifikasi kontak dan alur keamanan yang telah ditetapkan.
 - MFA Admin wajib tersedia sebelum sistem digunakan di produksi. Metode dan penyedianya masih merupakan keputusan implementasi.
 
@@ -43,7 +43,7 @@ Baseline masa berlaku, batas percobaan, lock, cooldown, dan rate limit OTP mengi
 - Sesi mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut.
 - Pengguna dapat melihat sesi aktif, mencabut sesi tertentu, dan logout dari semua perangkat.
 - Fitur “Ingat perangkat ini” tidak melewati batas sesi atau pencabutan server.
-- Pemulihan akun hanya boleh menggunakan kanal yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset; fitur reset tidak boleh dirilis sebelum pengiriman token aman tersedia. Akun Google-only menggunakan pemulihan Google.
+- Pemulihan akun hanya boleh menggunakan kanal yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset; fitur reset tidak boleh dirilis sebelum pengiriman token aman tersedia.
 - Kepemilikan kontak bersama tidak membuktikan kepemilikan seluruh akun yang terhubung. Pemilihan akun dan pemeriksaan risiko tetap diperlukan.
 - Jika kontak utama dan pemulihan tidak tersedia, gunakan pemulihan alternatif berbasis risiko dan pemeriksaan manual oleh petugas khusus jika diperlukan.
 - Pemulihan berisiko tinggi dapat ditunda atau ditolak; role utama tidak pernah berubah.
