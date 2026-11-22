@@ -1008,6 +1008,26 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .await
     .expect("active Admin session should be created for review");
 
+    let revoked_reviewer_session_token = "c".repeat(64);
+    let revoked_reviewer_session_hash = hash_session_token(&revoked_reviewer_session_token);
+    sqlx::query(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
+    )
+    .bind(&reviewer_id)
+    .bind(revoked_reviewer_session_hash.to_vec())
+    .execute(&admin_pool)
+    .await
+    .expect("a second Admin session should be created for revocation testing");
+    sqlx::query(
+        "UPDATE public.sessions SET revoked_at = clock_timestamp(), revocation_reason = 'logout' \
+          WHERE token_hash = $1",
+    )
+    .bind(revoked_reviewer_session_hash.to_vec())
+    .execute(&admin_pool)
+    .await
+    .expect("Admin session should be revoked for the negative test");
+
     let review_service = RecoveryReviewService::new(&pool);
     assert!(
         review_service
@@ -1021,6 +1041,20 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             .await
             .is_err(),
         "a non-Admin account must not approve recovery"
+    );
+
+    assert!(
+        review_service
+            .review_case(
+                &recovery_case_id,
+                &reviewer_id,
+                &revoked_reviewer_session_token,
+                RecoveryReviewDecision::Approve,
+                RecoveryReviewReason::OwnershipConfirmed,
+            )
+            .await
+            .is_err(),
+        "a revoked Admin session must not approve recovery"
     );
 
     review_service
