@@ -1991,7 +1991,8 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                FROM unnest(ARRAY[ \
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
-                   'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens' \
+                   'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
+                   'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
                  OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'INSERT') \
@@ -2076,6 +2077,24 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
             .await
             .expect("application may create a pending account through the guarded function");
     assert!(!created_user_id.is_empty());
+
+    let created_profile: String = sqlx::query_scalar(
+        "SELECT display_name FROM public.user_profiles WHERE user_id = $1::uuid",
+    )
+    .bind(&created_user_id)
+    .fetch_one(pool)
+    .await
+    .expect("migration principal should verify the application-created profile");
+    assert_eq!(created_profile, "Pemilik Bootstrap");
+
+    let created_acceptances: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.policy_acceptance_records WHERE user_id = $1::uuid",
+    )
+    .bind(&created_user_id)
+    .fetch_one(pool)
+    .await
+    .expect("migration principal should verify required policy acceptance");
+    assert_eq!(created_acceptances, 2);
 
     sqlx::query(
         "INSERT INTO public.identity_audit_events (actor_type, action_code, outcome) \
@@ -2204,6 +2223,18 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         .expect("registration orchestration should create a pending account and dispatch OTP");
     assert_eq!(started.dispatch_status, DispatchStatus::Accepted);
 
+    let registration_state: (String, i64, i64) = sqlx::query_as(
+        "SELECT p.display_name, \
+                (SELECT count(*)::bigint FROM public.policy_acceptance_records AS a WHERE a.user_id = p.user_id), \
+                (SELECT count(*)::bigint FROM public.consent_events AS c WHERE c.user_id = p.user_id) \
+         FROM public.user_profiles AS p WHERE p.user_id = $1::uuid",
+    )
+    .bind(&started.user_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("registration profile and policy state should be persisted");
+    assert_eq!(registration_state, ("Pemilik Usaha Demo".to_owned(), 2, 0));
+
     let code = {
         let messages = delivery
             .messages
@@ -2266,6 +2297,16 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         .await
         .expect("WhatsApp registration should create a pending account and dispatch OTP");
     assert_eq!(phone_started.dispatch_status, DispatchStatus::Accepted);
+
+    let phone_marketing_events: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.consent_events \
+         WHERE user_id = $1::uuid AND purpose = 'marketing' AND action = 'granted'",
+    )
+    .bind(&phone_started.user_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("explicit marketing opt-in should be recorded");
+    assert_eq!(phone_marketing_events, 1);
 
     let phone_code = {
         let messages = delivery
