@@ -3,11 +3,11 @@
 > Status: diimplementasikan sebagai migration SQLx; dokumen ini menjadi kontrak dan referensi tes
 > Tanggal: 21 November 2026
 > Basis: keputusan teknis Identity Core yang telah disetujui sebagai baseline
-> Cakupan: akun, role permanen, kontak utama, dan identitas Google
+> Cakupan historis: akun, role permanen, kontak utama, dan tabel identitas provider (dihapus oleh migration 0006)
 
-Dokumen ini menetapkan kontrak historis skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
+Dokumen ini menetapkan kontrak historis skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration 0001 awalnya memuat tabel identitas provider; migration 0006 menghapus tabel tersebut dan mengganti fungsi pembuatan akun menjadi password-only. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
 
-> **Catatan keputusan 22 November 2026:** kebijakan terbaru mewajibkan OTP untuk pendaftaran email/WhatsApp + password; Google OAuth tidak memerlukan OTP tambahan bila token tervalidasi dan email_verified=true. Lifecycle pending dan verifikasi kontak di migration ini menjadi dasar alur password. Jalur pembuatan akun Google tanpa OTP tetap harus diaudit terhadap constraint dan trigger. Jangan mengubah file migration ini; bila penyesuaian diperlukan, buat migration lanjutan dan tes. Lihat [Keputusan Autentikasi Identity Core — Registrasi OTP dan Google OAuth](identity-core-authentication-stage-one-decision.md).
+> **Keputusan terbaru 22 November 2026:** registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP. Migration 0001–0005 tetap immutable. Migration 0006 menghapus tabel identitas provider yang hanya disiapkan untuk OAuth dan mengganti fungsi `create_client_user` menjadi fungsi lima parameter yang mewajibkan password hash. Jangan mengubah migration lama; perubahan selanjutnya memakai migration baru dan tes. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`. File implementasinya adalah `20261121170000_create_identity_accounts.sql`.
 
@@ -29,7 +29,7 @@ Migration pertama **tidak** membangun:
 
 Migration ini hanya membentuk skema; migration ini tidak menjalankan dirinya sendiri pada database produksi dan tidak membuat endpoint registrasi/login. Secara terpisah, HTTP server menginisialisasi pool PostgreSQL saat startup, tetapi tidak menjalankan migration secara otomatis.
 
-**Temuan untuk Google OAuth:** fungsi `create_client_user` selalu menyimpan akun sebagai `pending_verification` dan menetapkan deadline 30 menit, tanpa mengisi timestamp verifikasi email meskipun `p_google_subject` disediakan. Dengan demikian, migration 0001 belum menyediakan jalur Google tanpa OTP untuk langsung mengaktifkan akun. Perlu migration lanjutan yang eksplisit dan tes PostgreSQL untuk jalur OAuth tervalidasi; jangan mengubah migration 0001.
+**Catatan historis:** migration 0001 semula menyertakan identitas provider dan parameter `p_google_subject`. Dukungan tersebut tidak digunakan dan telah dihapus melalui migration 0006. Fungsi aktif `create_client_user` hanya menerima role klien, kontak awal, dan password hash; aktivasi tetap menunggu verifikasi OTP.
 
 ## 2. Tabel `users`
 
