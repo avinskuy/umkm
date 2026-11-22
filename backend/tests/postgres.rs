@@ -483,13 +483,15 @@ async fn assert_password_only_authentication_invariants(pool: &PgPool) {
     assert_eq!(account_state.0, "pending_verification");
     assert_eq!(account_state.1.as_deref(), Some("encoded-password-hash"));
 
-    let legacy_identity_table_exists: bool = sqlx::query_scalar(
-        "SELECT pg_catalog.to_regclass('public.user_identities') IS NOT NULL",
-    )
-    .fetch_one(pool)
-    .await
-    .expect("legacy provider identity table state should be queryable");
-    assert!(!legacy_identity_table_exists, "provider identity storage must be absent");
+    let legacy_identity_table_exists: bool =
+        sqlx::query_scalar("SELECT pg_catalog.to_regclass('public.user_identities') IS NOT NULL")
+            .fetch_one(pool)
+            .await
+            .expect("legacy provider identity table state should be queryable");
+    assert!(
+        !legacy_identity_table_exists,
+        "provider identity storage must be absent"
+    );
 
     assert!(
         sqlx::query_scalar::<_, String>(
