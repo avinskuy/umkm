@@ -307,7 +307,7 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 └──────────────────────────────────────────────────────────────┘
 ```
 
-OTP tidak diminta pada registrasi maupun login tahap pertama. Verifikasi kontak dan OTP ditunda ke tahap berikutnya; UI tidak boleh memberi kesan bahwa kontak yang baru dimasukkan sudah terverifikasi.
+Setelah formulir registrasi dikirim, tampilkan layar verifikasi OTP sesuai kanal: email untuk email, atau WhatsApp untuk nomor telepon. Akun tetap pending sampai kode berhasil diverifikasi. Sediakan status pengiriman, expiry, cooldown resend, batas percobaan, dan pesan error generik yang tidak membocorkan apakah identifier telah terdaftar.
 
 ### Langkah 2 — Tahap usaha
 
@@ -351,7 +351,7 @@ Jika tahap usaha masih berupa ide, beri label nama usaha sebagai nama ide/proyek
 
 ### Langkah 1 dan 2
 
-Gunakan kembali tata letak akun dan konfirmasi pembuatan akun tanpa OTP dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
+Gunakan kembali tata letak registrasi dan verifikasi OTP dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
 
 ### Langkah 3 — Preferensi Investor
 
@@ -474,7 +474,7 @@ Tempatkan style komponen dekat fitur terkait atau dalam CSS Modules. Jangan memu
 - [ ] Admin terpisah dengan jelas dari alur pengguna publik.
 - [ ] Tidak ada pemilih role pada profil pengguna yang sudah login seolah-olah role dapat diganti kapan saja.
 - [ ] Semua formulir memiliki label yang terlihat, validasi inline, dan status error dari server.
-- [ ] Registrasi dan login tahap pertama tidak meminta OTP; kontak belum terverifikasi diberi batas penggunaan yang jelas.
+- [ ] Registrasi meminta OTP sesuai kanal dan akun tetap pending sampai verifikasi berhasil; login rutin tidak meminta OTP.
 - [ ] Tata letak mobile tidak overflow secara horizontal dan tetap nyaman digunakan saat keyboard layar terbuka.
 - [ ] Keanggotaan copy preserves free approved-connection chat.
 - [ ] Tidak ada UI yang menyiratkan jaminan pendanaan, hasil investasi, atau metrik terverifikasi tanpa bukti.
