@@ -1,0 +1,292 @@
+-- verification database operations --
+
+CREATE FUNCTION public.create_registration_verification_session(
+    p_user_id UUID,
+    p_channel TEXT,
+    p_destination_ciphertext BYTEA,
+    p_destination_nonce BYTEA,
+    p_encryption_key_version TEXT,
+    p_destination_hmac BYTEA,
+    p_hmac_key_version TEXT,
+    p_expires_at TIMESTAMPTZ
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+    v_user public.users%ROWTYPE;
+    v_session_id UUID;
+BEGIN
+    SELECT * INTO v_user
+      FROM public.users
+     WHERE id = p_user_id
+     FOR UPDATE;
+
+    IF NOT FOUND
+       OR v_user.account_status <> 'pending_verification'
+       OR p_channel NOT IN ('email', 'whatsapp')
+       OR (p_channel = 'email' AND v_user.initial_contact_channel <> 'email')
+       OR (p_channel = 'whatsapp' AND v_user.initial_contact_channel <> 'phone')
+       OR p_expires_at <= clock_timestamp()
+       OR p_expires_at > v_user.pending_expires_at
+       OR p_expires_at > clock_timestamp() + INTERVAL '10 minutes'
+       OR p_destination_ciphertext IS NULL OR octet_length(p_destination_ciphertext) = 0
+       OR p_destination_nonce IS NULL OR octet_length(p_destination_nonce) = 0
+       OR p_destination_hmac IS NULL OR octet_length(p_destination_hmac) = 0
+       OR p_encryption_key_version IS NULL OR length(btrim(p_encryption_key_version)) = 0
+       OR p_hmac_key_version IS NULL OR length(btrim(p_hmac_key_version)) = 0 THEN
+        RAISE EXCEPTION 'registration verification session input is invalid'
+            USING ERRCODE = '22023';
+    END IF;
+
+    INSERT INTO public.verification_sessions (
+        user_id, purpose, channel, destination_ciphertext, destination_nonce,
+        encryption_key_version, destination_hmac, hmac_key_version, expires_at
+    )
+    VALUES (
+        p_user_id, 'registration', p_channel, p_destination_ciphertext, p_destination_nonce,
+        p_encryption_key_version, p_destination_hmac, p_hmac_key_version, p_expires_at
+    )
+    RETURNING id INTO v_session_id;
+
+    RETURN v_session_id;
+END;
+$$;
+
+CREATE FUNCTION public.reserve_otp_challenge(
+    p_session_id UUID,
+    p_code_hash BYTEA,
+    p_hash_key_version TEXT
+)
+RETURNS TABLE (challenge_id UUID, delivery_event_id UUID)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+    v_session public.verification_sessions%ROWTYPE;
+    v_now TIMESTAMPTZ := clock_timestamp();
+    v_send_count BIGINT;
+    v_last_sent_at TIMESTAMPTZ;
+BEGIN
+    SELECT * INTO v_session
+      FROM public.verification_sessions
+     WHERE id = p_session_id
+     FOR UPDATE;
+
+    IF NOT FOUND
+       OR v_session.status <> 'pending'
+       OR v_session.expires_at <= v_now
+       OR v_session.purpose <> 'registration'
+       OR v_session.failed_attempt_count >= 5
+       OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now)
+       OR p_code_hash IS NULL OR octet_length(p_code_hash) = 0
+       OR p_hash_key_version IS NULL OR length(btrim(p_hash_key_version)) = 0 THEN
+        RAISE EXCEPTION 'OTP challenge cannot be reserved for this session'
+            USING ERRCODE = '22023';
+    END IF;
+
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended(
+            pg_catalog.encode(v_session.destination_hmac, 'hex') || ':' || v_session.channel,
+            0
+        )
+    );
+
+    SELECT count(*), max(created_at)
+      INTO v_send_count, v_last_sent_at
+      FROM public.otp_delivery_events
+     WHERE destination_hmac = v_session.destination_hmac
+       AND hmac_key_version = v_session.hmac_key_version
+       AND channel = v_session.channel
+       AND created_at >= v_now - INTERVAL '60 minutes';
+
+    IF v_send_count >= 5
+       OR (v_last_sent_at IS NOT NULL AND v_last_sent_at > v_now - INTERVAL '60 seconds') THEN
+        RAISE EXCEPTION 'OTP delivery rate limit exceeded'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    UPDATE public.verification_challenges
+       SET status = 'superseded', superseded_at = v_now
+     WHERE verification_session_id = p_session_id
+       AND status = 'pending';
+
+    INSERT INTO public.verification_challenges (
+        verification_session_id, code_hash, hash_key_version, expires_at
+    )
+    VALUES (
+        p_session_id, p_code_hash, p_hash_key_version,
+        LEAST(v_now + INTERVAL '10 minutes', v_session.expires_at)
+    )
+    RETURNING id INTO challenge_id;
+
+    INSERT INTO public.otp_delivery_events (
+        destination_hmac, hmac_key_version, channel, purpose
+    )
+    VALUES (
+        v_session.destination_hmac, v_session.hmac_key_version,
+        v_session.channel, v_session.purpose
+    )
+    RETURNING id INTO delivery_event_id;
+
+    UPDATE public.verification_sessions
+       SET resend_available_at = v_now + INTERVAL '60 seconds'
+     WHERE id = p_session_id;
+
+    RETURN NEXT;
+END;
+$$;
+
+CREATE FUNCTION public.record_otp_delivery_result(
+    p_delivery_event_id UUID,
+    p_dispatch_status TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF p_dispatch_status NOT IN ('accepted', 'failed', 'unknown') THEN
+        RAISE EXCEPTION 'OTP delivery result is invalid'
+            USING ERRCODE = '22023';
+    END IF;
+
+    UPDATE public.otp_delivery_events
+       SET dispatch_status = p_dispatch_status
+     WHERE id = p_delivery_event_id
+       AND dispatch_status = 'pending';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'pending OTP delivery event was not found'
+            USING ERRCODE = 'P0002';
+    END IF;
+END;
+$$;
+
+CREATE FUNCTION public.record_otp_verification_attempt(
+    p_session_id UUID,
+    p_challenge_id UUID,
+    p_code_matches BOOLEAN
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+    v_session public.verification_sessions%ROWTYPE;
+    v_challenge public.verification_challenges%ROWTYPE;
+    v_now TIMESTAMPTZ := clock_timestamp();
+    v_contact_failures BIGINT;
+BEGIN
+    SELECT * INTO v_session
+      FROM public.verification_sessions
+     WHERE id = p_session_id
+     FOR UPDATE;
+
+    IF NOT FOUND OR v_session.status <> 'pending'
+       OR v_session.expires_at <= v_now
+       OR v_session.failed_attempt_count >= 5
+       OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now) THEN
+        RAISE EXCEPTION 'OTP verification session is not eligible'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended(
+            pg_catalog.encode(v_session.destination_hmac, 'hex') || ':' || v_session.channel,
+            0
+        )
+    );
+
+    SELECT * INTO v_challenge
+      FROM public.verification_challenges
+     WHERE id = p_challenge_id
+       AND verification_session_id = p_session_id
+     FOR UPDATE;
+
+    IF NOT FOUND OR v_challenge.status <> 'pending'
+       OR v_challenge.expires_at <= v_now THEN
+        RAISE EXCEPTION 'OTP challenge is not eligible'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    SELECT count(*) INTO v_contact_failures
+      FROM public.otp_verification_attempt_events
+     WHERE destination_hmac = v_session.destination_hmac
+       AND hmac_key_version = v_session.hmac_key_version
+       AND channel = v_session.channel
+       AND outcome = 'failed'
+       AND attempted_at >= v_now - INTERVAL '60 minutes';
+
+    IF v_contact_failures >= 5 THEN
+        RAISE EXCEPTION 'OTP contact verification rate limit exceeded'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    INSERT INTO public.otp_verification_attempt_events (
+        verification_session_id, verification_challenge_id,
+        destination_hmac, hmac_key_version, channel, purpose, outcome
+    )
+    VALUES (
+        p_session_id, p_challenge_id,
+        v_session.destination_hmac, v_session.hmac_key_version,
+        v_session.channel, v_session.purpose,
+        CASE WHEN p_code_matches THEN 'succeeded' ELSE 'failed' END
+    );
+
+    IF NOT p_code_matches THEN
+        UPDATE public.verification_sessions
+           SET failed_attempt_count = failed_attempt_count + 1
+         WHERE id = p_session_id;
+        RETURN FALSE;
+    END IF;
+
+    UPDATE public.verification_challenges
+       SET status = 'consumed', consumed_at = v_now
+     WHERE id = p_challenge_id;
+
+    UPDATE public.verification_sessions
+       SET status = 'verified', verified_at = v_now
+     WHERE id = p_session_id;
+
+    IF v_session.purpose = 'registration' THEN
+        UPDATE public.users
+           SET account_status = 'active',
+               email_verified_at = CASE WHEN v_session.channel = 'email' THEN v_now ELSE email_verified_at END,
+               phone_verified_at = CASE WHEN v_session.channel = 'whatsapp' THEN v_now ELSE phone_verified_at END,
+               initial_contact_verified_at = v_now,
+               pending_expires_at = NULL,
+               status_changed_at = v_now,
+               updated_at = v_now
+         WHERE id = v_session.user_id
+           AND account_status = 'pending_verification'
+           AND pending_expires_at > v_now;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'pending account cannot be activated'
+                USING ERRCODE = 'P0001';
+        END IF;
+    END IF;
+
+    RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN) FROM PUBLIC;
+
+COMMENT ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) IS
+    'Membuat sesi OTP registrasi untuk akun pending melalui transaksi aplikasi.';
+COMMENT ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT) IS
+    'Merotasi challenge dan mereservasi kuota pengiriman OTP secara atomik.';
+COMMENT ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) IS
+    'Mencatat hasil dispatch provider OTP satu kali.';
+COMMENT ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN) IS
+    'Mencatat percobaan OTP dan mengaktifkan akun registrasi secara atomik.';
