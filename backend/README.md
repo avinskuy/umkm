@@ -72,13 +72,17 @@ cargo build --workspace --locked
 
 ## Akses runtime Identity Core
 
-Lapisan `usahapintar_api::identity` menyediakan dua operasi terbatas yang sudah sesuai dengan grant principal aplikasi:
+Lapisan `usahapintar_api::identity` menyediakan operasi terbatas untuk registrasi dan verifikasi melalui principal aplikasi:
 
-- `create_client_user` memanggil fungsi database `SECURITY DEFINER` yang hanya dapat membuat akun pending dengan role Business Owner atau Investor. Aplikasi tidak memperoleh hak INSERT langsung ke tabel `users` atau `user_identities`.
-- `append_audit_event` hanya menambahkan event ke tabel audit append-only. Principal aplikasi tetap tidak dapat membaca, mengubah, atau menghapus event audit. Kedua operasi menerima koneksi PostgreSQL dalam lingkup pemanggil sehingga pembuatan akun dan event audit dapat dijalankan dalam satu transaksi.
+- `create_client_user` memanggil fungsi database `SECURITY DEFINER` untuk membuat akun pending dengan role Business Owner atau Investor. Aplikasi tidak memperoleh hak INSERT langsung ke tabel identitas.
+- `append_audit_event` menambahkan event ke tabel audit append-only. Principal aplikasi tidak memperoleh hak membaca, mengubah, atau menghapus event audit.
+- `VerificationService` mengorkestrasi registrasi, penerbitan/resend OTP, pencatatan hasil pengiriman, verifikasi, dan aktivasi akun. Password diproses menggunakan komponen hashing backend; password plaintext tidak disimpan atau diteruskan ke provider.
+- `registration_router` menyediakan endpoint registrasi, resend, dan verifikasi. Router ini telah memiliki pengujian runtime, tetapi sengaja belum dipasang pada `app()`/`main()` sehingga belum tersedia melalui HTTP server default.
 
-Gunakan tipe `ClientRole` dan `ContactChannel` agar nilai role/kanal berasal dari pilihan yang telah ditentukan, bukan string bebas. `ClientRegistration.password_hash` harus berisi hasil password hashing dari komponen yang telah ditinjau; jangan pernah mengirim password plaintext. Implementasi hashing, endpoint registrasi, OTP, aktivasi akun, login, dan session belum termasuk tahap ini.
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin yang ditargetkan menggunakan email/nomor telepon + password tanpa OTP setiap kali login; endpoint login/logout, pencarian kredensial runtime, cookie/session middleware, dan validasi sesi belum tersedia.
 
-Untuk menjaga konsistensi, alur yang membuat akun sekaligus menulis audit wajib menjalankan kedua operasi pada transaksi PostgreSQL yang sama dan hanya commit setelah keduanya berhasil. Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya (misalnya hasil autentikasi/middleware), bukan dari payload yang dikirim klien. Metadata harus hanya memuat key allowlist non-sensitif yang didukung database; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
+Provider pengiriman masih berupa abstraksi. Resend (email) dan FlowKirim (WhatsApp) merupakan target adapter, bukan integrasi nyata yang telah dikonfigurasi atau diuji dengan pengiriman langsung. CI menggunakan fake provider dan tidak mengirim pesan.
 
-Operasi baca akun, pencarian kredensial login, perubahan lifecycle, verifikasi, recovery, session, dan pembacaan audit belum disediakan. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
+Untuk menjaga konsistensi, operasi pembuatan akun, profil, penerimaan Terms/Privacy, consent opsional, dan event audit yang terkait harus menggunakan transaksi sesuai kontrak database dan hanya commit setelah seluruh operasi berhasil. Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya, bukan payload klien. Metadata hanya boleh memuat key allowlist non-sensitif; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
+
+Operasi login/logout, middleware sesi, pemulihan akun, adapter provider nyata, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
