@@ -1249,7 +1249,7 @@ async fn assert_otp_resend_during_verification_lock(pool: &PgPool) {
             id, verification_session_id, code_hash, hash_key_version, expires_at\
          ) VALUES (\
             '77777777-7777-4777-8777-777777777777'::uuid, $1::uuid, $2, 'otp-hmac-v1', \
-            clock_timestamp() + INTERVAL '10 minutes'\
+            clock_timestamp() + INTERVAL '8 minutes'\
          ) RETURNING id::text",
     )
     .bind(&session_id)
