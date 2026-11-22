@@ -1,5 +1,7 @@
 # Autentikasi & Identitas — Rancangan Arsitektur dan Keamanan
 
+> **STATUS: DOKUMEN HISTORIS, TIDAK MENJADI KONTRAK IMPLEMENTASI AKTIF.** Keputusan autentikasi terbaru hanya menggunakan email/WhatsApp + password dengan OTP saat registrasi dan password tanpa OTP untuk login rutin. Login sosial/OAuth tidak termasuk cakupan. Jangan implementasikan endpoint, tabel, atau alur OAuth yang masih tercantum di isi historis dokumen ini. Gunakan [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md), [Desain Runtime Registrasi dan Verifikasi Identity Core](identity-core-registration-verification-runtime.md), serta kontrak migration terbaru sebagai acuan.
+
 > Status: migration Identity Core 0001–0005 tersedia; runtime autentikasi lengkap belum diimplementasikan  
 > Referensi produk: `docs/product/public-and-auth-uiux-spec.md`  
 > Referensi wireframe: `docs/product/low-fidelity-public-auth-wireframes.md`  
