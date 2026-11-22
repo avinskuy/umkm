@@ -609,13 +609,15 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
 #[ignore = "requires the disposable least-privilege PostgreSQL application principal"]
 async fn account_recovery_service_verifies_contact_and_binds_a_matching_account() {
     use usahapintar_api::identity::{
+        authentication::hash_session_token,
         crypto::{
             contact_fingerprint, CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey,
             VersionedKey,
         },
         delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
         password::hash_password,
-        ClientRegistration, ClientRole, ContactChannel, VerificationService,
+        ClientRegistration, ClientRole, ContactChannel, RecoveryReviewDecision,
+        RecoveryReviewReason, RecoveryReviewService, VerificationService,
     };
 
     struct RecoveryKeys;
@@ -753,6 +755,18 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .execute(&admin_pool)
     .await
     .expect("test account should have a verified recovery contact");
+
+    let session_token = "a".repeat(64);
+    let session_token_hash = hash_session_token(&session_token);
+    sqlx::query(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
+    )
+    .bind(&registered.user_id)
+    .bind(session_token_hash.to_vec())
+    .execute(&admin_pool)
+    .await
+    .expect("a prior active session should exist for recovery signal testing");
 
     use usahapintar_api::identity::http::{
         recovery_router, AbuseDecision, RecoveryApiState, RegistrationAbuseGuard,
@@ -935,13 +949,20 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     );
     assert_eq!(candidates_payload["accounts"][0]["role"], "business_owner");
 
+    let mut select_request = make_recovery_request(
+        Method::POST,
+        format!("/api/v1/identity/recovery/cases/{recovery_case_id}/select"),
+        Some(serde_json::json!({ "user_id": registered.user_id })),
+        false,
+    );
+    select_request.headers_mut().insert(
+        header::COOKIE,
+        format!("__Host-usahapintar_session={session_token}")
+            .parse()
+            .expect("session cookie header should be valid"),
+    );
     let selected = recovery_router
-        .oneshot(make_recovery_request(
-            Method::POST,
-            format!("/api/v1/identity/recovery/cases/{recovery_case_id}/select"),
-            Some(serde_json::json!({ "user_id": registered.user_id })),
-            false,
-        ))
+        .oneshot(select_request)
         .await
         .expect("account selection route should respond");
     assert_eq!(selected.status(), axum::http::StatusCode::ACCEPTED);
@@ -953,6 +974,68 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             .await
             .expect("DBA should inspect recovery case state");
     assert_eq!(case_status, "under_review");
+
+    let matched_signal_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.account_recovery_case_signals \
+          WHERE recovery_case_id = $1::uuid AND signal_code = 'active_session_match'",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("DBA should inspect recorded prior-session signal");
+    assert_eq!(matched_signal_count, 1);
+
+    let admin_email = format!("recovery-review-admin-{email}");
+    let reviewer_id: String = sqlx::query_scalar(
+        "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at, password_hash) \
+         VALUES ('admin', 'active', $1, 'email', clock_timestamp(), clock_timestamp(), '$argon2id$test-review-hash') \
+         RETURNING id::text",
+    )
+    .bind(&admin_email)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("an active Admin reviewer should be provisioned for the test");
+
+    let review_service = RecoveryReviewService::new(&pool);
+    assert!(
+        review_service
+            .review_case(
+                &recovery_case_id,
+                &registered.user_id,
+                RecoveryReviewDecision::Approve,
+                RecoveryReviewReason::OwnershipConfirmed,
+            )
+            .await
+            .is_err(),
+        "a non-Admin account must not approve recovery"
+    );
+
+    review_service
+        .review_case(
+            &recovery_case_id,
+            &reviewer_id,
+            RecoveryReviewDecision::Approve,
+            RecoveryReviewReason::OwnershipConfirmed,
+        )
+        .await
+        .expect("an active Admin may approve a selected recovery case");
+
+    let reviewed_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&recovery_case_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("DBA should inspect reviewed recovery case");
+    assert_eq!(reviewed_status, "approved");
+
+    let review_event_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM public.account_recovery_review_decisions WHERE recovery_case_id = $1::uuid",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("DBA should inspect the append-only review decision");
+    assert_eq!(review_event_count, 1);
 
     admin_pool.close().await;
     pool.close().await;
