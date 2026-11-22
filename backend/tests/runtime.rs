@@ -341,6 +341,23 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         .expect("wrong-role login should respond");
     assert_eq!(wrong_role.status(), axum::http::StatusCode::UNAUTHORIZED);
 
+    let wrong_password = authentication
+        .clone()
+        .oneshot(make_request(
+            "/api/v1/identity/login/owner".to_owned(),
+            serde_json::json!({
+                "identifier": email,
+                "password": "incorrect-password"
+            }),
+        ))
+        .await
+        .expect("wrong-password login should respond");
+    assert_eq!(wrong_password.status(), axum::http::StatusCode::UNAUTHORIZED);
+    assert!(
+        wrong_password.headers().get(header::SET_COOKIE).is_none(),
+        "failed login must not create a session cookie"
+    );
+
     let logged_in = authentication
         .clone()
         .oneshot(make_request(
