@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use super::{
     crypto::{random_bytes, KeyProvider},
     delivery::OtpDeliveryProvider,
+    password::PasswordPolicy,
     recovery::RecoveryService,
     registration::ContactChannel,
     verification::VerificationService,
@@ -13,9 +14,11 @@ use super::{
 mod authentication;
 mod handlers;
 mod recovery;
+mod password_reset;
 pub use authentication::{authentication_router, AuthenticationApiState};
 pub use handlers::registration_router;
 pub use recovery::recovery_router;
+pub use password::PasswordPolicy as RegistrationPasswordPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegistrationAction {
@@ -27,6 +30,7 @@ pub enum RegistrationAction {
     RecoveryVerify,
     RecoveryCandidates,
     RecoverySelect,
+    RecoveryPasswordResetComplete,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,11 +51,6 @@ pub trait RegistrationAbuseGuard: Send + Sync {
         peer_ip: IpAddr,
         subject: Option<&'a str>,
     ) -> Pin<Box<dyn Future<Output = AbuseDecision> + Send + 'a>>;
-}
-
-/// Kebijakan password ditentukan melalui keputusan produk/keamanan dan diinjeksi dari runtime.
-pub trait RegistrationPasswordPolicy: Send + Sync {
-    fn accepts(&self, password: &str) -> bool;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,7 +139,7 @@ pub struct RegistrationApiState {
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
-    pub(super) password_policy: Arc<dyn RegistrationPasswordPolicy>,
+    pub(super) password_policy: Arc<dyn PasswordPolicy>,
     pub(super) policy_versions: RegistrationPolicyVersions,
 }
 
@@ -174,6 +173,7 @@ pub struct RecoveryApiState {
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
+    pub(super) password_policy: Option<Arc<dyn PasswordPolicy>>,
 }
 
 impl RecoveryApiState {
@@ -188,7 +188,13 @@ impl RecoveryApiState {
             keys,
             delivery,
             abuse_guard,
+            password_policy: None,
         }
+    }
+
+    pub fn with_password_policy(mut self, policy: Arc<dyn PasswordPolicy>) -> Self {
+        self.password_policy = Some(policy);
+        self
     }
 
     pub(super) fn recovery_service(&self) -> RecoveryService<'_> {
