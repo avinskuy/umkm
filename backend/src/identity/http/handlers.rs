@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, State},
     http::StatusCode,
@@ -8,7 +10,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-use super::{valid_contact_input, AbuseDecision, RegistrationAction, RegistrationApiState};
+use super::{
+    opaque_verification_id, valid_contact_input, AbuseDecision, RegistrationAction,
+    RegistrationApiState,
+};
 use super::super::{
     password::hash_password,
     registration::{ClientRegistration, ClientRole, ContactChannel},
