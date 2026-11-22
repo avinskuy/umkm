@@ -130,8 +130,7 @@ BEGIN
     SELECT account_status
       INTO v_target_status
       FROM public.users
-     WHERE id = v_target_user_id
-     FOR SHARE;
+     WHERE id = v_target_user_id;
 
     IF NOT FOUND OR v_target_status <> 'active' THEN
         RETURN FALSE;
@@ -241,8 +240,7 @@ BEGIN
     SELECT primary_role, account_status
       INTO v_reviewer_role, v_reviewer_status
       FROM public.users
-     WHERE id = p_reviewer_user_id
-     FOR SHARE;
+     WHERE id = p_reviewer_user_id;
 
     IF NOT FOUND
        OR v_reviewer_role <> 'admin'
