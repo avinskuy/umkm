@@ -290,11 +290,11 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Langkah 2 — Akun dibuat
+### Konfirmasi — Akun dibuat
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar]                               Langkah 2 dari 3 │
+│ [USahapintar]                         Pendaftaran berhasil │
 │                                                              │
 │ Akun berhasil dibuat                                         │
 │ Kamu dapat masuk menggunakan kontak dan kata sandi.          │
@@ -309,7 +309,7 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 
 OTP tidak diminta pada registrasi maupun login tahap pertama. Verifikasi kontak dan OTP ditunda ke tahap berikutnya; UI tidak boleh memberi kesan bahwa kontak yang baru dimasukkan sudah terverifikasi.
 
-### Langkah 3 — Tahap usaha
+### Langkah 2 — Tahap usaha
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -326,7 +326,7 @@ OTP tidak diminta pada registrasi maupun login tahap pertama. Verifikasi kontak 
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Langkah 4 — Profil awal usaha
+### Langkah 3 — Profil awal usaha
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
