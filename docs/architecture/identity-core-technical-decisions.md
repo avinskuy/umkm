@@ -1,14 +1,19 @@
 # Keputusan Teknis Identity Core
 
 > Status: baseline teknis yang direkomendasikan untuk implementasi bertahap
-> Tanggal: 21 November 2026
+> Tanggal: 22 November 2026
 > Cakupan: keputusan teknis lintas migration Identity Core
+> Keputusan autentikasi tahap pertama: email/telepon + password atau Google OAuth; OTP registrasi/login ditunda.
 
-Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau menjalankan migration otomatis pada HTTP startup. Migration 0001–0005 telah dibuat, diuji, dan di-merge. Runtime HTTP kini menginisialisasi pool PostgreSQL menggunakan principal aplikasi; operasi Identity Core yang tersedia masih terbatas pada pembuatan akun pending dan penambahan audit event. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
+Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak menjalankan migration otomatis pada HTTP startup. Migration 0001–0005 telah dibuat, diuji, dan di-merge. Runtime HTTP kini menginisialisasi pool PostgreSQL menggunakan principal aplikasi; operasi Identity Core yang tersedia masih terbatas pada pembuatan akun pending dan penambahan audit event.
 
-## 1. Perlindungan tujuan pengiriman OTP
+> **Amendemen 22 November 2026:** metode tahap pertama adalah email/telepon + password dan Google OAuth. OTP tidak diminta saat registrasi maupun login. Migration 0001 saat ini masih mengikat aktivasi pada verifikasi kontak; diperlukan migration lanjutan sebelum runtime registrasi tahap pertama dibuat. Detail keputusan ada di [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+
+## 1. Perlindungan tujuan pengiriman OTP — tahap berikutnya
 
 ### Keputusan
+
+Bagian ini merupakan baseline untuk fitur verifikasi kontak/OTP pada tahap berikutnya. Fitur tersebut tidak menjadi prasyarat registrasi atau login tahap pertama.
 
 Gunakan dua representasi yang berbeda untuk dua kebutuhan berbeda:
 
@@ -95,12 +100,12 @@ Gunakan `account_status` hanya untuk siklus hidup akun. Pembatasan akses oleh Ad
 
 | Status | Arti dan aturan |
 | --- | --- |
-| `pending_verification` | Registrasi belum selesai; berlaku paling lama 30 menit dan kontak utama tetap direservasi. |
+| `pending_verification` | Status pada migration saat ini untuk registrasi lama yang menunggu verifikasi; tidak digunakan oleh alur registrasi tahap pertama yang membuat akun aktif tanpa OTP. |
 | `active` | Akun aktif dan dapat memakai fitur sesuai role/entitlement. |
 | `deactivated` | Penonaktifan sementara oleh pengguna; profil disembunyikan, data dipertahankan, kontak tetap direservasi. |
 | `deletion_pending` | Permintaan penghapusan dalam masa tunggu pembatalan 30 hari; akun dibatasi dan kontak tetap direservasi. |
 | `deletion_processing` | Masa tunggu selesai dan proses penghapusan sedang berlangsung; kontak tetap direservasi sampai penghapusan benar-benar selesai. |
-| `pending_expired` | Registrasi tidak selesai dalam 30 menit; tidak dapat login dan kontak utama telah dilepas secara atomik. |
+| `pending_expired` | Status terminal untuk registrasi pending lama yang tidak selesai; tidak menjadi lifecycle normal registrasi tahap pertama. |
 | `closed` | Penghapusan telah selesai sesuai proses retensi; kontak utama telah dilepas dan data personal telah dihapus atau dianonimkan sesuai kebijakan. |
 
 Status suspend/limit fitur, lock verifikasi, lock keamanan sementara, dan status OTP tidak boleh dimasukkan ke `account_status`. Enforcement aktif dapat membatasi akses meskipun lifecycle akun tetap `active` atau `deletion_pending`. Status moderasi konten juga bukan status lifecycle akun.
@@ -113,7 +118,7 @@ Kontak dilepas hanya dalam dua kondisi:
 - Registrasi pending telah kedaluwarsa dan transisi ke `pending_expired` selesai secara atomik.
 - Penghapusan permanen benar-benar selesai dan transisi ke `closed` dilakukan setelah kewajiban retensi yang berlaku ditangani.
 
-Saat pending expired, hapus nilai kontak dari kolom identitas aktif dalam transaksi yang sama atau pindahkan hanya ke data audit yang tidak dapat digunakan untuk autentikasi. Jangan mempertahankan nilai yang masih memblokir unique index tanpa alasan. Saat deletion processing, jangan melepas kontak hanya karena 30 hari telah berlalu.
+Aturan cleanup pending di atas hanya berlaku untuk record yang masih menggunakan lifecycle pending lama. Registrasi tahap pertama harus dibuat aktif tanpa OTP setelah validasi input, role, persetujuan, dan kontrol anti-penyalahgunaan. Saat deletion processing, jangan melepas kontak hanya karena 30 hari telah berlalu.
 
 Transisi status harus dilakukan oleh operasi backend yang tervalidasi dan tercatat. CHECK constraint menjaga nilai lifecycle yang sah; active moderation/enforcement records mengatur pembatasan akses; partial unique index menjaga reservasi; tes transaksi membuktikan tidak ada race antara aktivasi, cleanup, pembatalan penghapusan, dan registrasi baru.
 
