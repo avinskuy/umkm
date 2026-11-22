@@ -87,7 +87,7 @@ fn login_error(error_value: AuthenticationError) -> Response {
         AuthenticationError::InvalidCredentials => error(
             StatusCode::UNAUTHORIZED,
             "Email/nomor telepon atau password salah.",
-        )
+        ),
         AuthenticationError::RateLimited => error(
             StatusCode::TOO_MANY_REQUESTS,
             "Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.",
