@@ -2133,5 +2133,45 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .await
     .expect("test migrator should inspect the activated account");
     assert_eq!(account_status, "active");
+
+    let phone_registration = ClientRegistration {
+        role: ClientRole::Investor,
+        initial_contact_channel: ContactChannel::Phone,
+        email_normalized: None,
+        phone_e164: Some("+6281234567890"),
+        password_hash: "test-only-encoded-password-hash",
+    };
+    let phone_started = service
+        .register(&phone_registration)
+        .await
+        .expect("WhatsApp registration should create a pending account and dispatch OTP");
+    assert_eq!(phone_started.dispatch_status, DispatchStatus::Accepted);
+
+    let phone_code = {
+        let messages = delivery
+            .messages
+            .lock()
+            .expect("fake delivery message lock should be available");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(
+            messages[1].channel,
+            usahapintar_api::identity::DeliveryChannel::WhatsApp
+        );
+        messages[1].code.as_str().to_owned()
+    };
+    assert!(
+        service
+            .verify(&phone_started.session_id, &phone_code)
+            .await
+            .expect("WhatsApp OTP should verify and activate the pending account")
+    );
+
+    let phone_account_status: String =
+        sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
+            .bind(&phone_started.user_id)
+            .fetch_one(migrator_pool)
+            .await
+            .expect("test migrator should inspect the activated phone account");
+    assert_eq!(phone_account_status, "active");
 }
 
