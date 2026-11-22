@@ -15,7 +15,7 @@ mod handlers;
 mod recovery;
 pub use authentication::{authentication_router, AuthenticationApiState};
 pub use handlers::registration_router;
-pub use recovery::{recovery_router, RecoveryApiState};
+pub use recovery::recovery_router;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegistrationAction {
