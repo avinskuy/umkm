@@ -2599,7 +2599,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit table privileges should be queryable");
     assert_eq!(audit_access, (true, false, false, false, false));
 
-    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
         "SELECT has_function_privilege(current_user, \
                     'public.create_client_user(text,text,text,text,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
@@ -2623,14 +2623,22 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.record_account_recovery_session_signal(uuid,bytea)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.review_account_recovery_case(uuid,uuid,bytea,text,text)', 'EXECUTE')",
+                    'public.review_account_recovery_case(uuid,uuid,bytea,text,text)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.get_approved_account_recovery_delivery_context(uuid)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.create_password_reset_token(uuid,bytea,bytea[])', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.revoke_password_reset_token(bytea)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.complete_password_reset(bytea,text)', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
     .expect("function privileges should be queryable");
     assert_eq!(
         function_access,
-        (false, true, false, true, true, true, true, true, true, true, true, true)
+        (false, true, false, true, true, true, true, true, true, true, true, true, true, true, true, true)
     );
 
     let created_user_id: String =
