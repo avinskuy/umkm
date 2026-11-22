@@ -2491,7 +2491,8 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
-                   'user_profiles', 'policy_acceptance_records', 'consent_events' \
+                   'user_profiles', 'policy_acceptance_records', 'consent_events', \
+                   'password_login_rate_limits', 'registration_http_rate_limits' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
                  OR has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'INSERT') \
@@ -2559,6 +2560,32 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         function_access,
         (false, true, false, true, true, true, true, true, true, true)
     );
+
+    let authentication_function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool) =
+        sqlx::query_as(
+            "SELECT has_function_privilege(current_user, 'public.find_active_password_login(text,text)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.reserve_password_login_attempt(bytea,bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.clear_password_login_identifier_limit(bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.create_password_login_session(uuid,bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.revoke_password_login_session(bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.get_active_password_login_session(bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.rotate_active_password_login_session(bytea,bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.revoke_all_password_login_sessions(bytea)', 'EXECUTE'), \
+                    has_function_privilege(current_user, 'public.reserve_registration_http_attempt(text,bytea,bytea)', 'EXECUTE')",
+        )
+        .fetch_one(&app_pool)
+        .await
+        .expect("authentication and registration guard function grants should be queryable");
+    assert_eq!(authentication_function_access, (true, true, true, true, true, true, true, true, true));
+
+    let registration_rate_limit_allowed: bool = sqlx::query_scalar(
+        "SELECT public.reserve_registration_http_attempt('create', $1, NULL)",
+    )
+    .bind(vec![101_u8; 32])
+    .fetch_one(&app_pool)
+    .await
+    .expect("application should execute the registration abuse guard");
+    assert!(registration_rate_limit_allowed);
 
     let created_user_id: String =
         sqlx::query_scalar("SELECT public.create_client_user_with_profile_and_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)::text")
