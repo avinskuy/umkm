@@ -1,8 +1,7 @@
 # Keputusan Autentikasi Identity Core — Password dan OTP
 
-> Status: disetujui pada 22 November 2026
-> Cakupan: registrasi, login, verifikasi kontak, pemulihan akun, dan provider OTP
-> Implementasi runtime: bertahap; dokumen ini menetapkan keputusan dan batas implementasi, bukan klaim fitur sudah aktif.
+> Cakupan: registrasi, login, verifikasi kontak, pemulihan akun, dan provider OTP.
+> Status implementasi: fondasi registrasi/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default dan provider nyata belum terintegrasi.
 
 ## 1. Keputusan autentikasi
 
@@ -76,4 +75,4 @@ Migration 0006 harus gagal secara aman bila masih ada baris identitas provider y
 
 ## 8. Hal yang belum diaktifkan
 
-Keputusan ini tidak dengan sendirinya mengaktifkan endpoint registrasi/login, provider OTP nyata, credential provider, migration produksi, atau deployment. Implementasi runtime harus melalui audit, pengujian PostgreSQL, CI, dan tinjauan keamanan terlebih dahulu.
+Router registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Endpoint login/logout, provider OTP nyata, credential provider, key produksi, migration produksi, dan deployment belum aktif. Setiap aktivasi runtime harus melalui audit, pengujian PostgreSQL, CI, dan tinjauan keamanan.
