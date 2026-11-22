@@ -1,23 +1,21 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration 0001–0005 dan bootstrap tersedia di `main`; migration 0006 password-only sedang disiapkan pada branch `feature/password-otp-only-auth` dan belum menunggu hasil CI.
-> Tanggal: 22 November 2026
-> Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin tanpa OTP.
-> Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
+> Cakupan: hasil review skema, migration, privilege, dan kontrak runtime Identity Core.
+> Status implementasi harus dibaca bersama hasil CI dan kondisi deployment; migration yang tersedia belum berarti telah diterapkan pada database produksi.
 
-Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration 0001–0005 serta skrip bootstrap principal dan grant tersedia di `main` dan diuji melalui CI. Seluruh migration dan bootstrap tetap belum dijalankan pada database produksi. HTTP runtime menginisialisasi pool PostgreSQL menggunakan principal aplikasi, tetapi tidak menjalankan migration otomatis.
+Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Migration 0001–0010 serta skrip bootstrap principal dan grant tersedia di repository dan diuji melalui CI. Migration dan bootstrap tidak dijalankan otomatis oleh HTTP runtime; penerapan pada database produksi merupakan operasi terpisah.
 
-> **Keputusan terbaru 22 November 2026:** registrasi email/WhatsApp + password wajib OTP dan login rutin menggunakan password tanpa OTP. Migration 0006 menghapus tabel identitas provider yang sebelumnya disiapkan sebagai ekstensi serta mempersempit fungsi pembuatan akun menjadi password-only. Migration 0001–0005 tetap menjadi riwayat skema yang immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0001–0010 membentuk baseline skema saat ini; seluruh migration yang sudah diterapkan pada database bersama harus diperlakukan immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Hasil pemeriksaan repository
 
 - Backend menggunakan Rust, Axum, Tokio, dan SQLx 0.8 dengan PostgreSQL 16 sebagai baseline.
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
-- `backend/migrations/` memiliki migration akun 0001, verifikasi 0002, sesi autentikasi 0003, account recovery 0004, dan Identity Audit Events 0005.
+- `backend/migrations/` memiliki migration Identity Core 0001–0010, termasuk penghapusan OAuth, operasi database verifikasi, binding ID runtime, audit runtime verifikasi, profil publik, dan penerimaan kebijakan.
 - HTTP server menyediakan `GET /api/v1/health` dan `GET /api/v1/readyz`. Pool PostgreSQL diinisialisasi saat startup menggunakan principal aplikasi.
 - Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, autentikasi password-only, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
-- Migration 0001–0005 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
-- Belum ada endpoint login/logout, provider OTP, cookie/session middleware, operasi enkripsi/HMAC runtime, atau aktivasi fitur autentikasi. Grant database minimal tidak berarti alur autentikasi telah aktif.
+- Migration 0001–0010 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
+- `VerificationService` dan router HTTP registrasi/resend/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default. Login/logout, cookie/session middleware, adapter provider nyata, konfigurasi key produksi, dan runtime recovery belum tersedia. Grant database minimal tidak berarti seluruh autentikasi telah aktif.
 
 ## 2. Prinsip desain yang harus dipertahankan
 
