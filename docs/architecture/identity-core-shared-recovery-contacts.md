@@ -1,5 +1,7 @@
 # Tinjauan Skema Identity Core — Verifikasi dan Pemulihan
 
+> Status: rancangan tahap berikutnya. OTP tidak menjadi syarat registrasi/login tahap pertama; kontak yang belum diverifikasi tidak boleh dipakai untuk pemulihan akun. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+
 > Status: keputusan produk dan implikasi skema yang disetujui sebagai baseline; rancangan SQL final tetap memerlukan tinjauan keamanan dan pengujian.
 > Cakupan: sesi verifikasi, kontak pemulihan bersama, pemilihan akun tujuan, batas penyalahgunaan, dan masa tunggu penghapusan.
 

@@ -2,9 +2,12 @@
 
 > Status: migration 0001–0005 dan bootstrap principal/privilege tersedia di `main` serta diuji melalui CI; runtime Identity Core masih terbatas
 > Tanggal: 22 November 2026
+> Keputusan autentikasi tahap pertama: email/telepon + password atau Google OAuth; OTP registrasi/login ditunda.
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
 
 Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Dokumen ini menyelaraskan kebijakan produk yang telah disetujui dengan struktur PostgreSQL/SQLx. Migration 0001–0005 serta skrip bootstrap principal dan grant tersedia di `main` dan diuji melalui CI. Seluruh migration dan bootstrap tetap belum dijalankan pada database produksi. HTTP runtime menginisialisasi pool PostgreSQL menggunakan principal aplikasi, tetapi tidak menjalankan migration otomatis.
+
+> **Perubahan keputusan 22 November 2026:** registrasi dan login tahap pertama menggunakan email/telepon + password atau Google OAuth; OTP tidak menjadi syarat registrasi/login. Migration 0001 saat ini masih mewajibkan verifikasi kontak sebelum aktivasi, sehingga skema yang ada belum sesuai untuk runtime tahap pertama. Migration lama tidak diubah; diperlukan migration lanjutan dan tes PostgreSQL sebelum runtime autentikasi dibuat. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Hasil pemeriksaan repository
 
@@ -54,20 +57,20 @@ Kolom konseptual yang diperlukan:
 - `id`: UUID primary key.
 - `primary_role`: constrained value `business_owner`, `investor`, `admin`.
 - `account_status`: constrained lifecycle value `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`. Suspend/limit fitur dicatat terpisah melalui moderation/enforcement records.
-- `email_normalized` dan `phone_e164`: nullable secara individual, tetapi akun klien harus memiliki tepat satu kontak awal yang dipilih saat pendaftaran. Akun Google tetap wajib memverifikasi satu kontak email atau WhatsApp terpisah.
-- `initial_contact_channel`: membedakan email dan phone/WhatsApp yang dipilih saat pendaftaran; nilainya harus cocok dengan kontak yang diverifikasi.
+- `email_normalized` dan `phone_e164`: nullable secara individual; akun klien memilih satu identifier awal. Kontak yang dimasukkan melalui registrasi password tidak otomatis dianggap terverifikasi. Google OAuth tidak memerlukan OTP tambahan.
+- `initial_contact_channel`: mencatat identifier awal (email atau phone) yang dipilih saat pendaftaran; pada skema tahap pertama yang diperbarui, nilainya tidak mensyaratkan verifikasi sebelum akun aktif.
 - `email_verified_at` dan `phone_verified_at`: waktu verifikasi yang sesuai; jangan menyimpulkan kontak kedua telah diverifikasi.
 - `password_hash`: nullable hanya untuk akun yang mendaftar melalui Google OAuth tanpa kata sandi lokal. Pendaftaran email/nomor HP wajib memiliki password hash.
-- `pending_expires_at`: batas 30 menit untuk akun yang belum selesai diverifikasi.
+- `pending_expires_at`: masih bagian dari migration saat ini untuk lifecycle pending lama; tidak digunakan sebagai syarat registrasi tahap pertama dan perlu ditinjau pada migration lanjutan.
 - `created_at`, `updated_at`, dan timestamp lifecycle yang memang diperlukan.
 
 Invariant database:
 
 - Unique partial index pada kontak utama ternormalisasi yang tidak null, selama kontak masih direservasi.
 - Role dibatasi oleh CHECK constraint dan tidak dapat diubah setelah INSERT. Terapkan perlindungan database yang sempit dan teruji, bukan memberi hak UPDATE role secara luas kepada akun aplikasi.
-- Akun klien baru harus memiliki tepat satu metode kontak awal yang dipilih. Akun Admin dibuat melalui provisioning internal dan mengikuti aturan kontak/MFA Admin tersendiri.
+- Akun klien baru harus memiliki tepat satu metode autentikasi awal yang sah: password lokal atau identitas Google. Akun Admin dibuat melalui provisioning internal dan mengikuti aturan kontak/MFA Admin tersendiri.
 - Status akun tidak boleh menjadi jalan pintas untuk melepas kontak. Kontak utama tetap direservasi selama masa tunggu penghapusan dan baru dilepas setelah penghapusan benar-benar selesai sesuai kebijakan retensi.
-- Cleanup pendaftaran tertunda harus idempotent dan aman terhadap proses bersamaan. Proses tidak boleh menghapus atau mengubah akun yang sudah aktif.
+- Cleanup untuk status pending lama tetap diperlukan bila masih ada record yang memakai lifecycle tersebut; jangan menerapkan kedaluwarsa 30 menit pada registrasi tahap pertama yang langsung aktif.
 - Jika baris pending dipertahankan untuk audit setelah kedaluwarsa, kontak yang dilepas harus dihapus dari kolom identitas aktif atau dipindahkan ke representasi audit yang tidak dapat digunakan untuk login. Jangan membiarkan baris expired tetap memblokir registrasi tanpa batas.
 
 ### 4.2 `user_identities`
@@ -225,7 +228,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Migration 0002 telah di-merge ke main dan lulus quality checks serta tes integrasi PostgreSQL CI. Sebelum runtime OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, operasi serialisasi/advisory lock lintas versi fingerprint, enforcement batas 5 kegagalan per kontak/60 menit, transaksi resend/verifikasi, bootstrap privilege terpisah untuk runtime application principal dan provisioning Admin, integrasi operasi registrasi dengan fungsi `create_client_user`, serta verifikasi alur OTP end-to-end.
+Migration 0002 telah di-merge ke main dan lulus quality checks serta tes integrasi PostgreSQL CI. Migration tersebut menjadi fondasi untuk verifikasi kontak/OTP pada tahap berikutnya, bukan syarat registrasi/login tahap pertama. Sebelum OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, enforcement batas percobaan lintas sesi, transaksi resend/verifikasi, serta pengujian end-to-end. Sebelum runtime registrasi tahap pertama dibuat, prioritaskan migration lanjutan yang menyelaraskan status akun/kontak, fungsi `create_client_user`, bootstrap privilege, dan tes PostgreSQL sesuai keputusan autentikasi terbaru.
 
 Migration 0001–0005 dan bootstrap principal/privilege telah diuji melalui CI, tetapi belum dijalankan pada database produksi. Runtime menyediakan operasi terbatas untuk menambahkan audit event melalui principal aplikasi dengan hak INSERT-only; integrasi audit untuk seluruh lifecycle identitas masih belum tersedia. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
 

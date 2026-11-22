@@ -165,7 +165,7 @@ Konten:
 
 ### Field formulir dan perilaku
 
-- Login menerima email atau nomor telepon yang terdaftar beserta kata sandi akun. Kode email/WhatsApp hanya untuk aktivasi akun dan bukan kredensial login.
+- Login menerima email atau nomor telepon yang terdaftar beserta kata sandi akun. OTP tidak digunakan untuk registrasi maupun login tahap pertama. Kontak yang belum diverifikasi tidak boleh dianggap sebagai bukti kepemilikan untuk pemulihan atau tindakan sensitif.
 - Field kata sandi dengan kontrol tampil/sembunyi.
 - Tautan lupa kata sandi.
 - Opsi ingat perangkat/sesi hanya boleh ditampilkan jika kebijakan sesi backend mendukungnya dengan aman; jangan memberi kesan sesi berlaku permanen.
@@ -187,7 +187,7 @@ Sediakan tautan ke halaman login Investor. Server wajib menegakkan kecocokan rol
 - Kredensial tidak valid: **Email/nomor atau kata sandi belum sesuai. Periksa kembali lalu coba lagi.**
 - Rate limit: jelaskan bahwa percobaan masuk dibatasi sementara dan kapan pengguna dapat mencoba lagi jika waktunya diketahui.
 - Gangguan jaringan/server: **Belum bisa terhubung. Periksa koneksi lalu coba lagi.**
-- Kontak belum diverifikasi: arahkan ke alur verifikasi yang sesuai.
+- Kontak belum diverifikasi: pengguna tetap dapat login dengan password yang benar, tetapi kontak tidak boleh dipakai untuk pemulihan atau tindakan sensitif sampai dibuktikan kepemilikannya.
 - Jangan mengungkap apakah email atau nomor telepon terdaftar.
 - Sediakan jalur bantuan untuk masalah akses akun yang berulang.
 
@@ -218,30 +218,27 @@ Pertahankan tata letak visual yang konsisten agar kedua halaman terasa sebagai s
 
 - Nama lengkap.
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
-- Jika memilih email, kirim kode verifikasi ke alamat email tersebut.
-- Jika memilih telepon, kirim kode verifikasi melalui WhatsApp.
-- Pendaftaran dengan email/telepon wajib memakai kata sandi dan konfirmasi. Pendaftaran Google tidak meminta kata sandi lokal terpisah.
+- Pendaftaran email/telepon menggunakan kontak yang dipilih dan wajib memakai kata sandi serta konfirmasi.
+- OTP tidak diminta saat membuat akun atau login. Kontak awal disimpan sebagai belum terverifikasi sampai fitur verifikasi kontak tersedia.
+- Pendaftaran Google tidak meminta kata sandi lokal terpisah.
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
-**Langkah 2 — Verifikasi kontak**
+**Konfirmasi — Akun dibuat**
 
-- Jika memilih Email: masukkan kode sekali pakai yang dikirim ke alamat email tersebut.
-- Jika memilih Telepon: masukkan kode sekali pakai yang dikirim melalui WhatsApp.
-- Hanya kontak yang dipilih yang wajib diverifikasi untuk aktivasi awal. Kontak lainnya dapat ditambahkan dan diverifikasi kemudian.
-- Tampilkan tujuan pengiriman dalam bentuk tersamarkan.
-- Sediakan tindakan kirim ulang dengan jeda dan batas percobaan yang terlihat.
-- Masa berlaku OTP dan status percobaan ulang harus jelas.
-- Jangan mencatat atau menampilkan nilai OTP dalam pesan error yang terlihat oleh klien.
+- Setelah data akun dan persetujuan tervalidasi, akun dapat dibuat tanpa OTP.
+- Kontak awal tetap berstatus belum terverifikasi; jangan menampilkan badge terverifikasi.
+- Jelaskan bahwa pembuktian kontak dan OTP akan tersedia pada tahap berikutnya.
+- Jangan izinkan kontak yang belum terverifikasi digunakan sebagai bukti pemulihan atau perubahan kredensial.
 
-**Langkah 3 — Tahap usaha**
+**Langkah 2 — Tahap usaha**
 
 - Baru berupa ide.
 - Sedang bersiap memulai.
 - Sudah beroperasi.
 - Sedang mengembangkan usaha yang berjalan.
 
-**Langkah 4 — Profil awal usaha**
+**Langkah 3 — Profil awal usaha**
 
 Minta hanya field yang relevan dengan tahap yang dipilih:
 
@@ -266,17 +263,17 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 - Nama lengkap.
 - Pilih satu metode kontak: alamat email ATAU nomor telepon.
-- Jika memilih email, kirim kode verifikasi ke alamat email tersebut.
-- Jika memilih telepon, kirim kode verifikasi melalui WhatsApp.
+- Pendaftaran email/telepon tidak meminta OTP pada tahap pertama. Kontak awal tetap ditandai belum terverifikasi.
 - Pendaftaran dengan email/telepon wajib memakai kata sandi dan field konfirmasi.
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
-**Langkah 2 — Verifikasi kontak**
+**Konfirmasi — Akun dibuat**
 
-- Gunakan pilihan Email atau Telepon/WhatsApp yang saling eksklusif dan pola verifikasi yang sama dengan pendaftaran Owner. Kata sandi dan konfirmasi wajib untuk jalur pendaftaran email/telepon ini.
+- Akun dibuat setelah data dan persetujuan tervalidasi, tanpa OTP.
+- Kontak yang belum diverifikasi tidak dapat dipakai sebagai bukti pemulihan atau tindakan sensitif.
 
-**Langkah 3 — Profil Investor**
+**Langkah 2 — Profil Investor**
 
 - Jenis/deskripsi profil Investor dengan kategori non-sensitif yang telah disetujui.
 - Sektor pilihan.
@@ -295,7 +292,7 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 - Google OAuth tetap tersedia untuk login dan pendaftaran.
 - Sebelum memulai pendaftaran Google, pengguna harus memilih Owner atau Investor secara eksplisit; pilihan tersebut diikat ke state OAuth di server. Pendaftaran Google tidak meminta kata sandi lokal terpisah.
-- Identitas Google baru tetap harus menyelesaikan verifikasi kontak yang dipilih: kode email ATAU kode telepon yang dikirim melalui WhatsApp. Email yang dinyatakan Google saja tidak memenuhi persyaratan ini.
+- Untuk pendaftaran Google baru, role Owner/Investor wajib dipilih sebelum OAuth dan diikat ke state server. Tidak ada OTP tambahan. Identitas Google menggunakan stable subject; klaim email hanya ditandai terverifikasi bila token tervalidasi menyatakan `email_verified=true`.
 - Identitas Google yang sudah terhubung hanya dapat masuk ke akun yang sudah ada. Role utama akun tetap dan menentukan portal yang benar.
 - Jangan menghubungkan identitas secara otomatis hanya karena email cocok. Pengaitan memerlukan bukti kendali terbaru atas kedua identitas.
 - Pendaftaran Admin tidak pernah tersedia melalui Google OAuth publik.
@@ -305,7 +302,7 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 ### Halaman permintaan — `/lupa-kata-sandi`
 
-- Terima email atau nomor telepon akun yang sudah diverifikasi sebagai tujuan pemulihan, dengan challenge pemulihan terpisah. Kode aktivasi pendaftaran tidak boleh digunakan ulang.
+- Hanya terima kanal pemulihan yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset. Akun Google-only menggunakan pemulihan Google; akun telepon-only belum dapat dipulihkan melalui nomor sampai verifikasi telepon tersedia. Jangan merilis reset password sebelum kanal pengiriman token yang aman tersedia.
 - Gunakan pesan konfirmasi netral, baik akun ada maupun tidak.
 - Terapkan rate limit dan pemantauan penyalahgunaan.
 - Jangan mengungkap keberadaan akun.
@@ -382,13 +379,13 @@ Jangan mengirim kata sandi, nilai OTP, nomor telepon/email mentah, token, atau i
 - [ ] Perilaku formulir bersama tetap konsisten.
 - [ ] Ketidaksesuaian role ditangani backend dan memberikan langkah berikutnya yang aman.
 - [ ] Kontrol kata sandi, lupa kata sandi, loading, error, dan rate limit dirancang.
-- [ ] Google OAuth mempertahankan pemilihan role wajib sebelum pendaftaran baru, verifikasi kontak terpisah, tanpa kewajiban kata sandi lokal terpisah, dan pengaitan identitas yang aman.
+- [ ] Google OAuth mempertahankan pemilihan role wajib sebelum pendaftaran baru, tanpa OTP tambahan, tanpa kewajiban kata sandi lokal terpisah, dan pengaitan identitas yang aman.
 
 ### Pendaftaran dan verifikasi
 
 - [ ] Hanya Owner dan Investor yang dapat mendaftar secara publik.
 - [ ] Pembuatan akun dipisahkan dari onboarding yang lebih panjang.
-- [ ] Pilihan pendaftaran Email ATAU Telepon/WhatsApp terlihat jelas; verifikasi kanal terpilih, jeda kirim ulang, expiry, dan batas percobaan sudah ditetapkan.
+- [ ] Pilihan pendaftaran Email ATAU Telepon terlihat jelas; akun dapat dibuat tanpa OTP dan kontak belum terverifikasi tidak diperlakukan sebagai bukti kepemilikan.
 - [ ] Consent opsional tidak dicentang secara default.
 - [ ] Progres dan perilaku pemulihan alur sudah ditetapkan.
 

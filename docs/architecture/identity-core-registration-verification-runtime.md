@@ -1,15 +1,17 @@
 # Desain Runtime Registrasi dan Verifikasi Identity Core
 
+> **Status: ditunda.** Dokumen ini adalah rancangan untuk tahap verifikasi kontak/OTP berikutnya dan **bukan** kontrak runtime tahap pertama. Keputusan terbaru menggunakan email/telepon + password atau Google OAuth tanpa OTP saat registrasi/login. Jangan implementasikan alur pending-verification/OTP di dokumen ini sebagai syarat registrasi tahap pertama. Sebelum runtime password/Google dibuat, selaraskan skema melalui migration lanjutan. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+
 > **Status nama produk:** Nama produk belum final. Nama yang pernah digunakan di repository hanya working title dan dapat diganti. Dokumen ini menggunakan istilah netral seperti *aplikasi*, *platform*, dan *layanan* agar keputusan teknis tidak mengikat identitas merek.
 
-- Status: rancangan teknis untuk implementasi bertahap
-- Cakupan: registrasi akun klien, password hashing, verifikasi kontak awal, penerbitan OTP, aktivasi akun, dan audit
+- Status: rancangan teknis tahap verifikasi kontak/OTP yang ditunda
+- Cakupan: verifikasi kontak, penerbitan OTP, aktivasi/verifikasi tambahan, dan audit; bukan registrasi/login tahap pertama
 - Basis: Identity Core migration 0001–0005 dan kebijakan registrasi/OTP yang telah disetujui
 - Bukan: persetujuan migration database produksi, provisioning credential produksi, atau deployment
 
 ## 1. Tujuan dan prinsip
 
-Runtime harus menyelesaikan registrasi Business Owner atau Investor dengan kontak awal terverifikasi, tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi.
+Runtime tahap berikutnya harus menyelesaikan verifikasi kontak Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi tahap pertama tidak menunggu verifikasi kontak/OTP.
 
 Prinsip wajib:
 1. Backend menjadi sumber kebenaran untuk validasi, role, status akun, expiry, limit, dan aktivasi.
@@ -235,12 +237,12 @@ CI menjalankan format, Clippy, unit tests, PostgreSQL integration tests dengan p
 
 ## 10. Tahapan implementasi
 
-1. **Cryptographic foundation:** pilih dan pin library; implementasikan Argon2id, key-provider interface, AEAD, HMAC, OTP hash, dan unit tests. Belum ada endpoint publik.
-2. **Database operations:** migration baru untuk fungsi terkontrol sesi/challenge/rate-limit/aktivasi dan bootstrap privilege sempit; integration tests dengan principal aplikasi.
-3. **Registration orchestration:** pending account + verification session + audit atomik; fake delivery provider.
-4. **OTP lifecycle:** issue/resend, dispatch result, verify, lock, cross-session limits, dan atomic activation.
-5. **HTTP API:** endpoint registrasi/verifikasi/resend dengan validasi, rate limit, error contract, dan tests.
-6. **Operational readiness:** key provider produksi, provider OTP nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
+Tahapan pada dokumen ini baru dimulai setelah autentikasi password/Google tahap pertama berjalan dan kebutuhan verifikasi kontak disetujui. Urutan tahap verifikasi berikutnya:
+1. **Database operations:** migration dan operasi terkontrol untuk sesi/challenge/rate limit serta bootstrap privilege sempit.
+2. **Verification orchestration:** sesi verifikasi, fake delivery provider, audit, dan transaksi atomik.
+3. **OTP lifecycle:** issue/resend, dispatch result, verify, lock, dan cross-session limits.
+4. **HTTP API:** endpoint verifikasi/resend dengan validasi, rate limit, error contract, dan tests.
+5. **Operational readiness:** key provider produksi, provider OTP nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
 
 Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi merge. Migration produksi, provisioning credential produksi, dan deployment memerlukan persetujuan terpisah.
 
