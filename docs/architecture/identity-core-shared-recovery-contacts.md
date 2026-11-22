@@ -3,9 +3,8 @@
 > Cakupan: kontrak kontak pemulihan bersama, pemilihan akun sasaran, dan perlindungan terhadap penyalahgunaan. Registrasi email/WhatsApp tetap mewajibkan OTP; login rutin menggunakan password tanpa OTP.
 
 > Status implementasi: skema recovery, operasi PostgreSQL, service core, dan router HTTP telah tersedia serta diuji. Sinyal sesi aktif sebelumnya dan service review Admin juga tersedia; keputusan review memerlukan sesi Admin aktif dan tercatat append-only. Router belum dipasang pada server default. Password reset dan pencabutan sesi setelah reset belum tersedia.
-> Cakupan: sesi verifikasi, kontak pemulihan bersama, pemilihan akun tujuan, batas penyalahgunaan, dan masa tunggu penghapusan.
 
-Dokumen ini melengkapi [Rancangan Skema Database](database-schema-design.md). Dokumen ini tidak menyatakan bahwa tabel atau alur sudah diimplementasikan.
+Dokumen ini menjelaskan invariant kontak pemulihan bersama, pemilihan akun sasaran, dan perlindungan penyalahgunaan. Skema, operasi PostgreSQL, service core, dan router HTTP tersedia; aktivasi router dan provider produksi tetap terpisah.
 
 ## 1. Prinsip utama
 
