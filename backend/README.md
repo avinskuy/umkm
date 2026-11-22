@@ -49,7 +49,7 @@ Gunakan liveness untuk mengetahui apakah proses perlu dipulihkan dan readiness u
 Siapkan database lokal dan principal aplikasi terlebih dahulu, kemudian jalankan:
 
 ```sh
-APP_DATABASE_URL='postgres://usahapintar_app_login:local_password@127.0.0.1:5432/usahapintar_dev' HOST=127.0.0.1 PORT=5000 cargo run --locked -p usahapintar-api
+AUTH_RATE_LIMIT_HMAC_KEY="$(openssl rand -hex 32)" APP_DATABASE_URL='postgres://usahapintar_app_login:local_password@127.0.0.1:5432/usahapintar_dev' HOST=127.0.0.1 PORT=5000 cargo run --locked -p usahapintar-api
 ```
 
 Jangan menggunakan kredensial produksi untuk pengembangan atau CI. Untuk migration lokal yang eksplisit, gunakan URL khusus migrator:
@@ -82,10 +82,10 @@ Lapisan `usahapintar_api::identity` menyediakan operasi terbatas untuk registras
 - `VerificationService` mengorkestrasi registrasi, penerbitan/resend OTP, pencatatan hasil pengiriman, verifikasi, dan aktivasi akun. Password diproses menggunakan komponen hashing backend; password plaintext tidak disimpan atau diteruskan ke provider.
 - `registration_router` menyediakan endpoint registrasi, resend, dan verifikasi. Router ini telah memiliki pengujian runtime, tetapi sengaja belum dipasang pada `app()`/`main()` sehingga belum tersedia melalui HTTP server default.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin yang ditargetkan menggunakan email/nomor telepon + password tanpa OTP setiap kali login; endpoint login/logout, pencarian kredensial runtime, cookie/session middleware, dan validasi sesi belum tersedia.
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin yang ditargetkan menggunakan email/nomor telepon + password tanpa OTP setiap kali login; router registrasi HTTP publik, middleware validasi sesi untuk endpoint terproteksi, rotasi token otomatis, dan recovery runtime belum tersedia.
 
 Provider pengiriman masih berupa abstraksi. Resend (email) dan FlowKirim (WhatsApp) merupakan target adapter, bukan integrasi nyata yang telah dikonfigurasi atau diuji dengan pengiriman langsung. CI menggunakan fake provider dan tidak mengirim pesan.
 
 Untuk menjaga konsistensi, operasi pembuatan akun, profil, penerimaan Terms/Privacy, consent opsional, dan event audit yang terkait harus menggunakan transaksi sesuai kontrak database dan hanya commit setelah seluruh operasi berhasil. Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya, bukan payload klien. Metadata hanya boleh memuat key allowlist non-sensitif; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
 
-Operasi login/logout, middleware sesi, pemulihan akun, adapter provider nyata, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
+Login password Owner/Investor dan logout telah tersedia. Middleware sesi untuk endpoint terproteksi, pemulihan akun, adapter provider nyata, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
