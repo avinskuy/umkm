@@ -2048,7 +2048,9 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.record_otp_delivery_result(uuid,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE'), \\\n                has_function_privilege(current_user, \\\n                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE')",
+                    'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
