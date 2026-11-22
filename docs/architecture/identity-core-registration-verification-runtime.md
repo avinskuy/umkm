@@ -152,7 +152,23 @@ Modul domain tidak bergantung pada Axum. Handler HTTP hanya memetakan request/re
 
 ## 5. Least privilege dan operasi database
 
-Principal runtime saat ini hanya memiliki EXECUTE pada fungsi pembuatan akun, INSERT audit, dan EXECUTE validator metadata. Akses baru dibuka eksplisit dan fail-closed.
+Principal runtime hanya mendapat EXECUTE pada fungsi yang terdaftar, INSERT audit, dan EXECUTE validator metadata. Akses baru dibuka eksplisit dan fail-closed.
+
+### Implementasi database operations 0007
+
+Migration 0007 menambahkan operasi terkontrol untuk tahap registrasi OTP:
+
+- `create_registration_verification_session`: membuat sesi verifikasi yang terikat pada akun pending dan kanal kontak awal.
+- `reserve_otp_challenge`: mengganti challenge pending, mencatat reservasi pengiriman, dan menerapkan cooldown 60 detik serta batas lima pengiriman dalam 60 menit.
+- `record_otp_delivery_result`: menyimpan hasil dispatch provider satu kali.
+- `record_otp_verification_attempt`: mencatat hasil pemeriksaan OTP, menerapkan batas kegagalan lintas sesi, mengunci sesi setelah lima kegagalan, dan mengaktifkan akun secara atomik saat berhasil.
+
+Rate limit lintas rotasi HMAC menerima daftar fingerprint aktif dan versi sebelumnya yang masih berada dalam jendela 60 menit. Runtime wajib menyertakan seluruh versi fingerprint yang masih relevan dan mengunci seluruh alias secara berurutan agar request paralel tidak melewati kuota.
+
+Operasi verifikasi pada migration 0007 dibatasi untuk purpose registrasi. Perubahan kontak, penambahan recovery contact, dan account recovery belum dibuka melalui fungsi ini. Pemeriksaan hash OTP dilakukan di backend; fungsi database menerima hasil boolean dari service tepercaya dan hanya mengelola transaksi, lifecycle, serta limit.
+
+Bootstrap memverifikasi owner, SECURITY DEFINER, dan search_path untuk seluruh fungsi tersebut. Principal aplikasi tetap tidak memiliki akses langsung ke tabel verifikasi.
+
 
 - Jangan memberikan SELECT/INSERT/UPDATE/DELETE langsung pada tabel verifikasi atau identitas.
 - Gunakan fungsi PostgreSQL `SECURITY DEFINER` yang sempit untuk operasi lintas tabel.
