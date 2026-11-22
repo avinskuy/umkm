@@ -51,6 +51,9 @@ BEGIN
     )
     RETURNING id INTO v_session_id;
 
+    INSERT INTO public.identity_audit_events (actor_type, action_code, outcome)
+    VALUES ('system', 'identity.registration.requested', 'success');
+
     RETURN v_session_id;
 END;
 $$;
@@ -356,6 +359,9 @@ BEGIN
             RAISE EXCEPTION 'pending account cannot be activated'
                 USING ERRCODE = 'P0001';
         END IF;
+
+        INSERT INTO public.identity_audit_events (actor_type, action_code, outcome)
+        VALUES ('system', 'identity.registration.verified', 'success');
     END IF;
 
     RETURN TRUE;
