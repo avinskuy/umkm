@@ -51,9 +51,9 @@ pub trait RegistrationPasswordPolicy: Send + Sync {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistrationPolicyVersions {
-    pub terms_of_service: String,
-    pub privacy_policy: String,
-    pub marketing_notice: Option<String>,
+    terms_of_service: String,
+    privacy_policy: String,
+    marketing_notice: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
