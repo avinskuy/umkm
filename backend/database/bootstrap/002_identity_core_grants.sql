@@ -181,3 +181,57 @@ GRANT EXECUTE ON FUNCTION public.record_otp_delivery_result(UUID, TEXT)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[])
     TO usahapintar_app;
+
+
+-- Password authentication and session operations.
+DO $password_authentication_ownership_guard$
+DECLARE
+    v_signature TEXT;
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    FOREACH v_signature IN ARRAY ARRAY[
+        'public.find_active_password_login(text,text)',
+        'public.create_password_login_session(uuid,bytea)',
+        'public.revoke_password_login_session(bytea)',
+        'public.reserve_password_login_attempt(bytea,bytea)',
+        'public.clear_password_login_identifier_limit(bytea)'
+    ] LOOP
+        SELECT pg_catalog.pg_get_userbyid(p.proowner),
+               p.prosecdef,
+               COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+          INTO v_owner, v_is_security_definer, v_has_safe_search_path
+          FROM pg_catalog.pg_proc AS p
+         WHERE p.oid = pg_catalog.to_regprocedure(v_signature);
+
+        IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+           OR v_is_security_definer IS DISTINCT FROM TRUE
+           OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+            RAISE EXCEPTION
+                'Refusing password authentication grants: % must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path',
+                v_signature;
+        END IF;
+    END LOOP;
+
+    IF pg_catalog.pg_get_userbyid(
+        (SELECT c.relowner FROM pg_catalog.pg_class AS c
+          WHERE c.oid = 'public.password_login_rate_limits'::pg_catalog.regclass)
+    ) IS DISTINCT FROM 'usahapintar_migrator' THEN
+        RAISE EXCEPTION
+            'Refusing password authentication grants: rate-limit table must be owned by usahapintar_migrator';
+    END IF;
+END;
+$password_authentication_ownership_guard$;
+
+REVOKE ALL ON TABLE public.password_login_rate_limits FROM usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.find_active_password_login(TEXT, TEXT)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.create_password_login_session(UUID, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.revoke_password_login_session(BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.reserve_password_login_attempt(BYTEA, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.clear_password_login_identifier_limit(BYTEA)
+    TO usahapintar_app;
