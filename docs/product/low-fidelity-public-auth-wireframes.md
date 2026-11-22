@@ -275,6 +275,7 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 │ Buat akun Pemilik Usaha                                      │
 │                                                              │
 │ Nama lengkap          [________________________________]     │
+│ Nama ini akan tampil di profil publik setelah akun aktif.     │
 │ Metode kontak awal (pilih satu):                             │
 │ ( ) Email   ( ) Telepon / WhatsApp                           │
 │ Kontak yang dipilih    [______________________________]     │
