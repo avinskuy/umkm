@@ -2576,15 +2576,17 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         .fetch_one(&app_pool)
         .await
         .expect("authentication and registration guard function grants should be queryable");
-    assert_eq!(authentication_function_access, (true, true, true, true, true, true, true, true, true));
+    assert_eq!(
+        authentication_function_access,
+        (true, true, true, true, true, true, true, true, true)
+    );
 
-    let registration_rate_limit_allowed: bool = sqlx::query_scalar(
-        "SELECT public.reserve_registration_http_attempt('create', $1, NULL)",
-    )
-    .bind(vec![101_u8; 32])
-    .fetch_one(&app_pool)
-    .await
-    .expect("application should execute the registration abuse guard");
+    let registration_rate_limit_allowed: bool =
+        sqlx::query_scalar("SELECT public.reserve_registration_http_attempt('create', $1, NULL)")
+            .bind(vec![101_u8; 32])
+            .fetch_one(&app_pool)
+            .await
+            .expect("application should execute the registration abuse guard");
     assert!(registration_rate_limit_allowed);
 
     let created_user_id: String =
