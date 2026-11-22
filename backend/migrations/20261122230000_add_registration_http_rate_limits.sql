@@ -44,7 +44,7 @@ DECLARE
     v_blocked_until TIMESTAMPTZ;
     v_allowed BOOLEAN := TRUE;
 BEGIN
-    IF p_action NOT IN ('create', 'resend', 'verify')
+    IF p_action IS NULL OR p_action NOT IN ('create', 'resend', 'verify')
        OR p_ip_hash IS NULL OR octet_length(p_ip_hash) <> 32 THEN
         RAISE EXCEPTION 'registration rate limit input is invalid'
             USING ERRCODE = '22023';
