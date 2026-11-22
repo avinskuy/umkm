@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use zeroize::Zeroizing;
 
 use super::super::authentication::{
@@ -69,6 +69,19 @@ fn is_cross_site_request(headers: &HeaderMap) -> bool {
         .is_some_and(|value| value.eq_ignore_ascii_case("cross-site"))
 }
 
+fn resolved_client_ip(headers: &HeaderMap, peer_ip: IpAddr) -> IpAddr {
+    if !peer_ip.is_loopback() {
+        return peer_ip;
+    }
+
+    headers
+        .get("x-real-ip")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<IpAddr>().ok())
+        .filter(|value| !value.is_unspecified())
+        .unwrap_or(peer_ip)
+}
+
 fn login_error(error_value: AuthenticationError) -> Response {
     match error_value {
         AuthenticationError::InvalidCredentials => {
@@ -106,7 +119,7 @@ async fn login_owner(
     if is_cross_site_request(&headers) {
         return error(StatusCode::FORBIDDEN, "Permintaan login lintas situs ditolak.");
     }
-    login(state, peer, request, LoginRole::BusinessOwner).await
+    login(state, resolved_client_ip(&headers, peer.ip()), request, LoginRole::BusinessOwner).await
 }
 
 async fn login_investor(
@@ -118,19 +131,19 @@ async fn login_investor(
     if is_cross_site_request(&headers) {
         return error(StatusCode::FORBIDDEN, "Permintaan login lintas situs ditolak.");
     }
-    login(state, peer, request, LoginRole::Investor).await
+    login(state, resolved_client_ip(&headers, peer.ip()), request, LoginRole::Investor).await
 }
 
 async fn login(
     state: AuthenticationApiState,
-    peer: SocketAddr,
+    peer_ip: IpAddr,
     request: LoginRequest,
     role: LoginRole,
 ) -> Response {
     let password = Zeroizing::new(request.password);
     match state
         .service()
-        .login(&request.identifier, password.as_str(), role, peer.ip())
+        .login(&request.identifier, password.as_str(), role, peer_ip)
         .await
     {
         Ok(session) => {
@@ -232,6 +245,20 @@ mod tests {
             HeaderValue::from_static("__Host-usahapintar_session=not-a-token"),
         );
         assert!(session_cookie(&headers).is_none());
+    }
+
+    #[test]
+    fn forwarded_client_ip_is_trusted_only_from_a_loopback_proxy() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-real-ip", HeaderValue::from_static("203.0.113.7"));
+        assert_eq!(
+            resolved_client_ip(&headers, "127.0.0.1".parse().unwrap()),
+            "203.0.113.7".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            resolved_client_ip(&headers, "198.51.100.8".parse().unwrap()),
+            "198.51.100.8".parse::<IpAddr>().unwrap()
+        );
     }
 
     #[test]
