@@ -82,7 +82,7 @@ Lapisan `usahapintar_api::identity` menyediakan operasi terbatas untuk registras
 - `VerificationService` mengorkestrasi registrasi, penerbitan/resend OTP, pencatatan hasil pengiriman, verifikasi, dan aktivasi akun. Password diproses menggunakan komponen hashing backend; password plaintext tidak disimpan atau diteruskan ke provider.
 - `registration_router` menyediakan endpoint registrasi, resend, dan verifikasi. Router ini telah memiliki pengujian runtime, tetapi sengaja belum dipasang pada `app()`/`main()` sehingga belum tersedia melalui HTTP server default.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin yang ditargetkan menggunakan email/nomor telepon + password tanpa OTP setiap kali login; router registrasi HTTP publik, middleware validasi sesi untuk endpoint terproteksi, rotasi token otomatis, dan recovery runtime belum tersedia.
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login Owner/Investor menggunakan email/nomor telepon + password tanpa OTP rutin dan sudah tersedia pada runtime. Router registrasi HTTP publik, middleware validasi sesi untuk endpoint terproteksi, rotasi token otomatis, dan recovery runtime belum tersedia.
 
 Provider pengiriman masih berupa abstraksi. Resend (email) dan FlowKirim (WhatsApp) merupakan target adapter, bukan integrasi nyata yang telah dikonfigurasi atau diuji dengan pengiriman langsung. CI menggunakan fake provider dan tidak mengirim pesan.
 
