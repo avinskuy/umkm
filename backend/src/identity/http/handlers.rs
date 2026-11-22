@@ -10,10 +10,6 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-use super::{
-    opaque_verification_id, valid_contact_input, AbuseDecision, RegistrationAction,
-    RegistrationApiState,
-};
 use super::super::{
     password::hash_password,
     registration::{ClientRegistration, ClientRole, ContactChannel},
