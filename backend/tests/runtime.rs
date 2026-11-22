@@ -150,7 +150,6 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
     pool.close().await;
 }
 
-
 #[tokio::test]
 #[ignore = "requires the disposable least-privilege PostgreSQL application principal"]
 async fn registration_http_router_creates_and_verifies_an_account_without_being_mounted_by_default()
