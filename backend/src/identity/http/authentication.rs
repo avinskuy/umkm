@@ -406,7 +406,7 @@ pub(super) fn session_cookie(headers: &HeaderMap) -> Option<Zeroizing<String>> {
     })
 }
 
-fn clear_session_cookie(response: &mut Response) {
+pub(super) fn clear_session_cookie(response: &mut Response) {
     let cookie = format!(
         "{SESSION_COOKIE}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax"
     );
