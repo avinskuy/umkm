@@ -33,7 +33,7 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 
 ## Status integrasi
 
-Migration 0001–0015 tersedia pada repository dan diuji melalui PostgreSQL CI. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan sebagian alur account recovery.
+Migration 0001–0016 tersedia pada repository dan diuji melalui PostgreSQL CI. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan sebagian alur account recovery.
 
 Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal. Router belum dipasang pada server default; password reset, pencabutan sesi setelah reset, dan notifikasi keamanan belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
 
