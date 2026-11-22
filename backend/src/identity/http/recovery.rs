@@ -416,9 +416,12 @@ async fn select_account(
         return response;
     }
 
+    let session_token = session_cookie(&headers);
+    let session_token = session_token.as_ref().map(|token| token.as_str());
+
     match state
         .recovery_service()
-        .select_account_with_session(&case_id, &request.user_id, session_cookie(&headers))
+        .select_account_with_session(&case_id, &request.user_id, session_token)
         .await
     {
         Ok(_) => message(
