@@ -37,7 +37,7 @@ Jangan membuat satu migration besar yang sekaligus membangun semua fitur akun. G
 | Urutan | Cakupan | Isi utama |
 | --- | --- | --- |
 | 0001 | Identitas akun | `users`, role/status kanonis, kontak utama, aturan reservasi, dan perlindungan role immutable |
-| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; skema tersedia dan diuji di CI, runtime OTP tetap belum diimplementasikan |
+| 0002 | Verifikasi kontak | `verification_sessions`, `verification_challenges`, event pengiriman dan percobaan verifikasi persisten, serta indeks pencarian/rate limit; skema dan fungsi database digunakan oleh `VerificationService` untuk registrasi OTP |
 | 0003 | Sesi autentikasi | `sessions`, hash token SHA-256 unik, idle timeout 7 hari, absolute expiry 30 hari, rotasi token, dan pencabutan server-side; skema dan tes invariant tersedia di `main`, runtime sesi belum tersedia |
 | 0004 | Pemulihan akun | `recovery_contacts`, `account_recovery_cases`, dan `password_reset_tokens` |
 | 0005 | Audit Identity Core | audit event yang dibutuhkan untuk perubahan identitas, sesi, verifikasi, dan pemulihan |
@@ -56,7 +56,7 @@ Kolom konseptual yang diperlukan:
 - `primary_role`: constrained value `business_owner`, `investor`, `admin`.
 - `account_status`: constrained lifecycle value `pending_verification`, `active`, `deactivated`, `deletion_pending`, `deletion_processing`, `pending_expired`, dan `closed`. Suspend/limit fitur dicatat terpisah melalui moderation/enforcement records.
 - `email_normalized` dan `phone_e164`: nullable secara individual; akun klien memilih satu identifier awal. Kontak awal baru dianggap terverifikasi setelah OTP email/WhatsApp valid.
-- `initial_contact_channel`: mencatat identifier awal (email atau phone) yang dipilih saat pendaftaran; pada skema tahap pertama yang diperbarui, nilainya tidak mensyaratkan verifikasi sebelum akun aktif.
+- `initial_contact_channel`: mencatat identifier awal (email atau phone) yang dipilih saat pendaftaran; akun hanya aktif setelah kontak awal berhasil diverifikasi melalui OTP.
 - `email_verified_at` dan `phone_verified_at`: waktu verifikasi yang sesuai; jangan menyimpulkan kontak kedua telah diverifikasi.
 - `password_hash`: wajib untuk akun klien aktif maupun pending; akun terminal yang telah ditutup atau kedaluwarsa mengikuti aturan pembersihan kredensial.
 - `pending_expires_at`: masih bagian dari migration saat ini untuk lifecycle pending lama; tidak digunakan sebagai syarat registrasi tahap pertama dan perlu ditinjau pada migration lanjutan.
@@ -224,9 +224,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Migration 0002 telah di-merge ke main dan lulus quality checks serta tes integrasi PostgreSQL CI. Migration tersebut menjadi fondasi untuk verifikasi kontak/OTP pada tahap berikutnya, bukan syarat registrasi/login tahap pertama. Sebelum OTP diaktifkan, tetap diperlukan abstraksi key provider untuk AEAD/HMAC, enforcement batas percobaan lintas sesi, transaksi resend/verifikasi, serta pengujian end-to-end. Sebelum runtime registrasi tahap pertama dibuat, prioritaskan migration lanjutan yang menyelaraskan status akun/kontak, fungsi `create_client_user`, bootstrap privilege, dan tes PostgreSQL sesuai keputusan autentikasi terbaru.
-
-Migration 0001–0005 dan bootstrap principal/privilege telah diuji melalui CI, tetapi belum dijalankan pada database produksi. Runtime menyediakan operasi terbatas untuk menambahkan audit event melalui principal aplikasi dengan hak INSERT-only; integrasi audit untuk seluruh lifecycle identitas masih belum tersedia. Jangan mengaktifkan migration otomatis pada HTTP startup atau melakukan deployment tanpa tinjauan dan persetujuan terpisah.
+Migration 0001–0010 dan bootstrap principal/privilege telah diuji melalui CI pada PostgreSQL sementara. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP serta router HTTP yang belum dipasang pada aplikasi default. Login/logout, sesi HTTP, provider nyata, recovery runtime, dan cleanup job masih memerlukan implementasi serta pengujian tersendiri. Migration dan bootstrap belum diterapkan ke database produksi; jangan menjalankan migration otomatis pada HTTP startup.
 
 ## 9. Referensi internal
 
