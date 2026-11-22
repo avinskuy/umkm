@@ -215,8 +215,8 @@ impl<'a> AuthenticationService<'a> {
             return Err(AuthenticationError::InvalidCredentials);
         };
 
-        let raw_token = random_session_token()?;
-        let token_hash = hash_session_token(&raw_token);
+        let raw_token = Zeroizing::new(random_session_token()?);
+        let token_hash = hash_session_token(raw_token.as_str());
 
         let mut transaction = self
             .pool
@@ -258,7 +258,7 @@ impl<'a> AuthenticationService<'a> {
         Ok(LoginSession {
             user_id,
             role,
-            token: Zeroizing::new(raw_token),
+            token: raw_token,
         })
     }
 
@@ -311,8 +311,8 @@ impl<'a> AuthenticationService<'a> {
 
     pub async fn rotate_session(&self, token: &str) -> Result<RotatedSession, AuthenticationError> {
         let old_token_hash = session_token_hash(token)?;
-        let new_token = random_session_token()?;
-        let new_token_hash = hash_session_token(&new_token);
+        let new_token = Zeroizing::new(random_session_token()?);
+        let new_token_hash = hash_session_token(new_token.as_str());
 
         let mut transaction = self
             .pool
@@ -355,7 +355,7 @@ impl<'a> AuthenticationService<'a> {
             session_id: row.0,
             user_id: row.1,
             role,
-            token: Zeroizing::new(new_token),
+            token: new_token,
             expires_in_seconds: row.3,
         })
     }
