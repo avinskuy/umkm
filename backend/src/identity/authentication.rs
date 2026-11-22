@@ -364,18 +364,23 @@ impl<'a> AuthenticationService<'a> {
         &self,
         user_id: &str,
         role: LoginRole,
+        token: &str,
     ) -> Result<i32, AuthenticationError> {
+        let token_hash = session_token_hash(token)?;
         let mut transaction = self
             .pool
             .begin()
             .await
             .map_err(|_| AuthenticationError::Database)?;
         let revoked_count: i32 =
-            sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1::uuid)")
-                .bind(user_id)
+            sqlx::query_scalar("SELECT public.revoke_all_password_login_sessions($1)")
+                .bind(token_hash.to_vec())
                 .fetch_one(&mut *transaction)
                 .await
                 .map_err(|_| AuthenticationError::Database)?;
+        if revoked_count == 0 {
+            return Err(AuthenticationError::InvalidSession);
+        }
         let count_bucket = match revoked_count {
             0 => "0",
             1 => "1",
