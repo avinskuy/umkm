@@ -8,12 +8,16 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::sync::Arc;
 use std::net::{IpAddr, SocketAddr};
 use zeroize::Zeroizing;
 
-use super::super::authentication::{
-    AuthenticatedSession, AuthenticationError, AuthenticationRateLimitKey, AuthenticationService,
-    LoginRole,
+use super::super::{
+    authentication::{
+        AuthenticatedSession, AuthenticationError, AuthenticationRateLimitKey,
+        AuthenticationService, LoginDeviceContext, LoginRole,
+    },
+    crypto::KeyProvider,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
@@ -24,18 +28,24 @@ const SESSION_MAX_AGE_SECONDS: u32 = 30 * 24 * 60 * 60;
 pub struct AuthenticationApiState {
     pool: PgPool,
     rate_limit_key: AuthenticationRateLimitKey,
+    device_keys: Arc<dyn KeyProvider>,
 }
 
 impl AuthenticationApiState {
-    pub fn new(pool: PgPool, rate_limit_key: AuthenticationRateLimitKey) -> Self {
+    pub fn new(
+        pool: PgPool,
+        rate_limit_key: AuthenticationRateLimitKey,
+        device_keys: Arc<dyn KeyProvider>,
+    ) -> Self {
         Self {
             pool,
             rate_limit_key,
+            device_keys,
         }
     }
 
     fn service(&self) -> AuthenticationService<'_> {
-        AuthenticationService::new(&self.pool, &self.rate_limit_key)
+        AuthenticationService::new(&self.pool, &self.rate_limit_key, self.device_keys.as_ref())
     }
 }
 
@@ -44,6 +54,8 @@ impl AuthenticationApiState {
 struct LoginRequest {
     identifier: String,
     password: String,
+    #[serde(default)]
+    remember_device: bool,
 }
 
 #[derive(Serialize)]
@@ -298,6 +310,7 @@ async fn login_owner(
         resolved_client_ip(&headers, peer.ip()),
         request,
         LoginRole::BusinessOwner,
+        headers.get(header::USER_AGENT).and_then(|value| value.to_str().ok()),
     )
     .await
 }
@@ -319,6 +332,7 @@ async fn login_investor(
         resolved_client_ip(&headers, peer.ip()),
         request,
         LoginRole::Investor,
+        headers.get(header::USER_AGENT).and_then(|value| value.to_str().ok()),
     )
     .await
 }
@@ -328,11 +342,21 @@ async fn login(
     peer_ip: IpAddr,
     request: LoginRequest,
     role: LoginRole,
+    user_agent: Option<&str>,
 ) -> Response {
     let password = Zeroizing::new(request.password);
     match state
         .service()
-        .login(&request.identifier, password.as_str(), role, peer_ip)
+        .login(
+            &request.identifier,
+            password.as_str(),
+            role,
+            LoginDeviceContext {
+                peer_ip,
+                user_agent,
+                remember_device: request.remember_device,
+            },
+        )
         .await
     {
         Ok(session) => {
