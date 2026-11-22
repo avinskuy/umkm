@@ -3,7 +3,7 @@
 > Status: skema Identity Core migration 0001–0005 tersedia; skema domain produk lainnya masih berupa rancangan  
 > Cakupan: model relasional, constraint integritas, batas privasi, dan urutan migration  
 > Baseline runtime: PostgreSQL 16 + SQLx 0.8
-> Keputusan autentikasi tahap pertama: email/telepon + password atau Google OAuth; OTP registrasi/login ditunda.
+> Keputusan autentikasi terbaru: OTP wajib untuk registrasi email/WhatsApp + password; Google OAuth tanpa OTP tambahan; login rutin tanpa OTP.
 
 Dokumen ini menerjemahkan kebijakan produk dan autentikasi USahapintar ke dalam model relasional. Migration Identity Core 0001–0005 sudah tersedia sebagai SQLx migration dan diuji di CI. Skema untuk domain produk lainnya masih berupa rancangan. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi atau alur registrasi dan autentikasi sudah aktif.
 
@@ -70,7 +70,7 @@ Label produk yang lebih singkat, “Owner” dan “Investor”, merupakan istil
 - Penutupan akun, pelepasan identitas, dan pemindahan identitas memerlukan kebijakan retensi serta verifikasi yang terpisah; jangan menerapkan penggunaan ulang identitas secara otomatis.
 - Challenge verifikasi harus mendukung rate limit, batas percobaan, masa berlaku singkat, jeda kirim ulang, dan pembatalan challenge yang telah digantikan. Hash OTP harus menggunakan konstruksi keyed yang sesuai untuk kode angka pendek.
 - Status kegagalan sesi verifikasi harus dipisahkan dari baris challenge OTP agar pengiriman ulang tidak mengatur ulang batas lima percobaan atau penguncian satu jam. Tegakkan jeda pengiriman ulang 60 detik dan batas lima pengiriman per alamat tujuan per jam secara persisten di seluruh instance aplikasi.
-- Registrasi tahap pertama membuat akun aktif tanpa OTP setelah validasi; kontak yang diberikan tidak otomatis terverifikasi. Lifecycle pending 30 menit pada migration lama tidak digunakan untuk alur baru dan harus diselaraskan melalui migration lanjutan.
+- Registrasi email/WhatsApp + password membuat akun pending dan hanya aktif setelah OTP valid; lifecycle pending 30 menit berlaku. Google OAuth yang tervalidasi tidak memerlukan OTP tambahan dan harus mengikuti jalur aktivasi yang konsisten dengan invariant database.
 - Data sesi harus mendukung batas 7 hari tanpa aktivitas dan 30 hari absolut, fitur “Ingat perangkat ini” tanpa melewati kedua batas, pencabutan sesi individual, dan logout dari semua perangkat.
 - Kontak pemulihan bersifat opsional dan harus dibuktikan kepemilikannya sebelum dipakai. Karena OTP ditunda, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; desain kanal pembuktian/pemulihan harus diselesaikan sebelum fitur reset dirilis.
 - Rancangan status akun harus membedakan penonaktifan sementara dan penghapusan permanen. Penghapusan permanen memiliki masa tunggu/pembatalan 30 hari sebelum diproses; retensi dan penanganan cadangan harus ditetapkan berdasarkan kategori data.
