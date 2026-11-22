@@ -94,6 +94,7 @@ DECLARE
     v_session_id UUID;
     v_user_id UUID;
     v_primary_role TEXT;
+    v_account_status TEXT;
     v_expires_at TIMESTAMPTZ;
     v_last_seen_at TIMESTAMPTZ;
 BEGIN
