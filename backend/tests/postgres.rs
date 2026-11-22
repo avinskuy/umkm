@@ -1,5 +1,55 @@
+use std::{future::Future, pin::Pin, sync::Mutex};
+
 use sqlx::{postgres::PgPoolOptions, raw_sql, PgPool};
-use usahapintar_api::database::{connect, migrations::run, DatabaseConfig};
+use usahapintar_api::{
+    database::{connect, migrations::run, DatabaseConfig},
+    identity::{
+        crypto::{CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey, VersionedKey},
+        ClientRegistration, ClientRole, ContactChannel, DispatchStatus, OtpDeliveryMessage,
+        OtpDeliveryProvider, VerificationService,
+    },
+};
+
+struct VerificationTestKeys;
+
+impl KeyProvider for VerificationTestKeys {
+    fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+        self.key(purpose, KeyVersion(1))
+            .map(|key| VersionedKey::new(KeyVersion(1), key))
+    }
+
+    fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+        if version != KeyVersion(1) {
+            return Err(CryptoError::KeyUnavailable);
+        }
+        let marker = match purpose {
+            KeyPurpose::DataEncryption => 0x11,
+            KeyPurpose::ContactFingerprint => 0x22,
+            KeyPurpose::OtpVerification => 0x33,
+        };
+        Ok(SecretKey::from_bytes([marker; 32]))
+    }
+}
+
+struct FakeOtpDelivery {
+    messages: Mutex<Vec<OtpDeliveryMessage>>,
+    status: DispatchStatus,
+}
+
+impl OtpDeliveryProvider for FakeOtpDelivery {
+    fn dispatch<'a>(
+        &'a self,
+        message: OtpDeliveryMessage,
+    ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>> {
+        Box::pin(async move {
+            self.messages
+                .lock()
+                .expect("fake delivery message lock should be available")
+                .push(message);
+            self.status
+        })
+    }
+}
 
 #[tokio::test]
 #[ignore = "requires a disposable PostgreSQL database; enabled explicitly in CI"]
@@ -2024,6 +2074,64 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit reader privileges should be queryable");
     assert_eq!(audit_reader_access, (true, false));
 
+    assert_verification_orchestration(&app_pool).await;
+
     app_pool.close().await;
     admin_pool.close().await;
 }
+
+async fn assert_verification_orchestration(pool: &PgPool) {
+    let keys = VerificationTestKeys;
+    let delivery = FakeOtpDelivery {
+        messages: Mutex::new(Vec::new()),
+        status: DispatchStatus::Accepted,
+    };
+    let service = VerificationService::new(pool, &keys, &delivery);
+    let registration = ClientRegistration {
+        role: ClientRole::BusinessOwner,
+        initial_contact_channel: ContactChannel::Email,
+        email_normalized: Some("orchestration@example.test"),
+        phone_e164: None,
+        password_hash: "test-only-encoded-password-hash",
+    };
+
+    let started = service
+        .register(&registration)
+        .await
+        .expect("registration orchestration should create a pending account and dispatch OTP");
+    assert_eq!(started.dispatch_status, DispatchStatus::Accepted);
+
+    let code = {
+        let messages = delivery
+            .messages
+            .lock()
+            .expect("fake delivery message lock should be available");
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].channel, usahapintar_api::identity::DeliveryChannel::Email);
+        messages[0].code.as_str().to_owned()
+    };
+
+    let incorrect_code = if code == "000000" { "000001" } else { "000000" };
+    assert!(
+        !service
+            .verify(&started.session_id, incorrect_code)
+            .await
+            .expect("incorrect OTP should be recorded as a failed attempt")
+    );
+    assert!(
+        service
+            .verify(&started.session_id, &code)
+            .await
+            .expect("correct OTP should verify and activate the pending account")
+    );
+
+    let account_status: String = sqlx::query_scalar(
+        "SELECT account_status FROM public.users WHERE id = $1::uuid",
+    )
+    .bind(&started.user_id)
+    .fetch_one(pool)
+    .await
+    .expect("test migrator should inspect the activated account");
+    assert_eq!(account_status, "active");
+}
+
