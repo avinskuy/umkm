@@ -248,7 +248,7 @@ BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
         'public.get_active_password_login_session(bytea)',
         'public.rotate_active_password_login_session(bytea,bytea)',
-        'public.revoke_all_password_login_sessions(uuid)'
+        'public.revoke_all_password_login_sessions(bytea)'
     ] LOOP
         SELECT pg_catalog.pg_get_userbyid(p.proowner),
                p.prosecdef,
@@ -272,5 +272,5 @@ GRANT EXECUTE ON FUNCTION public.get_active_password_login_session(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.rotate_active_password_login_session(BYTEA, BYTEA)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.revoke_all_password_login_sessions(UUID)
+GRANT EXECUTE ON FUNCTION public.revoke_all_password_login_sessions(BYTEA)
     TO usahapintar_app;
