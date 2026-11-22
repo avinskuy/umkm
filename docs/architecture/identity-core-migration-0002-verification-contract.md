@@ -2,7 +2,9 @@
 
 > Status: diimplementasikan sebagai migration SQLx dan lulus CI frontend/backend, termasuk pengujian integrasi PostgreSQL.
 
-Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Ini belum mengimplementasikan endpoint, provider OTP, atau operasi enkripsi/HMAC. HTTP server secara terpisah menginisialisasi pool PostgreSQL saat startup, tetapi tidak menjalankan migration secara otomatis.
+Dokumen ini menerjemahkan kebijakan Identity Core dan [Keputusan Teknis Identity Core](identity-core-technical-decisions.md) menjadi kontrak skema untuk slice verifikasi kontak tahap berikutnya. Skema tabel dan constraint untuk sesi verifikasi, challenge, event percobaan, dan event pengiriman telah dibuat pada migration 0002. Migration ini tidak menjadikan OTP sebagai syarat registrasi/login tahap pertama; endpoint, provider OTP, dan operasi enkripsi/HMAC belum diimplementasikan. HTTP server menginisialisasi pool PostgreSQL saat startup, tetapi tidak menjalankan migration otomatis.
+
+> Keputusan autentikasi tahap pertama pada 22 November 2026 menggunakan email/telepon + password atau Google OAuth tanpa OTP registrasi/login. Migration 0002 dipertahankan untuk verifikasi kontak dan pemulihan pada tahap berikutnya. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
 
 Migration 0002 mencakup sesi verifikasi, challenge OTP, event percobaan verifikasi lintas sesi, dan event pengiriman untuk rate limit kontak lintas sesi/instance. Recovery contacts, account recovery cases, password reset, login sessions, audit, dan notifikasi tetap berada pada slice terpisah.
 
