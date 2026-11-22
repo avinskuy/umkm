@@ -58,7 +58,8 @@ $$;
 CREATE FUNCTION public.reserve_otp_challenge(
     p_session_id UUID,
     p_code_hash BYTEA,
-    p_hash_key_version TEXT
+    p_hash_key_version TEXT,
+    p_destination_hmac_aliases BYTEA[]
 )
 RETURNS TABLE (challenge_id UUID, delivery_event_id UUID)
 LANGUAGE plpgsql
@@ -70,6 +71,7 @@ DECLARE
     v_now TIMESTAMPTZ := clock_timestamp();
     v_send_count BIGINT;
     v_last_sent_at TIMESTAMPTZ;
+    v_alias BYTEA;
 BEGIN
     SELECT * INTO v_session
       FROM public.verification_sessions
@@ -80,26 +82,32 @@ BEGIN
        OR v_session.status <> 'pending'
        OR v_session.expires_at <= v_now
        OR v_session.purpose <> 'registration'
-       OR v_session.failed_attempt_count >= 5
        OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now)
        OR p_code_hash IS NULL OR octet_length(p_code_hash) = 0
-       OR p_hash_key_version IS NULL OR length(btrim(p_hash_key_version)) = 0 THEN
+       OR p_hash_key_version IS NULL OR length(btrim(p_hash_key_version)) = 0
+       OR p_destination_hmac_aliases IS NULL
+       OR NOT (v_session.destination_hmac = ANY(p_destination_hmac_aliases)) THEN
         RAISE EXCEPTION 'OTP challenge cannot be reserved for this session'
             USING ERRCODE = '22023';
     END IF;
 
-    PERFORM pg_catalog.pg_advisory_xact_lock(
-        pg_catalog.hashtextextended(
-            pg_catalog.encode(v_session.destination_hmac, 'hex') || ':' || v_session.channel,
-            0
-        )
-    );
+    FOR v_alias IN
+        SELECT DISTINCT alias
+          FROM pg_catalog.unnest(p_destination_hmac_aliases) AS aliases(alias)
+         ORDER BY alias
+    LOOP
+        PERFORM pg_catalog.pg_advisory_xact_lock(
+            pg_catalog.hashtextextended(
+                pg_catalog.encode(v_alias, 'hex') || ':' || v_session.channel,
+                0
+            )
+        );
+    END LOOP;
 
     SELECT count(*), max(created_at)
       INTO v_send_count, v_last_sent_at
       FROM public.otp_delivery_events
-     WHERE destination_hmac = v_session.destination_hmac
-       AND hmac_key_version = v_session.hmac_key_version
+     WHERE destination_hmac = ANY(p_destination_hmac_aliases)
        AND channel = v_session.channel
        AND created_at >= v_now - INTERVAL '60 minutes';
 
@@ -170,7 +178,8 @@ $$;
 CREATE FUNCTION public.record_otp_verification_attempt(
     p_session_id UUID,
     p_challenge_id UUID,
-    p_code_matches BOOLEAN
+    p_code_matches BOOLEAN,
+    p_destination_hmac_aliases BYTEA[]
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -182,6 +191,7 @@ DECLARE
     v_challenge public.verification_challenges%ROWTYPE;
     v_now TIMESTAMPTZ := clock_timestamp();
     v_contact_failures BIGINT;
+    v_alias BYTEA;
 BEGIN
     SELECT * INTO v_session
       FROM public.verification_sessions
@@ -190,18 +200,32 @@ BEGIN
 
     IF NOT FOUND OR v_session.status <> 'pending'
        OR v_session.expires_at <= v_now
-       OR v_session.failed_attempt_count >= 5
-       OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now) THEN
+       OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now)
+       OR p_destination_hmac_aliases IS NULL
+       OR NOT (v_session.destination_hmac = ANY(p_destination_hmac_aliases)) THEN
         RAISE EXCEPTION 'OTP verification session is not eligible'
             USING ERRCODE = 'P0001';
     END IF;
 
-    PERFORM pg_catalog.pg_advisory_xact_lock(
-        pg_catalog.hashtextextended(
-            pg_catalog.encode(v_session.destination_hmac, 'hex') || ':' || v_session.channel,
-            0
-        )
-    );
+    FOR v_alias IN
+        SELECT DISTINCT alias
+          FROM pg_catalog.unnest(p_destination_hmac_aliases) AS aliases(alias)
+         ORDER BY alias
+    LOOP
+        PERFORM pg_catalog.pg_advisory_xact_lock(
+            pg_catalog.hashtextextended(
+                pg_catalog.encode(v_alias, 'hex') || ':' || v_session.channel,
+                0
+            )
+        );
+    END LOOP;
+
+    IF v_session.failed_attempt_count = 5
+       AND v_session.locked_until <= v_now THEN
+        UPDATE public.verification_sessions
+           SET failed_attempt_count = 0, locked_until = NULL
+         WHERE id = p_session_id;
+    END IF;
 
     SELECT * INTO v_challenge
       FROM public.verification_challenges
@@ -217,8 +241,7 @@ BEGIN
 
     SELECT count(*) INTO v_contact_failures
       FROM public.otp_verification_attempt_events
-     WHERE destination_hmac = v_session.destination_hmac
-       AND hmac_key_version = v_session.hmac_key_version
+     WHERE destination_hmac = ANY(p_destination_hmac_aliases)
        AND channel = v_session.channel
        AND outcome = 'failed'
        AND attempted_at >= v_now - INTERVAL '60 minutes';
@@ -278,15 +301,15 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT, BYTEA[]) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[]) FROM PUBLIC;
 
 COMMENT ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ) IS
     'Membuat sesi OTP registrasi untuk akun pending melalui transaksi aplikasi.';
-COMMENT ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT) IS
+COMMENT ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT, BYTEA[]) IS
     'Merotasi challenge dan mereservasi kuota pengiriman OTP secara atomik.';
 COMMENT ON FUNCTION public.record_otp_delivery_result(UUID, TEXT) IS
     'Mencatat hasil dispatch provider OTP satu kali.';
-COMMENT ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN) IS
+COMMENT ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[]) IS
     'Mencatat percobaan OTP dan mengaktifkan akun registrasi secara atomik.';
