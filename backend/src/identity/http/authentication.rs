@@ -176,14 +176,18 @@ fn unauthorized_session() -> Response {
 }
 
 async fn current_session(Extension(session): Extension<AuthenticatedSession>) -> Response {
-    (
+    let mut response = (
         StatusCode::OK,
         Json(CurrentSessionResponse {
             user_id: session.user_id,
             role: role_label(session.role),
         }),
     )
-        .into_response()
+        .into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 async fn refresh_session(
