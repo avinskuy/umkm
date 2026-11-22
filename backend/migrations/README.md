@@ -1,6 +1,6 @@
 # Migrasi Database
 
-Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0012):
+Direktori ini berisi migration SQLx berversi. Migration Identity Core yang tersedia (0001–0013):
 
 - `20261121170000_create_identity_accounts.sql` — membuat `users` dan `user_identities`, constraint lifecycle/role/kontak, unique partial index reservasi kontak, trigger immutability, transisi lifecycle 30 menit/30 hari, pemeriksaan metode autentikasi, serta fungsi `create_client_user` yang hanya menerima role Business Owner atau Investor.
 - `20261122100000_create_identity_verification.sql` — membuat `verification_sessions`, `verification_challenges`, `otp_verification_attempt_events`, dan `otp_delivery_events`, termasuk state constraints, batas umur challenge 10 menit, satu challenge pending per sesi, binding recovery pra-pemilihan akun, serta indeks event lintas sesi.
@@ -14,6 +14,7 @@ Direktori ini berisi migration SQLx berversi. Migration Identity Core yang terse
 - `20261122190000_add_public_profile_and_policy_acceptance.sql` — menambahkan profil publik satu-ke-satu, nama tampilan publik, catatan penerimaan Terms of Service dan Privacy Policy per versi, serta event consent marketing opsional yang append-only. Fungsi registrasi terkontrol menyimpan akun, profil, penerimaan kebijakan, dan pilihan marketing secara atomik.
 - `20261122200000_allow_otp_resend_during_verification_lock.sql` — mengizinkan penerbitan ulang OTP selama lock verifikasi aktif tanpa mengubah penghitung kegagalan atau `locked_until`; verifikasi tetap ditolak sampai lock berakhir.
 - `20261122210000_add_password_authentication_runtime.sql` — menambahkan operasi login berbasis role, pembuatan/pencabutan sesi opaque, dan rate limit HMAC per identifier/IP.
+- `20261122220000_add_session_runtime_operations.sql` — menambahkan validasi sesi aktif, pembaruan `last_seen_at`, rotasi token, dan pencabutan semua sesi satu akun.
 
 ## Status runtime
 
@@ -21,7 +22,7 @@ Modul Rust `identity` menyediakan pembuatan akun pending, profil publik, penerim
 
 Rate limit pengiriman dan percobaan verifikasi ditegakkan melalui fungsi PostgreSQL terkontrol. Batas pengiriman adalah lima kali per kontak dalam 60 menit dengan cooldown 60 detik; batas kegagalan verifikasi lintas sesi adalah lima kali per kontak dalam 60 menit, dengan lock sesi satu jam setelah lima kegagalan. Challenge berlaku maksimal 10 menit. Akun pending memiliki masa berlaku 30 menit.
 
-Migration 0003 menyediakan penyimpanan sesi autentikasi. Runtime menyediakan login password terpisah untuk Owner/Investor, cookie `__Host-` HttpOnly/Secure/SameSite=Lax, logout, dan rate limit PostgreSQL berbasis HMAC. Sesi memiliki expiry absolut 30 hari dan batas idle 7 hari pada skema; validasi sesi untuk middleware permintaan terproteksi dan rotasi token otomatis masih menjadi pekerjaan berikutnya. Migration 0004 menyediakan skema recovery, tetapi runtime recovery belum tersedia. Pembacaan audit, retensi, forwarding eksternal, cleanup job, dan proses operasional lainnya belum termasuk.
+Migration 0003 menyediakan penyimpanan sesi autentikasi. Runtime menyediakan login password terpisah untuk Owner/Investor, cookie `__Host-` HttpOnly/Secure/SameSite=Lax, logout, dan rate limit PostgreSQL berbasis HMAC. Sesi memiliki expiry absolut 30 hari dan batas idle 7 hari pada skema; validasi sesi dan pembaruan idle timeout pada endpoint identitas terproteksi, rotasi token melalui endpoint refresh eksplisit, serta logout semua perangkat tersedia. Middleware belum diterapkan ke endpoint fitur yang belum dibangun; daftar sesi perangkat dan pencabutan individual melalui UI belum tersedia. Migration 0004 menyediakan skema recovery, tetapi runtime recovery belum tersedia. Pembacaan audit, retensi, forwarding eksternal, cleanup job, dan proses operasional lainnya belum termasuk.
 
 ## Pemisahan runtime dan migration
 
@@ -31,7 +32,7 @@ HTTP runtime membuat pool PostgreSQL melalui `DatabaseConfig::from_app_env()` da
 
 Endpoint `GET /api/v1/health` merupakan liveness check yang tidak bergantung pada database. Endpoint `GET /api/v1/readyz` menjalankan `SELECT 1` melalui pool runtime dan mengembalikan HTTP 503 jika database tidak siap.
 
-Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0012 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
+Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0013 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
 
 Pengujian PostgreSQL untuk migration, invariant identitas, privilege principal, dan orchestration OTP berada di `backend/tests/postgres.rs`. Pengujian readiness runtime berada di `backend/tests/runtime.rs` dan memakai `APP_DATABASE_URL` melalui principal aplikasi. Keduanya dijalankan terhadap database disposable di CI.
 
