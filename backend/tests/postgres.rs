@@ -77,6 +77,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_contact_reservations_and_release(&pool).await;
     assert_password_only_authentication_invariants(&pool).await;
     assert_client_creation_function(&pool).await;
+    assert_profile_and_policy_records(&pool).await;
     assert_verification_schema_invariants(&pool).await;
     assert_verification_database_operations(&pool).await;
     assert_authentication_session_invariants(&pool).await;
@@ -1830,6 +1831,96 @@ async fn assert_identity_audit_event_invariants(pool: &PgPool) {
     );
 }
 
+async fn assert_profile_and_policy_records(pool: &PgPool) {
+    let user_id: String = sqlx::query_scalar(
+        "SELECT public.create_client_user_with_profile_and_policy(\
+            'Nama Tampilan', 'business_owner', 'email', 'profile-policy@example.test', NULL, \
+            'encoded-password-hash', 'terms-v1', 'privacy-v1', FALSE, NULL)::text",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("registration should persist a public profile and required policy acceptance");
+
+    let display_name: String =
+        sqlx::query_scalar("SELECT display_name FROM public.user_profiles WHERE user_id = $1::uuid")
+            .bind(&user_id)
+            .fetch_one(pool)
+            .await
+            .expect("profile display name should be stored");
+    assert_eq!(display_name, "Nama Tampilan");
+
+    let policy_records: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.policy_acceptance_records \
+         WHERE user_id = $1::uuid AND policy_version IN ('terms-v1', 'privacy-v1')",
+    )
+    .bind(&user_id)
+    .fetch_one(pool)
+    .await
+    .expect("required policy acceptance records should be queryable");
+    assert_eq!(policy_records, 2);
+
+    let marketing_events: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.consent_events WHERE user_id = $1::uuid",
+    )
+    .bind(&user_id)
+    .fetch_one(pool)
+    .await
+    .expect("marketing consent history should be queryable");
+    assert_eq!(marketing_events, 0, "marketing must remain off by default");
+
+    let marketing_user_id: String = sqlx::query_scalar(
+        "SELECT public.create_client_user_with_profile_and_policy(\
+            'Investor Demo', 'investor', 'email', 'marketing-opt-in@example.test', NULL, \
+            'encoded-password-hash', 'terms-v1', 'privacy-v1', TRUE, 'marketing-v1')::text",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("explicit marketing opt-in should be recorded");
+    let marketing_action: String = sqlx::query_scalar(
+        "SELECT action FROM public.consent_events WHERE user_id = $1::uuid",
+    )
+    .bind(&marketing_user_id)
+    .fetch_one(pool)
+    .await
+    .expect("marketing opt-in event should be queryable");
+    assert_eq!(marketing_action, "granted");
+
+    assert!(
+        sqlx::query("UPDATE public.policy_acceptance_records SET policy_version = 'tampered' WHERE user_id = $1::uuid")
+            .bind(&user_id)
+            .execute(pool)
+            .await
+            .is_err(),
+        "policy acceptance history must be append-only"
+    );
+    assert!(
+        sqlx::query("DELETE FROM public.consent_events WHERE user_id = $1::uuid")
+            .bind(&marketing_user_id)
+            .execute(pool)
+            .await
+            .is_err(),
+        "consent history must be append-only"
+    );
+    assert!(
+        sqlx::query("SELECT public.create_client_user_with_profile_and_policy(\
+            '   ', 'investor', 'email', 'invalid-display-name@example.test', NULL, \
+            'encoded-password-hash', 'terms-v1', 'privacy-v1', FALSE, NULL)")
+            .execute(pool)
+            .await
+            .is_err(),
+        "blank public display names must be rejected"
+    );
+    assert!(
+        sqlx::query("SELECT public.create_client_user_with_profile_and_policy(\
+            'No Policy', 'investor', 'email', 'missing-policy-version@example.test', NULL, \
+            'encoded-password-hash', NULL, 'privacy-v1', FALSE, NULL)")
+            .execute(pool)
+            .await
+            .is_err(),
+        "required policy versions must be supplied"
+    );
+}
+
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
     let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL").expect(
         "CI must provide a disposable target-database DBA connection for privilege bootstrap tests",
@@ -1939,7 +2030,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit table privileges should be queryable");
     assert_eq!(audit_access, (true, false, false, false, false));
 
-    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+    let function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
         "SELECT has_function_privilege(current_user, \
                     'public.create_client_user(text,text,text,text,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
@@ -1957,23 +2048,28 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.record_otp_delivery_result(uuid,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE')",
+                    'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE'), \\\n                has_function_privilege(current_user, \\\n                    'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
     .expect("function privileges should be queryable");
     assert_eq!(
         function_access,
-        (true, true, false, true, true, true, true, true, true)
+        (false, true, false, true, true, true, true, true, true, true)
     );
 
     let created_user_id: String =
-        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
+        sqlx::query_scalar("SELECT public.create_client_user_with_profile_and_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)::text")
+            .bind("Pemilik Bootstrap")
             .bind("business_owner")
             .bind("email")
             .bind("principal-bootstrap@example.test")
             .bind(Option::<String>::None)
             .bind("test-only-encoded-password-hash")
+            .bind("terms-v1")
+            .bind("privacy-v1")
+            .bind(false)
+            .bind(Option::<String>::None)
             .fetch_one(&app_pool)
             .await
             .expect("application may create a pending account through the guarded function");
@@ -2088,11 +2184,16 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     };
     let service = VerificationService::new(app_pool, &keys, &delivery);
     let registration = ClientRegistration {
+        display_name: "Pemilik Usaha Demo",
         role: ClientRole::BusinessOwner,
         initial_contact_channel: ContactChannel::Email,
         email_normalized: Some("orchestration@example.test"),
         phone_e164: None,
         password_hash: "test-only-encoded-password-hash",
+        terms_of_service_version: "terms-v1",
+        privacy_policy_version: "privacy-v1",
+        marketing_consent: false,
+        marketing_notice_version: None,
     };
 
     let started = service
@@ -2147,11 +2248,16 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     assert_eq!(email_audit_counts, (1, 1, 1, 1));
 
     let phone_registration = ClientRegistration {
+        display_name: "Investor Demo",
         role: ClientRole::Investor,
         initial_contact_channel: ContactChannel::Phone,
         email_normalized: None,
         phone_e164: Some("+6281234567892"),
         password_hash: "test-only-encoded-password-hash",
+        terms_of_service_version: "terms-v1",
+        privacy_policy_version: "privacy-v1",
+        marketing_consent: true,
+        marketing_notice_version: Some("marketing-v1"),
     };
     let phone_started = service
         .register(&phone_registration)
