@@ -10,14 +10,14 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use super::super::{
-    registration::ContactChannel,
     recovery::{RecoveryAction, RecoveryCandidate},
+    registration::ContactChannel,
     verification::VerificationError,
 };
 use super::{
     authentication::{is_cross_site_request, resolved_client_ip},
-    valid_contact_input, AbuseDecision, RegistrationAbuseGuard, RegistrationAction,
-    RecoveryApiState,
+    valid_contact_input, AbuseDecision, RecoveryApiState, RegistrationAbuseGuard,
+    RegistrationAction,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
@@ -209,7 +209,11 @@ async fn start_recovery(
 
     let decision = state
         .abuse_guard
-        .check(RegistrationAction::RecoveryStart, resolved_client_ip(&headers, peer.ip()), None)
+        .check(
+            RegistrationAction::RecoveryStart,
+            resolved_client_ip(&headers, peer.ip()),
+            None,
+        )
         .await;
     if let Some(response) = rate_limit_response(decision) {
         return response;
