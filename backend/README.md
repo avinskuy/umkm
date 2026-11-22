@@ -10,12 +10,13 @@ Server membaca alamat bind dari variabel lingkungan:
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | Alamat IP untuk bind. Mendukung literal IPv4 dan IPv6. |
 | `PORT` | `5000` | Port TCP. Harus berupa bilangan bulat dari 1 sampai 65535. |
+| `AUTH_RATE_LIMIT_HMAC_KEY` | — | Wajib. Secret 32 byte dalam 64 karakter hex untuk fingerprint rate limit login. Gunakan nilai acak dari secret manager; jangan commit ke repository atau log. |
 
 Jika salah satu variabel tidak diisi, server menggunakan nilai bawaannya. Nilai yang tidak valid akan menghentikan proses startup dengan kesalahan konfigurasi, bukan diam-diam diganti dengan nilai bawaan.
 
 Alamat loopback bawaan menjaga API tetap dapat diakses dari host itu sendiri. Atur `HOST=0.0.0.0` hanya jika lingkungan deployment memang memerlukan antarmuka yang dapat dijangkau dari luar. Lindungi layanan menggunakan kontrol jaringan atau reverse proxy yang sesuai. Jangan membuka API secara langsung ke internet publik tanpa tinjauan keamanan deployment yang jelas.
 
-Aplikasi tidak memuat file `.env` dengan sendirinya. Atur variabel lingkungan melalui shell, service manager, container runtime, atau platform deployment.
+Aplikasi tidak memuat file `.env` dengan sendirinya. Atur variabel lingkungan melalui shell, service manager, container runtime, atau platform deployment. Generate key dengan `openssl rand -hex 32`, simpan di secret manager, dan gunakan nilai yang sama pada seluruh instance. Rotasi key harus dikoordinasikan agar tidak menghapus bucket rate limit yang masih aktif.
 
 ## PostgreSQL
 
@@ -25,6 +26,8 @@ Runtime HTTP memakai principal aplikasi dengan hak minimum dan hanya membaca kon
 | --- | --- | --- | --- |
 | `APP_DATABASE_URL` | Ya | — | URL koneksi PostgreSQL milik `usahapintar_app_login`; jangan gunakan kredensial DBA atau migrator. |
 | `DATABASE_MAX_CONNECTIONS` | Tidak | `10` | Batas connection pool; rentang yang diterima 1–100. |
+
+Login Owner/Investor tersedia melalui `POST /api/v1/identity/login/owner` dan `POST /api/v1/identity/login/investor`; logout melalui `POST /api/v1/identity/logout`. Login menggunakan email/nomor telepon + password dan tidak meminta OTP rutin. Cookie sesi menggunakan prefix `__Host-`, `HttpOnly`, `Secure`, `SameSite=Lax`, dan masa absolut 30 hari. Rate limit database: maksimal 10 percobaan per identifier dan 30 per IP dalam 15 menit; fingerprint disimpan sebagai HMAC.
 
 Pool runtime membuka minimal satu koneksi saat startup untuk memverifikasi database tersedia, dengan batas maksimum sesuai konfigurasi, waktu tunggu akuisisi 5 detik, idle timeout 10 menit, dan masa hidup koneksi maksimum 30 menit. Kegagalan koneksi awal menghentikan startup agar layanan tidak berjalan dalam keadaan database yang dibutuhkan tidak tersedia. Kredensial dan URL database tidak ditulis ke log.
 
