@@ -1,6 +1,8 @@
 # Identity Core — Keputusan Pendaftaran
 
 > Status: batas awal kebijakan produk Identity Core telah disetujui; rancangan teknis terperinci, pemilihan penyedia layanan, dan tinjauan keamanan tetap harus diselesaikan sebelum implementasi.
+>
+> **Amendemen 22 November 2026:** keputusan tahap pertama yang berlaku adalah email/telepon + password atau Google OAuth. OTP tidak diminta saat registrasi maupun login. Kontak yang belum dibuktikan kepemilikannya tidak boleh dianggap terverifikasi. Ketentuan OTP dan aktivasi pending di bagian lama dokumen ini merupakan rancangan tahap berikutnya dan tidak boleh diterapkan sebagai syarat tahap pertama. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
 
 ## Kebijakan pendaftaran yang disetujui
 
@@ -10,7 +12,7 @@
    - Telepon: kode sekali pakai dikirim melalui WhatsApp.
 3. Email dan telepon merupakan pilihan alternatif. Keduanya tidak wajib diberikan saat pendaftaran awal.
 4. Pendaftaran melalui email atau telepon wajib menggunakan kata sandi. Pendaftaran melalui Google OAuth tidak mewajibkan pengguna membuat atau memasukkan kata sandi lokal terpisah.
-5. Akun tetap berstatus menunggu verifikasi sampai kode dari kanal yang dipilih berhasil diverifikasi. Verifikasi merupakan kontrol aktivasi akun dan anti-bot, bukan metode login tanpa kata sandi.
+5. Akun tahap pertama dapat langsung aktif setelah data, role, persetujuan, dan kontrol anti-penyalahgunaan tervalidasi. Kontak yang diberikan belum dianggap terverifikasi. Verifikasi kontak/OTP menjadi tahap berikutnya, bukan syarat registrasi atau login.
 6. Kontak yang dipilih dinormalisasi dan direservasi secara unik. Kontak yang sudah terhubung ke akun lain tidak dapat digunakan kembali untuk membuat atau menggabungkan akun.
 7. Kontak yang tidak dipilih dapat ditambahkan kemudian, tetapi harus diverifikasi secara terpisah sebelum dianggap terverifikasi atau digunakan untuk pemulihan yang sensitif terhadap keamanan.
 8. Nomor telepon dinormalisasi ke format E.164. Pengiriman WhatsApp merupakan integrasi penyedia di sisi server; kredensial tidak boleh masuk ke source control atau konfigurasi frontend.
@@ -31,11 +33,11 @@
 2. Pengguna memilih Email atau Telepon/WhatsApp.
 3. Server memvalidasi dan menormalisasi kontak, menerapkan batas penyalahgunaan, lalu membuat pendaftaran/challenge berstatus pending.
 4. Server mengirim kode sekali pakai melalui kanal pengiriman yang dipilih.
-5. Pengguna mengirim kode; server memvalidasi masa berlaku, batas percobaan, status challenge, tujuan penggunaan, dan keterikatan ke tujuan pengiriman. Proses ini memverifikasi kendali atas kontak dan kelayakan anti-bot; bukan autentikasi sesi login.
-6. Dalam satu transaksi, konsumsi challenge, tandai kontak terpilih sebagai terverifikasi, dan aktifkan akun hanya jika seluruh persyaratan pembuatan akun terpenuhi.
+5. Pada tahap pertama, server membuat akun aktif setelah validasi registrasi tanpa mengirim atau meminta OTP. Kontak awal tetap berstatus belum terverifikasi.
+6. Ketika verifikasi kontak ditambahkan pada tahap berikutnya, server harus mengonsumsi challenge dan memperbarui timestamp verifikasi secara atomik.
 7. Pengguna melanjutkan onboarding sesuai role.
 
-Pendaftaran tertunda kedaluwarsa setelah **30 menit** jika verifikasi kontak yang diwajibkan belum selesai. Proses kedaluwarsa dan pembersihan harus atomik serta idempotent, melepaskan reservasi kontak tertunda yang memenuhi syarat dengan aman, dan tidak pernah menghapus akun yang sudah aktif. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
+Aturan pendaftaran pending 30 menit merupakan bagian dari rancangan lama dan tidak berlaku untuk tahap pertama yang membuat akun aktif tanpa OTP. Migration 0001 saat ini masih mengandung constraint pending tersebut; diperlukan migration lanjutan untuk menyelaraskan lifecycle sebelum runtime registrasi dibuat. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
 
 ## Implikasi model data (usulan tahap verifikasi dan sesi)
 
@@ -47,9 +49,9 @@ Jangan mengasumsikan pengguna memberikan kedua metode kontak. Migration Identity
 
 ### Google OAuth dan model kata sandi
 
-Google OAuth tetap digunakan untuk pendaftaran dan login. Pengguna baru harus memilih tepat satu role klien yang tidak dapat diubah (Owner atau Investor) sebelum memulai OAuth; pilihan role diikat ke state OAuth yang dikelola server. Pendaftaran yang hanya menggunakan Google tidak mewajibkan pembuatan kata sandi lokal. Pengguna baru tetap harus memilih dan memverifikasi satu kontak pendaftaran terpisah (email atau nomor HP melalui WhatsApp) sebelum akun diaktifkan. Email yang dinyatakan oleh Google tidak menggantikan verifikasi kontak tersebut.
+Google OAuth tetap digunakan untuk pendaftaran dan login. Pengguna baru harus memilih tepat satu role klien yang tidak dapat diubah (Owner atau Investor) sebelum memulai OAuth; pilihan role diikat ke state OAuth yang dikelola server. Pendaftaran yang hanya menggunakan Google tidak mewajibkan pembuatan kata sandi lokal. Tidak ada OTP tambahan pada tahap pertama. Klaim email hanya ditandai terverifikasi jika token Google tervalidasi menyatakan `email_verified=true`; klaim tersebut tidak boleh digunakan untuk menggabungkan akun secara otomatis.
 
-Pendaftaran menggunakan email atau nomor HP wajib memiliki kata sandi lokal. Login kata sandi menggunakan email atau nomor HP terdaftar beserta kata sandinya. OTP pendaftaran hanya digunakan untuk verifikasi kontak, aktivasi akun, dan perlindungan anti-bot; OTP bukan kredensial login dan tidak dapat digunakan untuk pemulihan kata sandi. Alur penambahan kata sandi lokal untuk akun yang hanya menggunakan Google masih menjadi keputusan produk terpisah jika kelak diperlukan.
+Pendaftaran menggunakan email atau nomor HP wajib memiliki kata sandi lokal. Login kata sandi menggunakan email atau nomor HP terdaftar beserta kata sandinya. OTP tidak digunakan untuk registrasi/login tahap pertama; saat diaktifkan kelak, OTP hanya menjadi mekanisme verifikasi kontak atau faktor tambahan yang dirancang terpisah, bukan kredensial password atau token reset. Alur penambahan kata sandi lokal untuk akun yang hanya menggunakan Google masih menjadi keputusan produk terpisah jika kelak diperlukan.
 
 Identitas Google yang sudah terhubung hanya dapat mengautentikasi akun yang sudah terhubung tersebut. Jangan menghubungkan akun secara otomatis hanya karena alamat email cocok. Penghubungan memerlukan sesi akun yang sudah terautentikasi serta bukti terbaru atas kendali identitas baru, atau proses pemulihan aman yang secara khusus disetujui. Validasi state, nonce, issuer, audience, signature, expiry, redirect URI yang tepat, provider subject, dan perlindungan terhadap callback yang diputar ulang. Akun Admin tidak boleh dibuat melalui OAuth publik.
 
@@ -88,7 +90,7 @@ Identitas Google yang sudah terhubung hanya dapat mengautentikasi akun yang suda
 
 ### Pemulihan akun
 
-Dukung alur **lupa kata sandi** dan **lupa email** melalui email pemulihan dan/atau nomor HP pemulihan yang sudah diverifikasi (dengan kode melalui WhatsApp). Kontak pemulihan bersifat opsional saat pendaftaran, dapat ditambahkan setelah aktivasi, dan harus diverifikasi secara terpisah sebelum digunakan. Sarankan pengguna menambahkannya saat onboarding tanpa menjadikannya syarat aktivasi.
+Dukung alur **lupa kata sandi** dan **lupa email** hanya melalui kanal pemulihan yang sudah dibuktikan kepemilikannya. Kontak pemulihan bersifat opsional saat pendaftaran dan harus diverifikasi sebelum digunakan. Karena OTP ditunda, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; mekanisme verifikasi/pengiriman reset yang aman harus diselesaikan sebelum fitur reset dirilis. Akun Google-only dapat menggunakan pemulihan Google.
 
 - Lupa kata sandi: verifikasi kepemilikan melalui metode pemulihan yang memenuhi syarat sebelum mengizinkan pengaturan ulang kata sandi. OTP pendaftaran tidak dapat digunakan sebagai kredensial reset.
 - Lupa email: setelah kontak pemulihan yang terhubung ke akun berhasil diverifikasi, pengguna boleh melihat alamat email utama secara lengkap. Jangan tampilkan sebelum verifikasi berhasil.
@@ -104,7 +106,7 @@ Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia
 
 ## Gerbang implementasi
 
-Migration Identity Core 0001–0005 untuk akun, verifikasi, sesi, pemulihan, dan audit sudah tersedia di repository serta diuji di CI. Tahap berikutnya berfokus pada implementasi runtime secara bertahap: orkestrasi registrasi, integrasi penyedia OTP, verifikasi dan aktivasi atomik, autentikasi sesi, pemulihan akun, serta proses cleanup. Setiap tahap hanya boleh dimulai setelah kontrak API, tanggung jawab penyedia layanan, konkurensi, kedaluwarsa, cleanup, privasi, threat model, dan rencana pengujian ditinjau. Migration produksi, provisioning kredensial produksi, dan deployment tetap merupakan operasi terpisah yang memerlukan persetujuan eksplisit. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
+Migration Identity Core 0001–0005 untuk akun, verifikasi, sesi, pemulihan, dan audit sudah tersedia di repository serta diuji di CI. Tahap berikutnya berfokus pada penyelarasan skema melalui migration lanjutan, runtime registrasi password/Google OAuth, autentikasi sesi, dan kontrol keamanan. Integrasi verifikasi kontak/OTP dilakukan pada tahap terpisah setelah metode pembuktian kontak dan provider siap. Setiap tahap hanya boleh dimulai setelah kontrak API, tanggung jawab penyedia layanan, konkurensi, kedaluwarsa, cleanup, privasi, threat model, dan rencana pengujian ditinjau. Migration produksi, provisioning kredensial produksi, dan deployment tetap merupakan operasi terpisah yang memerlukan persetujuan eksplisit. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
 
 
 ## Tambahan keputusan: kontak pemulihan bersama dan UX pemilihan akun
