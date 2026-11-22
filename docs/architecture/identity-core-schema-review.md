@@ -5,7 +5,7 @@
 
 Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Migration 0001–0013 serta skrip bootstrap principal dan grant tersedia di repository dan diuji melalui CI. Migration dan bootstrap tidak dijalankan otomatis oleh HTTP runtime; penerapan pada database produksi merupakan operasi terpisah.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0001–0012 membentuk baseline skema saat ini; seluruh migration yang sudah diterapkan pada database bersama harus diperlakukan immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0001–0013 membentuk baseline skema saat ini; seluruh migration yang sudah diterapkan pada database bersama harus diperlakukan immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
 ## 1. Hasil pemeriksaan repository
 
@@ -14,8 +14,8 @@ Registrasi publik menggunakan email + password dengan OTP email atau nomor telep
 - `backend/migrations/` memiliki migration Identity Core 0001–0013, termasuk penghapusan OAuth, operasi database verifikasi, binding ID runtime, audit runtime verifikasi, profil publik, dan penerimaan kebijakan.
 - HTTP server menyediakan `GET /api/v1/health` dan `GET /api/v1/readyz`. Pool PostgreSQL diinisialisasi saat startup menggunakan principal aplikasi.
 - Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, autentikasi password-only, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
-- Migration 0001–0012 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
-- `VerificationService` dan router HTTP registrasi/resend/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default. Login password Owner/Investor dan logout tersedia dengan cookie aman, sesi server-side, dan rate limit PostgreSQL. Penerapan middleware sesi pada endpoint fitur, adapter provider nyata, konfigurasi key produksi, dan runtime recovery belum tersedia. Grant database minimal tidak berarti seluruh autentikasi telah aktif.
+- Migration 0001–0013 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
+- `VerificationService` dan router HTTP registrasi/resend/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default. Login password Owner/Investor, validasi sesi, refresh/rotasi token, logout, dan logout semua perangkat tersedia pada endpoint identitas dengan cookie aman dan rate limit PostgreSQL. Penerapan middleware sesi pada endpoint fitur, adapter provider nyata, konfigurasi key produksi, dan runtime recovery belum tersedia. Grant database minimal tidak berarti seluruh autentikasi telah aktif.
 
 ## 2. Prinsip desain yang harus dipertahankan
 
@@ -224,7 +224,7 @@ Migration akun Identity Core pertama sudah diimplementasikan dan gerbang berikut
 - [x] Tes PostgreSQL untuk constraint, role immutability, kontak, metode autentikasi, provider identity, dan concurrency berhasil di CI.
 - [x] Migration pertama dibatasi pada akun dan identitas provider; verifikasi, sesi, recovery, dan audit tidak ikut dicampur.
 
-Migration 0001–0013 dan bootstrap principal/privilege telah diuji melalui CI pada PostgreSQL sementara. Runtime menyediakan orkestrasi registrasi/verifikasi OTP serta login password Owner/Investor dan logout. Router registrasi publik, middleware validasi sesi untuk endpoint terproteksi, provider nyata, recovery runtime, dan cleanup job masih memerlukan implementasi serta pengujian tersendiri. Migration dan bootstrap belum diterapkan ke database produksi; jangan menjalankan migration otomatis pada HTTP startup.
+Migration 0001–0013 dan bootstrap principal/privilege telah diuji melalui CI pada PostgreSQL sementara. Runtime menyediakan login password Owner/Investor, validasi sesi pada endpoint identitas, pembaruan idle timeout, rotasi token, logout, dan logout semua perangkat. Router registrasi publik, penerapan middleware pada endpoint fitur, provider nyata, recovery runtime, dan cleanup job masih memerlukan implementasi serta pengujian tersendiri. Migration dan bootstrap belum diterapkan ke database produksi; jangan menjalankan migration otomatis pada HTTP startup.
 
 ## 9. Referensi internal
 
