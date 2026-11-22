@@ -196,7 +196,7 @@ BEGIN
     VALUES (
         p_challenge_id, p_session_id, p_code_hash, p_hash_key_version,
         LEAST(v_now + INTERVAL '10 minutes', v_session.expires_at)
-    )
+    );
     challenge_id := p_challenge_id;
 
     INSERT INTO public.otp_delivery_events (
