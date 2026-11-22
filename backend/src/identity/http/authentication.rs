@@ -64,6 +64,18 @@ fn error(status: StatusCode, message: &'static str) -> Response {
     response
 }
 
+pub(super) fn session_cookie(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::COOKIE)?
+        .to_str()
+        .ok()?
+        .split(';')
+        .find_map(|part| {
+            let (name, value) = part.trim().split_once('=')?;
+            (name == SESSION_COOKIE && !value.is_empty()).then_some(value)
+        })
+}
+
 pub(super) fn is_cross_site_request(headers: &HeaderMap) -> bool {
     headers
         .get("sec-fetch-site")
