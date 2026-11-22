@@ -285,3 +285,19 @@ Migration `20261122170000_bind_verification_ids_from_runtime.sql` memperbarui du
 - `reserve_otp_challenge` menerima `p_challenge_id` dari backend dan menyimpan UUID tersebut sebagai primary key challenge.
 
 Runtime wajib membuat UUID sebelum menghitung associated data AEAD atau keyed OTP digest. Database tetap memvalidasi akun pending, purpose, kanal, expiry, rate limit, dan binding sesi/challenge. Signature lama dihapus agar tidak ada jalur fungsi lama yang masih dapat dipanggil. Bootstrap 002 memverifikasi dan memberikan EXECUTE hanya pada signature baru; akses langsung ke tabel tetap ditolak.
+
+## Implementasi orchestration Rust
+
+Tahap orchestration kini menyediakan `identity::VerificationService` dengan operasi:
+
+- `register`: normalisasi kontak awal, membuat akun pending dan sesi verifikasi dalam satu transaksi, lalu melakukan dispatch setelah commit.
+- `resend`: membuat challenge baru hanya setelah reservasi database menyetujui cooldown dan kuota.
+- `verify`: membaca challenge pending melalui fungsi terkontrol, memverifikasi keyed digest dengan constant-time comparison, lalu menyerahkan hasil ke operasi database yang mengelola percobaan dan aktivasi atomik.
+
+UUID sesi dan challenge dibuat oleh runtime sebelum AEAD/AAD atau keyed OTP digest dihitung. Tujuan pengiriman didekripsi hanya saat dibutuhkan, sedangkan nilai tujuan dan kode dibersihkan dari memori melalui `Zeroizing`. Tidak ada kontak, kode, password, ciphertext, atau key material yang ditulis ke log.
+
+Kontrak provider berada di `identity::delivery`. Provider mengembalikan `accepted`, `failed`, atau `unknown`; hasil dicatat setelah dispatch. Timeout/hasil tidak pasti tidak memicu pengembalian kuota atau retry otomatis. CI menggunakan fake provider dan tidak mengirim pesan nyata. Adapter Resend/FlowKirim dan endpoint HTTP belum diaktifkan.
+
+Format label versi key yang disimpan pada kolom TEXT adalah `vN`; parsing dilakukan ketat dan versi yang tidak dikenal ditolak. `KeyProvider::key_versions` harus mengembalikan seluruh versi HMAC fingerprint yang masih diperlukan selama jendela rate-limit. Implementasi default hanya mengembalikan key aktif dan tidak cukup untuk rotasi produksi. Provider produksi wajib mengimplementasikan riwayat versi secara eksplisit.
+
+Kebijakan awal OTP untuk orchestration ini menggunakan enam digit numerik dari CSPRNG dengan rejection sampling. Nilai ini berlaku untuk implementasi internal; endpoint publik tetap belum tersedia dan provider produksi belum dikonfigurasi.
