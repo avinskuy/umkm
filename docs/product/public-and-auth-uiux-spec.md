@@ -224,21 +224,21 @@ Pertahankan tata letak visual yang konsisten agar kedua halaman terasa sebagai s
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
-**Langkah 2 — Akun dibuat**
+**Konfirmasi — Akun dibuat**
 
 - Setelah data akun dan persetujuan tervalidasi, akun dapat dibuat tanpa OTP.
 - Kontak awal tetap berstatus belum terverifikasi; jangan menampilkan badge terverifikasi.
 - Jelaskan bahwa pembuktian kontak dan OTP akan tersedia pada tahap berikutnya.
 - Jangan izinkan kontak yang belum terverifikasi digunakan sebagai bukti pemulihan atau perubahan kredensial.
 
-**Langkah 3 — Tahap usaha**
+**Langkah 2 — Tahap usaha**
 
 - Baru berupa ide.
 - Sedang bersiap memulai.
 - Sudah beroperasi.
 - Sedang mengembangkan usaha yang berjalan.
 
-**Langkah 4 — Profil awal usaha**
+**Langkah 3 — Profil awal usaha**
 
 Minta hanya field yang relevan dengan tahap yang dipilih:
 
@@ -268,12 +268,12 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 - Persetujuan Ketentuan dan Kebijakan Privasi wajib.
 - Persetujuan pembaruan produk bersifat opsional dan tidak dicentang secara default.
 
-**Langkah 2 — Akun dibuat**
+**Konfirmasi — Akun dibuat**
 
 - Akun dibuat setelah data dan persetujuan tervalidasi, tanpa OTP.
 - Kontak yang belum diverifikasi tidak dapat dipakai sebagai bukti pemulihan atau tindakan sensitif.
 
-**Langkah 3 — Profil Investor**
+**Langkah 2 — Profil Investor**
 
 - Jenis/deskripsi profil Investor dengan kategori non-sensitif yang telah disetujui.
 - Sektor pilihan.
