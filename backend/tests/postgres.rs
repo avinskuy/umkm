@@ -1572,6 +1572,54 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
             .expect("created session should be persisted");
     assert_eq!(session_owner, user_id);
 
+    let active_session: (String, String, String, i64) = sqlx::query_as(
+        "SELECT session_id::text, user_id::text, primary_role, expires_in_seconds \
+         FROM public.get_active_password_login_session($1)",
+    )
+    .bind(&token_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active session should validate and update its idle timestamp");
+    assert_eq!(active_session.0, session_id);
+    assert_eq!(active_session.1, user_id);
+    assert_eq!(active_session.2, "business_owner");
+    assert!((29 * 24 * 60 * 60..=30 * 24 * 60 * 60).contains(&active_session.3));
+
+    let rotated_token_hash = vec![42_u8; 32];
+    let rotated_session: (String, String, String, i64) = sqlx::query_as(
+        "SELECT session_id::text, user_id::text, primary_role, expires_in_seconds \
+         FROM public.rotate_active_password_login_session($1, $2)",
+    )
+    .bind(&token_hash)
+    .bind(&rotated_token_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active session token should rotate atomically");
+    assert_eq!(rotated_session.0, session_id);
+    assert_eq!(rotated_session.1, user_id);
+    assert_eq!(rotated_session.2, "business_owner");
+
+    let old_token_session: Option<String> = sqlx::query_scalar(
+        "SELECT session_id::text FROM public.get_active_password_login_session($1)",
+    )
+    .bind(&token_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("old token lookup should execute");
+    assert!(
+        old_token_session.is_none(),
+        "the old token must stop authenticating immediately after rotation"
+    );
+
+    let new_token_session: String = sqlx::query_scalar(
+        "SELECT session_id::text FROM public.get_active_password_login_session($1)",
+    )
+    .bind(&rotated_token_hash)
+    .fetch_one(pool)
+    .await
+    .expect("new token should validate after rotation");
+    assert_eq!(new_token_session, session_id);
+
     let identifier_hash = vec![51_u8; 32];
     let ip_hash = vec![52_u8; 32];
     for attempt in 1..=10 {
@@ -1669,14 +1717,14 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
     assert!(!ip_blocked, "the thirty-first IP attempt must be limited");
 
     let revoked: bool = sqlx::query_scalar("SELECT public.revoke_password_login_session($1)")
-        .bind(&token_hash)
+        .bind(&rotated_token_hash)
         .fetch_one(pool)
         .await
         .expect("logout function should revoke the session");
     assert!(revoked);
 
     let revoked_again: bool = sqlx::query_scalar("SELECT public.revoke_password_login_session($1)")
-        .bind(&token_hash)
+        .bind(&rotated_token_hash)
         .fetch_one(pool)
         .await
         .expect("repeated logout should be idempotent");
@@ -1689,6 +1737,41 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
             .await
             .expect("revocation reason should remain auditable");
     assert_eq!(reason, "logout");
+
+    let second_token_hash = vec![43_u8; 32];
+    let second_session_id: String = sqlx::query_scalar(
+        "SELECT public.create_password_login_session($1::uuid, $2)::text",
+    )
+    .bind(&user_id)
+    .bind(&second_token_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active user should be able to create another device session");
+    let revoked_count: i32 = sqlx::query_scalar(
+        "SELECT public.revoke_all_password_login_sessions($1::uuid)",
+    )
+    .bind(&user_id)
+    .fetch_one(pool)
+    .await
+    .expect("logout-all should revoke every active session for the account");
+    assert_eq!(revoked_count, 1);
+
+    let second_reason: String =
+        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE id = $1::uuid")
+            .bind(&second_session_id)
+            .fetch_one(pool)
+            .await
+            .expect("logout-all revocation reason should be recorded");
+    assert_eq!(second_reason, "logout_all");
+
+    let revoked_all_session: Option<String> = sqlx::query_scalar(
+        "SELECT session_id::text FROM public.get_active_password_login_session($1)",
+    )
+    .bind(&second_token_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("revoked session validation should execute");
+    assert!(revoked_all_session.is_none());
 }
 
 async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
