@@ -6,6 +6,7 @@
 //! sengaja belum dipasang pada aplikasi runtime.
 
 mod audit;
+pub mod abuse;
 pub mod authentication;
 pub mod crypto;
 pub mod delivery;
@@ -14,11 +15,13 @@ pub mod password;
 mod registration;
 pub mod verification;
 
+pub use abuse::PostgresRegistrationAbuseGuard;
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
 pub use authentication::{
     AuthenticatedSession, AuthenticationConfigError, AuthenticationError,
     AuthenticationRateLimitKey, AuthenticationService, LoginRole, LoginSession, RotatedSession,
 };
+pub use crypto::{EnvironmentKeyProvider, EnvironmentKeyProviderError};
 pub use delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider};
 pub use registration::{create_client_user, ClientRegistration, ClientRole, ContactChannel};
 
