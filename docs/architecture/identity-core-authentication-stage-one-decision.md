@@ -91,7 +91,9 @@ Ketentuan:
 
 ## 8. Konsekuensi terhadap skema
 
-Migration 0001–0005 tidak boleh diedit setelah merge. Migration 0001 sudah memodelkan akun `pending_verification` dan aktivasi setelah verifikasi kontak. Migration 0002 sudah menyediakan sesi, challenge, event pengiriman, dan event percobaan untuk kanal `email` dan `whatsapp`.
+Migration 0001–0005 tidak boleh diedit setelah merge. Migration 0001 memodelkan akun `pending_verification` dan aktivasi setelah verifikasi kontak. Migration 0002 menyediakan sesi, challenge, event pengiriman, dan event percobaan untuk kanal `email` dan `whatsapp`.
+
+**Temuan audit konkret:** fungsi `public.create_client_user` pada migration 0001 selalu membuat akun `pending_verification` dengan `pending_expires_at` 30 menit, termasuk ketika `p_google_subject` diberikan. Fungsi tersebut tidak mengisi `email_verified_at` atau `initial_contact_verified_at`. Karena itu, Google OAuth tanpa OTP belum dapat langsung menghasilkan akun aktif melalui fungsi yang ada. Akun Google-only juga tidak boleh sekadar dilewatkan ke aktivasi OTP karena tidak ada challenge registrasi. Diperlukan desain dan migration lanjutan (tanpa mengubah migration lama) untuk jalur pembuatan akun Google yang memvalidasi provider, mengikat stable subject, menetapkan status/verifikasi email yang benar, dan tetap menjaga invariant akun serta role. Sampai migration dan tes itu tersedia, Google OAuth tanpa OTP adalah keputusan produk, belum didukung oleh skema runtime saat ini.
 
 Sebelum runtime dibuat, audit harus memastikan:
 1. Fungsi `create_client_user` dan trigger mendukung jalur password pending serta jalur Google OAuth tanpa OTP secara benar.
