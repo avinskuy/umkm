@@ -1,9 +1,4 @@
-use std::{
-    future::Future,
-    net::IpAddr,
-    pin::Pin,
-    sync::Arc,
-};
+use std::{future::Future, net::IpAddr, pin::Pin, sync::Arc};
 
 use sqlx::PgPool;
 
@@ -174,8 +169,6 @@ fn opaque_verification_id() -> Result<String, super::crypto::CryptoError> {
     ))
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,11 +180,7 @@ mod tests {
             Err(RegistrationApiConfigError::InvalidTermsVersion)
         );
         assert_eq!(
-            RegistrationPolicyVersions::new(
-                "terms-v1".to_owned(),
-                "privacy v1".to_owned(),
-                None
-            ),
+            RegistrationPolicyVersions::new("terms-v1".to_owned(), "privacy v1".to_owned(), None),
             Err(RegistrationApiConfigError::InvalidPrivacyVersion)
         );
         assert_eq!(
