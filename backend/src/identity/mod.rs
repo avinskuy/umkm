@@ -11,6 +11,7 @@ pub mod crypto;
 pub mod delivery;
 pub mod http;
 pub mod password;
+pub mod recovery;
 mod registration;
 pub mod verification;
 
@@ -23,3 +24,5 @@ pub use delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliv
 pub use registration::{create_client_user, ClientRegistration, ClientRole, ContactChannel};
 
 pub use verification::{RegistrationStart, VerificationError, VerificationService};
+
+pub use recovery::{RecoveryAction, RecoveryCandidate, RecoveryService, RecoveryStart};
