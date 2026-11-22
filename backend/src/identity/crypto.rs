@@ -244,19 +244,9 @@ pub fn contact_fingerprint_aliases(
         .into_iter()
         .map(|version| {
             if version == active.version {
-                contact_fingerprint_with_key(
-                    version,
-                    &active.key,
-                    channel,
-                    canonical_contact,
-                )
+                contact_fingerprint_with_key(version, &active.key, channel, canonical_contact)
             } else {
-                contact_fingerprint_for_version(
-                    provider,
-                    version,
-                    channel,
-                    canonical_contact,
-                )
+                contact_fingerprint_for_version(provider, version, channel, canonical_contact)
             }
         })
         .collect()
@@ -303,9 +293,7 @@ pub fn key_version_label(version: KeyVersion) -> Result<String, CryptoError> {
 
 /// Membaca versi key secara ketat; tidak ada fallback untuk label yang tidak dikenal.
 pub fn parse_key_version(label: &str) -> Result<KeyVersion, CryptoError> {
-    let value = label
-        .strip_prefix('v')
-        .ok_or(CryptoError::InvalidInput)?;
+    let value = label.strip_prefix('v').ok_or(CryptoError::InvalidInput)?;
     let version = value
         .parse::<u32>()
         .map_err(|_| CryptoError::InvalidInput)?;
@@ -467,8 +455,7 @@ mod tests {
     #[test]
     fn contact_fingerprint_aliases_cover_active_and_previous_versions() {
         let provider = RotatingTestKeyProvider;
-        let aliases =
-            contact_fingerprint_aliases(&provider, "email", "user@example.test").unwrap();
+        let aliases = contact_fingerprint_aliases(&provider, "email", "user@example.test").unwrap();
 
         assert_eq!(
             aliases.iter().map(|alias| alias.key_version).collect::<Vec<_>>(),
@@ -480,7 +467,10 @@ mod tests {
     #[test]
     fn key_version_labels_are_strict_and_round_trip() {
         assert_eq!(key_version_label(KeyVersion(7)), Ok("v7".to_owned()));
-        assert_eq!(key_version_label(KeyVersion(0)), Err(CryptoError::InvalidInput));
+        assert_eq!(
+            key_version_label(KeyVersion(0)),
+            Err(CryptoError::InvalidInput)
+        );
         assert_eq!(parse_key_version("v7"), Ok(KeyVersion(7)));
         assert_eq!(parse_key_version("7"), Err(CryptoError::InvalidInput));
         assert_eq!(parse_key_version("v0"), Err(CryptoError::InvalidInput));
