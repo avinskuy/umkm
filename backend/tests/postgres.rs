@@ -2892,6 +2892,53 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
             .expect("migrator should inspect recovery case state");
     assert_eq!(recovery_case_status, "account_selection_required");
 
+    let recovery_context: (String, String) = sqlx::query_as(
+        "SELECT session_id::text, channel \
+           FROM public.get_account_recovery_selection_context($1::uuid)",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(app_pool)
+    .await
+    .expect("application may load the verified recovery selection context");
+    assert_eq!(
+        recovery_context,
+        (recovery_session_id.clone(), "email".to_owned())
+    );
+
+    let candidates: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT user_id::text, primary_role, display_name \
+           FROM public.list_account_recovery_candidates($1::uuid, $2)",
+    )
+    .bind(&recovery_case_id)
+    .bind(vec![shared_contact_hmac.clone()])
+    .fetch_all(app_pool)
+    .await
+    .expect("verified contact may list all active accounts that share it");
+    assert_eq!(candidates.len(), 2);
+    assert!(candidates.iter().any(|candidate| {
+        candidate.0 == started.user_id
+            && candidate.1 == "business_owner"
+            && candidate.2 == "Pemilik Usaha Demo"
+    }));
+    assert!(candidates.iter().any(|candidate| {
+        candidate.0 == phone_started.user_id
+            && candidate.1 == "investor"
+            && candidate.2 == "Investor Demo"
+    }));
+
+    let mismatched_candidates = sqlx::query_as::<_, (String, String, String)>(
+        "SELECT user_id::text, primary_role, display_name \
+           FROM public.list_account_recovery_candidates($1::uuid, $2)",
+    )
+    .bind(&recovery_case_id)
+    .bind(vec![vec![0x7fu8; 32]])
+    .fetch_all(app_pool)
+    .await;
+    assert!(
+        mismatched_candidates.is_err(),
+        "candidate discovery must reject HMAC aliases that do not match the verified session"
+    );
+
     let unrelated_user_id: String = sqlx::query_scalar("SELECT gen_random_uuid()::text")
         .fetch_one(migrator_pool)
         .await
