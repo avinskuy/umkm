@@ -184,7 +184,7 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 DECLARE
     v_channel TEXT;
     v_purpose TEXT;
