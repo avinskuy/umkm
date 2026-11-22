@@ -1,4 +1,4 @@
--- Jalankan setelah migration Identity Core 0001–0009 selesai.
+-- Jalankan setelah migration Identity Core 0001–0010 selesai.
 -- Fail closed jika SECURITY DEFINER registration function bukan milik migrator non-superuser.
 
 DO $ownership_guard$
@@ -75,14 +75,55 @@ BEGIN
 END;
 $ownership_guard$;
 
+DO $profile_policy_ownership_guard$
+DECLARE
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    SELECT pg_catalog.pg_get_userbyid(p.proowner),
+           p.prosecdef,
+           COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+      INTO v_owner, v_is_security_definer, v_has_safe_search_path
+      FROM pg_catalog.pg_proc AS p
+     WHERE p.oid = pg_catalog.to_regprocedure(
+         'public.create_client_user_with_profile_and_policy(text,text,text,text,text,text,text,text,boolean,text)'
+     );
+
+    IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+       OR v_is_security_definer IS DISTINCT FROM TRUE
+       OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION
+            'Refusing application grants: profile/policy registration function must be SECURITY DEFINER owned by usahapintar_migrator';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+          FROM pg_catalog.pg_class AS c
+         WHERE c.oid IN (
+             'public.user_profiles'::pg_catalog.regclass,
+             'public.policy_acceptance_records'::pg_catalog.regclass,
+             'public.consent_events'::pg_catalog.regclass
+         )
+           AND pg_catalog.pg_get_userbyid(c.relowner) <> 'usahapintar_migrator'
+    ) THEN
+        RAISE EXCEPTION
+            'Refusing application grants: profile and policy history tables must be owned by usahapintar_migrator';
+    END IF;
+END;
+$profile_policy_ownership_guard$;
+
 -- Tidak ada akses langsung aplikasi ke tabel akun, kredensial, sesi, atau recovery.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM usahapintar_app;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM usahapintar_app;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM usahapintar_app;
 
 -- Pengecualian sempit: pembuatan akun melalui fungsi terkontrol dan penulisan audit.
-GRANT EXECUTE ON FUNCTION public.create_client_user(TEXT, TEXT, TEXT, TEXT, TEXT)
-    TO usahapintar_app;
+REVOKE EXECUTE ON FUNCTION public.create_client_user(TEXT, TEXT, TEXT, TEXT, TEXT)
+    FROM usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.create_client_user_with_profile_and_policy(
+    TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT
+) TO usahapintar_app;
 GRANT INSERT ON TABLE public.identity_audit_events TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.is_safe_identity_audit_metadata(JSONB)
     TO usahapintar_app;
