@@ -75,4 +75,4 @@ Migration 0006 harus gagal secara aman bila masih ada baris identitas provider y
 
 ## 8. Hal yang belum diaktifkan
 
-Router registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Endpoint login/logout, provider OTP nyata, credential provider, key produksi, migration produksi, dan deployment belum aktif. Setiap aktivasi runtime harus melalui audit, pengujian PostgreSQL, CI, dan tinjauan keamanan.
+Router registrasi/resend/verifikasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Login password Owner/Investor dan logout sudah dipasang pada aplikasi HTTP utama; aktivasi production tetap memerlukan konfigurasi `AUTH_RATE_LIMIT_HMAC_KEY` dan penerapan migration secara terpisah. Middleware sesi untuk endpoint terproteksi, provider OTP nyata, credential provider, key OTP produksi, dan deployment belum aktif. Setiap aktivasi fitur berikutnya harus melalui audit, pengujian PostgreSQL, CI, dan tinjauan keamanan.
