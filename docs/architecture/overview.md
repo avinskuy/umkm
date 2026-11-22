@@ -23,7 +23,7 @@ USahapintar dimulai dengan pendekatan **modular monolith**. Frontend dan backend
 - Fondasi runtime SQLx 0.8 sudah tersedia. HTTP server membuat connection pool saat startup menggunakan `APP_DATABASE_URL` milik principal aplikasi dengan hak minimum.
 - Endpoint `GET /api/v1/health` menyediakan liveness check yang tidak bergantung pada database. Endpoint `GET /api/v1/readyz` memeriksa kesiapan koneksi database melalui pool runtime.
 - Migration dijalankan secara eksplisit menggunakan principal migrator yang terpisah. HTTP server tidak menjalankan migration otomatis saat startup.
-- Modul `identity` menyediakan hashing password, `VerificationService` untuk registrasi email/WhatsApp dengan OTP, dan router HTTP registrasi/resend/verifikasi yang diuji tetapi belum dipasang pada aplikasi HTTP default. Kebijakan produk mewajibkan OTP saat registrasi; login dan login kembali setelah logout menggunakan password tanpa OTP rutin. Endpoint login/logout, cookie/session middleware, adapter provider nyata, dan runtime recovery belum tersedia.
+- Modul `identity` menyediakan hashing password, `VerificationService` untuk registrasi email/WhatsApp dengan OTP, dan router HTTP registrasi/resend/verifikasi yang diuji tetapi belum dipasang pada aplikasi HTTP default. Kebijakan produk mewajibkan OTP saat registrasi; login dan login kembali setelah logout menggunakan password tanpa OTP rutin. Login password Owner/Investor dan logout sudah tersedia dengan cookie aman, sesi server-side, serta rate limit PostgreSQL. Middleware validasi sesi untuk endpoint fitur, adapter provider nyata, dan runtime recovery belum tersedia.
 - Otorisasi ditegakkan di sisi server.
 
 ## Batas domain awal
@@ -42,11 +42,11 @@ Daftar ini menunjukkan batas tanggung jawab secara logis, bukan kewajiban untuk 
 
 ## Keputusan Identity Core
 
-Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Skema Identity Core tersedia melalui migration 0001–0011, mencakup akun, verifikasi, sesi, pemulihan, audit, penghapusan dukungan OAuth, operasi database verifikasi, pengikatan ID verifikasi, audit runtime verifikasi, profil dan penerimaan kebijakan, serta kebijakan resend OTP saat lock verifikasi. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP. Login dan login kembali setelah logout ditetapkan menggunakan password tanpa OTP rutin, tetapi endpoint login/logout, sesi HTTP, adapter provider nyata, dan recovery runtime belum tersedia.
+Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Skema Identity Core tersedia melalui migration 0001–0011, mencakup akun, verifikasi, sesi, pemulihan, audit, penghapusan dukungan OAuth, operasi database verifikasi, pengikatan ID verifikasi, audit runtime verifikasi, profil dan penerimaan kebijakan, serta kebijakan resend OTP saat lock verifikasi. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP. Login dan login kembali setelah logout ditetapkan menggunakan password tanpa OTP rutin, sementara login/logout dan pembuatan sesi tersedia melalui runtime; middleware validasi sesi untuk endpoint terproteksi, adapter provider nyata, dan recovery runtime belum tersedia.
 
 ## Skema database
 
-Model relasional, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Migration Identity Core 0001–0011 tersedia dan tercakup dalam pengujian PostgreSQL di CI. Migration tersebut mencakup akun, verifikasi, sesi, pemulihan, audit, serta operasi runtime registrasi; migration domain produk lainnya belum tersedia. Penerapan migration dilakukan secara eksplisit melalui principal migrator dan tetap terpisah dari startup HTTP maupun deployment produksi.
+Model relasional, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Migration Identity Core 0001–0012 tersedia dan tercakup dalam pengujian PostgreSQL di CI. Migration tersebut mencakup akun, verifikasi, sesi, pemulihan, audit, serta operasi runtime registrasi; migration domain produk lainnya belum tersedia. Penerapan migration dilakukan secara eksplisit melalui principal migrator dan tetap terpisah dari startup HTTP maupun deployment produksi.
 
 ## Akses data dan privasi
 
