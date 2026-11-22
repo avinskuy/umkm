@@ -268,9 +268,9 @@ impl<'a> AuthenticationService<'a> {
         let token_hash = hash_session_token(token);
         sqlx::query_scalar::<_, bool>("SELECT public.revoke_password_login_session($1)")
             .bind(token_hash.to_vec())
-        .fetch_one(self.pool)
-        .await
-        .map_err(|_| AuthenticationError::Database)?;
+            .fetch_one(self.pool)
+            .await
+            .map_err(|_| AuthenticationError::Database)?;
         Ok(())
     }
 }
