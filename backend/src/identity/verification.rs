@@ -160,7 +160,6 @@ impl<'a> VerificationService<'a> {
     }
 }
 
-
 pub(crate) async fn dispatch_otp_challenge(
     pool: &PgPool,
     keys: &dyn KeyProvider,
