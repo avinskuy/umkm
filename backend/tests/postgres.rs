@@ -1048,14 +1048,16 @@ async fn assert_verification_database_operations(pool: &PgPool) {
         .expect("provider acceptance should be recorded");
 
     assert!(
-        sqlx::query("SELECT * FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",)
-            .bind(&session_id)
-            .bind("33333333-3333-4333-8333-333333333333")
-            .bind(vec![5_u8; 32])
-            .bind(vec![vec![3_u8; 32]])
-            .fetch_one(pool)
-            .await
-            .is_err(),
+        sqlx::query(
+            "SELECT * FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",
+        )
+        .bind(&session_id)
+        .bind("33333333-3333-4333-8333-333333333333")
+        .bind(vec![5_u8; 32])
+        .bind(vec![vec![3_u8; 32]])
+        .fetch_one(pool)
+        .await
+        .is_err(),
         "resend must respect the 60-second cooldown"
     );
 
