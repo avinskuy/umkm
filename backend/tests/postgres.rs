@@ -1891,7 +1891,10 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .fetch_one(&app_pool)
     .await
     .expect("function privileges should be queryable");
-    assert_eq!(function_access, (true, true, false, true, true, true, true, true, true));
+    assert_eq!(
+        function_access,
+        (true, true, false, true, true, true, true, true, true)
+    );
 
     let created_user_id: String =
         sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
