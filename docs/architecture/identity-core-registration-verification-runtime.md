@@ -1,17 +1,13 @@
 # Desain Runtime Registrasi dan Verifikasi Identity Core
 
-> **Status: rancangan untuk implementasi berikutnya.** Registrasi email + password wajib diverifikasi melalui OTP email; registrasi nomor telepon/WhatsApp + password wajib diverifikasi melalui OTP WhatsApp. Login rutin menggunakan email/nomor telepon + password tanpa OTP.
+> **Cakupan:** desain dan status implementasi runtime registrasi serta verifikasi OTP Identity Core.
+> **Batas operasional:** router registrasi tersedia dan diuji, tetapi belum dipasang pada aplikasi HTTP default. Provider nyata, key produksi, login/logout, sesi HTTP, dan recovery runtime belum tersedia.
 
-> **Status nama produk:** Nama produk belum final. Nama yang pernah digunakan di repository hanya working title dan dapat diganti. Dokumen ini menggunakan istilah netral seperti *aplikasi*, *platform*, dan *layanan* agar keputusan teknis tidak mengikat identitas merek.
-
-- Status: rancangan teknis verifikasi OTP untuk pendaftaran password dan verifikasi kontak lainnya
-- Cakupan: verifikasi kontak, penerbitan OTP, aktivasi/verifikasi tambahan, dan audit; bukan registrasi/login tahap pertama
-- Basis: Identity Core migration 0001–0005 dan kebijakan registrasi/OTP yang telah disetujui
-- Bukan: persetujuan migration database produksi, provisioning credential produksi, atau deployment
+Registrasi email + password diverifikasi melalui OTP email; registrasi nomor telepon/WhatsApp + password diverifikasi melalui OTP WhatsApp. Login rutin menggunakan email/nomor telepon + password tanpa OTP.
 
 ## 1. Tujuan dan prinsip
 
-Runtime tahap berikutnya harus menyelesaikan verifikasi kontak Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi email/WhatsApp + password menunggu verifikasi OTP sebelum aktivasi. Login sosial/OAuth tidak termasuk cakupan autentikasi saat ini.
+Runtime Identity Core menyediakan orkestrasi registrasi dan verifikasi OTP Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi email/WhatsApp + password menunggu verifikasi OTP sebelum aktivasi. Login sosial/OAuth tidak termasuk cakupan autentikasi saat ini.
 
 Prinsip wajib:
 1. Backend menjadi sumber kebenaran untuk validasi, role, status akun, expiry, limit, dan aktivasi.
@@ -180,20 +176,20 @@ Bootstrap memverifikasi owner, SECURITY DEFINER, dan search_path untuk seluruh f
 - Perubahan data dan audit wajib berada dalam transaksi yang sama.
 - Jangan menjalankan migration otomatis pada HTTP startup.
 
-Operasi database untuk sesi/challenge, attempt/delivery, supersede, verifikasi, aktivasi, dan cleanup harus dirancang sebagai API database terkontrol sebelum runtime menggunakannya. Bootstrap 002 tidak boleh diperluas dengan grant tabel luas.
+Operasi database untuk sesi/challenge, attempt/delivery, supersede, dan aktivasi sudah tersedia sebagai fungsi terkontrol pada migration 0007–0009. Cleanup akun pending tetap memerlukan job operasional terpisah. Bootstrap 002 tidak boleh diperluas dengan grant tabel luas.
 
 ## 6. Kontrak provider OTP
 
 Interface provider mengembalikan hasil eksplisit:
 - `Accepted`: provider menerima permintaan.
-- `Rejected`: provider menolak secara definitif.
+- `Failed`: pengiriman gagal secara definitif.
 - `Unknown`: timeout/koneksi terputus sehingga hasil tidak dapat dipastikan.
 
 Provider tidak menerima password, session token, atau metadata yang tidak diperlukan. Tujuan hanya dikirim untuk dispatch dan tidak dicatat pada log. Pesan menjelaskan kode tidak boleh dibagikan dan tidak memuat data akun berlebihan. Fake provider dapat mensimulasikan accepted, rejected, timeout/unknown, retry, dan duplikasi. Tidak ada provider nyata yang diaktifkan pada tahap ini.
 
 ## 7. Kontrak API dan UX
 
-Endpoint publik belum ditetapkan. Saat dirancang, gunakan prefix `/api/v1`, validasi backend, schema request/response eksplisit, rate limit, correlation ID, dan error response konsisten.
+Router menyediakan `POST /api/v1/identity/registrations`, `POST /api/v1/identity/registrations/{verification_id}/resend`, dan `POST /api/v1/identity/registrations/{verification_id}/verify`. Router belum dipasang pada `app()` atau `main.rs`, sehingga endpoint tersebut belum dapat diakses melalui aplikasi HTTP default. Sebelum pemasangan, lengkapi key provider produksi, adapter provider, abuse guard, password policy, versi kebijakan server-side, serta pemeriksaan keamanan.
 
 UX minimum:
 - Tampilkan tujuan yang dimasking, expiry/countdown, dan waktu tunggu resend.
@@ -254,11 +250,11 @@ CI menjalankan format, Clippy, unit tests, PostgreSQL integration tests dengan p
 ## 10. Tahapan implementasi
 
 Status tahapan implementasi:
-1. **Database operations — selesai:** migration 0007 dan 0008 menyediakan fungsi terkontrol untuk sesi, challenge, delivery, attempt, dan aktivasi.
-2. **Verification orchestration — implementasi inti:** `VerificationService` menangani registrasi pending, enkripsi tujuan, issue/resend, dispatch result, dan verifikasi. CI memakai fake provider.
+1. **Database operations — tersedia:** migration 0007–0009 menyediakan fungsi terkontrol untuk sesi, challenge, delivery, attempt, audit, dan aktivasi.
+2. **Verification orchestration — tersedia:** `VerificationService` menangani registrasi pending, enkripsi tujuan, issue/resend, dispatch result, dan verifikasi. CI memakai fake provider.
 3. **OTP lifecycle — inti tersedia:** expiry, cooldown, rate limit lintas sesi, lock, konsumsi satu kali, dan aktivasi atomik dikelola PostgreSQL bersama runtime.
-4. **HTTP API — belum dimulai:** endpoint publik, validasi request/response, rate limit HTTP, dan kontrak frontend belum dibuat.
-5. **Operational readiness — belum dimulai:** key provider produksi, adapter provider nyata, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review.
+4. **HTTP API — router tersedia, belum dipasang:** handler registrasi, resend, dan verifikasi tersedia serta memiliki pengujian runtime; `app()`/`main.rs` belum memasangnya.
+5. **Operational readiness — belum lengkap:** key provider produksi, adapter Resend/FlowKirim nyata, abuse guard produksi, versi kebijakan aktif, observability tanpa PII, cleanup job, alert biaya/abuse, runbook, dan security review masih diperlukan.
 
 Setiap tahap melalui PR, review patch, CI hijau pada head final, dan verifikasi merge. Migration produksi, provisioning credential produksi, dan deployment memerlukan persetujuan terpisah.
 
@@ -272,7 +268,7 @@ Hal berikut tetap terbuka dan tidak boleh ditebak:
 - Batas password minimum/maksimum dan benchmark Argon2id pada runtime sasaran.
 - Idempotency strategy provider dan retry/outbox operasional.
 - Jadwal cleanup dan retensi event.
-- Endpoint HTTP final dan kontrak frontend.
+- Kontrak integrasi frontend untuk router registrasi yang belum dipasang.
 
 Tidak ada credential atau secret yang diminta melalui chat. Jangan mengirim OTP provider key, database password, atau production secret ke repository maupun percakapan.
 
