@@ -262,6 +262,7 @@ BEGIN
        OR v_session.purpose <> 'registration'
        OR v_session.expires_at <= v_now
        OR (v_session.locked_until IS NOT NULL AND v_session.locked_until > v_now)
+       OR p_code_matches IS NULL
        OR p_destination_hmac_aliases IS NULL
        OR NOT (v_session.destination_hmac = ANY(p_destination_hmac_aliases)) THEN
         RAISE EXCEPTION 'OTP verification session is not eligible'
