@@ -1595,6 +1595,41 @@ async fn assert_authentication_database_operations(pool: &PgPool) {
         .expect("rate limit function should return a decision after the threshold");
     assert!(!blocked, "the eleventh identifier attempt must be limited");
 
+    sqlx::query(
+        "UPDATE public.password_login_rate_limits SET window_started_at = clock_timestamp() - INTERVAL '20 minutes' WHERE scope = 'identifier' AND key_hash = $1",
+    )
+    .bind(&identifier_hash)
+    .execute(pool)
+    .await
+    .expect("test should age the rate-limit window without expiring its active block");
+    let still_blocked: bool =
+        sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("active login block should remain enforceable after the original window");
+    assert!(
+        !still_blocked,
+        "an active block must not reset with its original window"
+    );
+
+    sqlx::query(
+        "UPDATE public.password_login_rate_limits SET blocked_until = clock_timestamp() - INTERVAL '1 second' WHERE scope = 'identifier' AND key_hash = $1",
+    )
+    .bind(&identifier_hash)
+    .execute(pool)
+    .await
+    .expect("test should expire the login block");
+    let allowed_after_block: bool =
+        sqlx::query_scalar("SELECT public.reserve_password_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("identifier should be reset after its block expires");
+    assert!(allowed_after_block);
+
     sqlx::query("SELECT public.clear_password_login_identifier_limit($1)")
         .bind(&identifier_hash)
         .execute(pool)
