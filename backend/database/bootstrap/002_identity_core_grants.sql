@@ -1,4 +1,4 @@
--- Jalankan setelah migration Identity Core 0001–0006 selesai.
+-- Jalankan setelah migration Identity Core 0001–0007 selesai.
 -- Fail closed jika SECURITY DEFINER registration function bukan milik migrator non-superuser.
 
 DO $ownership_guard$
@@ -91,3 +91,46 @@ GRANT EXECUTE ON FUNCTION public.is_safe_identity_audit_metadata(JSONB)
 -- belum diberikan kepada principal Admin mana pun.
 GRANT USAGE ON SCHEMA public TO usahapintar_audit_reader;
 GRANT SELECT ON TABLE public.identity_audit_events TO usahapintar_audit_reader;
+
+
+-- verification function ownership --
+DO $verification_ownership_guard$
+DECLARE
+    v_signature TEXT;
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    FOREACH v_signature IN ARRAY ARRAY[
+        'public.create_registration_verification_session(uuid,text,bytea,bytea,text,bytea,text,timestamp with time zone)',
+        'public.reserve_otp_challenge(uuid,bytea,text)',
+        'public.record_otp_delivery_result(uuid,text)',
+        'public.record_otp_verification_attempt(uuid,uuid,boolean)'
+    ] LOOP
+        SELECT pg_catalog.pg_get_userbyid(p.proowner),
+               p.prosecdef,
+               COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+          INTO v_owner, v_is_security_definer, v_has_safe_search_path
+          FROM pg_catalog.pg_proc AS p
+         WHERE p.oid = pg_catalog.to_regprocedure(v_signature);
+
+        IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+           OR v_is_security_definer IS DISTINCT FROM TRUE
+           OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+            RAISE EXCEPTION
+                'Refusing verification grants: % must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path',
+                v_signature;
+        END IF;
+    END LOOP;
+END;
+$verification_ownership_guard$;
+
+-- verification function grants --
+GRANT EXECUTE ON FUNCTION public.create_registration_verification_session(UUID, TEXT, BYTEA, BYTEA, TEXT, BYTEA, TEXT, TIMESTAMPTZ)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.reserve_otp_challenge(UUID, BYTEA, TEXT)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.record_otp_delivery_result(UUID, TEXT)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN)
+    TO usahapintar_app;
