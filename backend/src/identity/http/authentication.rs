@@ -64,14 +64,14 @@ fn error(status: StatusCode, message: &'static str) -> Response {
     response
 }
 
-fn is_cross_site_request(headers: &HeaderMap) -> bool {
+pub(super) fn is_cross_site_request(headers: &HeaderMap) -> bool {
     headers
         .get("sec-fetch-site")
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value.eq_ignore_ascii_case("cross-site"))
 }
 
-fn resolved_client_ip(headers: &HeaderMap, peer_ip: IpAddr) -> IpAddr {
+pub(super) fn resolved_client_ip(headers: &HeaderMap, peer_ip: IpAddr) -> IpAddr {
     if !peer_ip.is_loopback() {
         return peer_ip;
     }

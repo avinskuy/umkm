@@ -2,7 +2,9 @@ pub mod config;
 pub mod database;
 pub mod identity;
 
-use crate::identity::http::{authentication_router, AuthenticationApiState};
+use crate::identity::http::{
+    authentication_router, recovery_router, AuthenticationApiState, RecoveryApiState,
+};
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
@@ -58,6 +60,15 @@ pub fn app_with_authentication(pool: PgPool, authentication: AuthenticationApiSt
     app(pool).merge(authentication_router(authentication))
 }
 
+/// Build the public API with password authentication and account recovery routes mounted.
+pub fn app_with_authentication_and_recovery(
+    pool: PgPool,
+    authentication: AuthenticationApiState,
+    recovery: RecoveryApiState,
+) -> Router {
+    app_with_authentication(pool, authentication).merge(recovery_router(recovery))
+}
+
 #[cfg(test)]
 mod tests {
     use super::app;
@@ -77,6 +88,27 @@ mod tests {
                 axum::http::Request::builder()
                     .method(axum::http::Method::POST)
                     .uri("/api/v1/identity/registrations")
+                    .header(axum::http::header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("{}"))
+                    .expect("request should be valid"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn account_recovery_routes_are_not_mounted_in_the_default_application() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy pool configuration should be valid");
+
+        let response = app(pool)
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(axum::http::Method::POST)
+                    .uri("/api/v1/identity/recovery")
                     .header(axum::http::header::CONTENT_TYPE, "application/json")
                     .body(Body::from("{}"))
                     .expect("request should be valid"),

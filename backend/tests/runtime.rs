@@ -615,8 +615,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         },
         delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
         password::hash_password,
-        ClientRegistration, ClientRole, ContactChannel, RecoveryAction, RecoveryService,
-        VerificationService,
+        ClientRegistration, ClientRole, ContactChannel, VerificationService,
     };
 
     struct RecoveryKeys;
@@ -755,43 +754,201 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .await
     .expect("test account should have a verified recovery contact");
 
-    let recovery = RecoveryService::new(&pool, &keys, &delivery);
-    let started = recovery
-        .start(
-            ContactChannel::Email,
-            Some(&recovery_email),
-            None,
-            RecoveryAction::PasswordReset,
-        )
+    use usahapintar_api::identity::http::{
+        recovery_router, AbuseDecision, RecoveryApiState, RegistrationAbuseGuard,
+        RegistrationAction,
+    };
+
+    struct AllowRecoveryGuard;
+
+    impl RegistrationAbuseGuard for AllowRecoveryGuard {
+        fn check<'a>(
+            &'a self,
+            _action: RegistrationAction,
+            _peer_ip: IpAddr,
+            _subject: Option<&'a str>,
+        ) -> Pin<Box<dyn Future<Output = AbuseDecision> + Send + 'a>> {
+            Box::pin(async { AbuseDecision::Allowed })
+        }
+    }
+
+    let recovery_router = recovery_router(RecoveryApiState::new(
+        pool.clone(),
+        Arc::new(RecoveryKeys),
+        Arc::new(RecoveryDelivery {
+            last_code: last_code.clone(),
+        }),
+        Arc::new(AllowRecoveryGuard),
+    ));
+    let make_recovery_request =
+        |method: Method, uri: String, body: Option<serde_json::Value>, cross_site: bool| {
+            let mut builder = Request::builder().method(method).uri(uri);
+            if body.is_some() {
+                builder = builder.header(header::CONTENT_TYPE, "application/json");
+            }
+            if cross_site {
+                builder = builder.header("sec-fetch-site", "cross-site");
+            }
+            let mut request = builder
+                .body(body.map_or_else(Body::empty, |value| Body::from(value.to_string())))
+                .expect("recovery HTTP request should be valid");
+            request.extensions_mut().insert(ConnectInfo(
+                "127.0.0.1:40001"
+                    .parse::<SocketAddr>()
+                    .expect("recovery test socket address should be valid"),
+            ));
+            request
+        };
+
+    let started = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            "/api/v1/identity/recovery".to_owned(),
+            Some(serde_json::json!({
+                "contact_channel": "email",
+                "email": recovery_email,
+                "requested_action": "password_reset"
+            })),
+            false,
+        ))
         .await
-        .expect("account recovery should create an unbound session");
+        .expect("recovery start route should respond");
+    assert_eq!(started.status(), axum::http::StatusCode::ACCEPTED);
+    assert_eq!(
+        started.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+    let started_body = started
+        .into_body()
+        .collect()
+        .await
+        .expect("recovery start response should be readable")
+        .to_bytes();
+    let started_payload: serde_json::Value =
+        serde_json::from_slice(&started_body).expect("recovery start response should be JSON");
+    let verification_id = started_payload["verification_id"]
+        .as_str()
+        .expect("recovery start should return an opaque verification ID")
+        .to_owned();
+    let recovery_case_id = started_payload["recovery_case_id"]
+        .as_str()
+        .expect("recovery start should return an opaque case ID")
+        .to_owned();
+
+    let resend = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            format!("/api/v1/identity/recovery/{verification_id}/resend"),
+            None,
+            false,
+        ))
+        .await
+        .expect("recovery resend route should respond");
+    assert_eq!(
+        resend.status(),
+        axum::http::StatusCode::TOO_MANY_REQUESTS,
+        "OTP delivery cooldown must be enforced across resend requests"
+    );
+
+    let premature_candidates = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::GET,
+            format!("/api/v1/identity/recovery/cases/{recovery_case_id}/accounts"),
+            None,
+            false,
+        ))
+        .await
+        .expect("premature candidate request should respond");
+    assert_eq!(
+        premature_candidates.status(),
+        axum::http::StatusCode::NOT_FOUND,
+        "account candidates must not be disclosed before OTP verification"
+    );
+
     let recovery_code = last_code
         .lock()
         .expect("recovery test delivery lock should be available")
         .clone()
         .expect("recovery OTP should be captured");
-    assert!(recovery
-        .verify(&started.session_id, &recovery_code)
+    let cross_site_verify = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            format!("/api/v1/identity/recovery/{verification_id}/verify"),
+            Some(serde_json::json!({ "code": recovery_code })),
+            true,
+        ))
         .await
-        .expect("account recovery OTP should be verified"));
+        .expect("cross-site verification request should respond");
+    assert_eq!(
+        cross_site_verify.status(),
+        axum::http::StatusCode::FORBIDDEN
+    );
 
-    let candidates = recovery
-        .list_candidates(&started.case_id)
+    let recovery_code = last_code
+        .lock()
+        .expect("recovery test delivery lock should be available")
+        .clone()
+        .expect("recovery OTP should remain available for the valid request");
+    let verified = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            format!("/api/v1/identity/recovery/{verification_id}/verify"),
+            Some(serde_json::json!({ "code": recovery_code })),
+            false,
+        ))
         .await
-        .expect("verified contact should list matching active accounts");
-    assert_eq!(candidates.len(), 1);
-    assert_eq!(candidates[0].user_id, registered.user_id);
-    assert_eq!(candidates[0].role, "business_owner");
+        .expect("recovery verify route should respond");
+    assert_eq!(verified.status(), axum::http::StatusCode::OK);
 
-    let selected_user_id = recovery
-        .select_account(&started.case_id, &registered.user_id)
+    let candidates = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::GET,
+            format!("/api/v1/identity/recovery/cases/{recovery_case_id}/accounts"),
+            None,
+            false,
+        ))
         .await
-        .expect("selected account should pass the database ownership check");
-    assert_eq!(selected_user_id, registered.user_id);
+        .expect("candidate list route should respond");
+    assert_eq!(candidates.status(), axum::http::StatusCode::OK);
+    assert_eq!(
+        candidates.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+    let candidates_body = candidates
+        .into_body()
+        .collect()
+        .await
+        .expect("candidate response should be readable")
+        .to_bytes();
+    let candidates_payload: serde_json::Value =
+        serde_json::from_slice(&candidates_body).expect("candidate response should be JSON");
+    assert_eq!(candidates_payload["accounts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        candidates_payload["accounts"][0]["user_id"],
+        registered.user_id
+    );
+    assert_eq!(candidates_payload["accounts"][0]["role"], "business_owner");
+
+    let selected = recovery_router
+        .oneshot(make_recovery_request(
+            Method::POST,
+            format!("/api/v1/identity/recovery/cases/{recovery_case_id}/select"),
+            Some(serde_json::json!({ "user_id": registered.user_id })),
+            false,
+        ))
+        .await
+        .expect("account selection route should respond");
+    assert_eq!(selected.status(), axum::http::StatusCode::ACCEPTED);
 
     let case_status: String =
         sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
-            .bind(&started.case_id)
+            .bind(&recovery_case_id)
             .fetch_one(&admin_pool)
             .await
             .expect("DBA should inspect recovery case state");
