@@ -1,201 +1,131 @@
 # Identity Core — Keputusan Pendaftaran
 
-> Status: batas awal kebijakan produk Identity Core telah disetujui; rancangan teknis terperinci, pemilihan penyedia layanan, dan tinjauan keamanan tetap harus diselesaikan sebelum implementasi.
->
-> **Amendemen 22 November 2026:** keputusan tahap pertama yang berlaku adalah email/telepon + password atau Google OAuth. OTP tidak diminta saat registrasi maupun login. Kontak yang belum dibuktikan kepemilikannya tidak boleh dianggap terverifikasi. Ketentuan OTP dan aktivasi pending di bagian lama dokumen ini merupakan rancangan tahap berikutnya dan tidak boleh diterapkan sebagai syarat tahap pertama. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+> **Status:** Keputusan aktif per 22 November 2026. Dokumen ini merangkum keputusan pendaftaran yang berlaku dan menggantikan rumusan lama yang bertentangan. Detail skema, runtime, recovery, dan migration dirujuk ke kontrak masing-masing.
 
-## Kebijakan pendaftaran yang disetujui
+## 1. Metode registrasi dan login
 
-1. Pendaftaran publik hanya tersedia bagi Business Owner dan Investor.
-2. Pendaftar memilih satu role utama yang bersifat tetap, lalu tepat satu metode kontak awal:
-   - Email: kode sekali pakai dikirim ke alamat email yang diberikan.
-   - Telepon: kode sekali pakai dikirim melalui WhatsApp.
-3. Email dan telepon merupakan pilihan alternatif. Keduanya tidak wajib diberikan saat pendaftaran awal.
-4. Pendaftaran melalui email atau telepon wajib menggunakan kata sandi. Pendaftaran melalui Google OAuth tidak mewajibkan pengguna membuat atau memasukkan kata sandi lokal terpisah.
-5. Akun tahap pertama dapat langsung aktif setelah data, role, persetujuan, dan kontrol anti-penyalahgunaan tervalidasi. Kontak yang diberikan belum dianggap terverifikasi. Verifikasi kontak/OTP menjadi tahap berikutnya, bukan syarat registrasi atau login.
-6. Kontak yang dipilih dinormalisasi dan direservasi secara unik. Kontak yang sudah terhubung ke akun lain tidak dapat digunakan kembali untuk membuat atau menggabungkan akun.
-7. Kontak yang tidak dipilih dapat ditambahkan kemudian, tetapi harus diverifikasi secara terpisah sebelum dianggap terverifikasi atau digunakan untuk pemulihan yang sensitif terhadap keamanan.
-8. Nomor telepon dinormalisasi ke format E.164. Pengiriman WhatsApp merupakan integrasi penyedia di sisi server; kredensial tidak boleh masuk ke source control atau konfigurasi frontend.
-9. OTP tidak pernah disimpan atau dicatat dalam log sebagai teks asli. Gunakan keyed hash, masa berlaku, penggunaan satu kali, batas percobaan, jeda kirim ulang, dan rate limit berdasarkan tujuan/akun/jaringan. Kegagalan pengiriman tidak pernah menandai kontak sebagai terverifikasi.
-10. Respons pendaftaran dan pemulihan tidak boleh mengungkap apakah kontak sudah terhubung ke suatu akun.
+Registrasi publik hanya menyediakan dua jalur:
 
-## Invariant role dan identitas
+1. **Email + password** — alamat email diverifikasi dengan OTP email.
+2. **Nomor telepon/WhatsApp + password** — nomor telepon diverifikasi dengan OTP melalui WhatsApp.
 
-- Setiap akun klien hanya memiliki satu role utama yang disimpan secara permanen dan tidak dapat diubah: `business_owner` atau `investor`.
-- Seseorang yang ingin menggunakan role lainnya harus mendaftar akun terpisah dengan identitas kontak berbeda yang memenuhi syarat dan belum terhubung ke akun lain.
-- Akun Admin disediakan melalui proses internal dan tidak dapat menggunakan pendaftaran publik.
-- Pengaitan identitas harus membuktikan kendali atas akun yang sudah ada dan identitas baru. Kecocokan teks alamat email saja tidak pernah cukup.
-- Penggabungan akun atau perubahan role tidak diizinkan melalui pendaftaran, OAuth, bantuan, maupun operasi Admin rutin.
+Tidak ada jalur registrasi tanpa OTP dan tidak ada Google OAuth. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login.
 
-## Rancangan siklus pendaftaran
+Akun dibuat dengan status `pending_verification`. Akun hanya menjadi `active` setelah OTP untuk kontak awal berhasil diverifikasi. Akun pending tidak boleh login atau memakai fitur yang mensyaratkan akun aktif.
 
-1. Pengguna memilih Owner atau Investor.
-2. Pengguna memilih Email atau Telepon/WhatsApp.
-3. Server memvalidasi dan menormalisasi kontak, menerapkan batas penyalahgunaan, lalu membuat pendaftaran/challenge berstatus pending.
-4. Server mengirim kode sekali pakai melalui kanal pengiriman yang dipilih.
-5. Pada tahap pertama, server membuat akun aktif setelah validasi registrasi tanpa mengirim atau meminta OTP. Kontak awal tetap berstatus belum terverifikasi.
-6. Ketika verifikasi kontak ditambahkan pada tahap berikutnya, server harus mengonsumsi challenge dan memperbarui timestamp verifikasi secara atomik.
-7. Pengguna melanjutkan onboarding sesuai role.
+Password:
+- Disimpan menggunakan Argon2id.
+- Password plaintext tidak boleh disimpan, dicatat, atau dikirim ke provider.
+- Password hash hanya diproses di backend dan diteruskan ke fungsi database terkontrol.
 
-Aturan pendaftaran pending 30 menit merupakan bagian dari rancangan lama dan tidak berlaku untuk tahap pertama yang membuat akun aktif tanpa OTP. Migration 0001 saat ini masih mengandung constraint pending tersebut; diperlukan migration lanjutan untuk menyelaraskan lifecycle sebelum runtime registrasi dibuat. Cegah pendaftaran tertunda aktif yang duplikat dan kondisi balapan saat reservasi.
+OTP:
+- Dibuat menggunakan sumber acak kriptografis dan disimpan sebagai keyed hash.
+- Tidak boleh dicatat atau dikirim ke log dalam bentuk plaintext.
+- Terikat pada tujuan, kontak, sesi, dan challenge yang benar.
+- Hanya dapat digunakan satu kali melalui transisi atomik.
+- Bukan kredensial login dan bukan pengganti password.
 
-## Implikasi model data (usulan tahap verifikasi dan sesi)
+## 2. Role dan identitas akun
 
-Skema akhir harus membedakan nilai email yang telah dinormalisasi dan nomor telepon berformat E.164, metode kontak awal pendaftaran, timestamp verifikasi yang terpisah, kanal pengiriman challenge (email atau WhatsApp), tujuan challenge dan keterikatannya pada tujuan pengiriman, keyed hash kode, jumlah percobaan, masa berlaku, status konsumsi, serta masa berlaku pendaftaran pending.
+- Pendaftaran publik hanya tersedia untuk `business_owner` dan `investor`.
+- Pengguna memilih tepat satu role utama sebelum akun dibuat.
+- Role utama bersifat tetap dan tidak dapat diubah melalui pengaturan, support, tindakan Admin rutin, migrasi akun, atau alur autentikasi.
+- Pengguna yang membutuhkan role klien lain harus membuat akun terpisah dengan kontak utama yang memenuhi aturan reservasi.
+- Admin dibuat melalui provisioning internal dan tidak tersedia pada pendaftaran publik.
+- Kontak utama yang dipilih saat registrasi dinormalisasi dan tunduk pada aturan keunikan/reservasi.
+- Kontak pemulihan opsional boleh digunakan bersama oleh beberapa akun; aturan ini tidak mengubah keunikan kontak utama.
 
-Jangan mengasumsikan pengguna memberikan kedua metode kontak. Migration Identity Core 0001–0005 untuk akun, verifikasi, sesi, pemulihan, dan audit sudah tersedia di `backend/migrations/` serta tercakup dalam pengujian CI. Ketersediaan migration di repository tidak berarti migration sudah diterapkan ke database produksi. Backend telah menginisialisasi pool PostgreSQL saat startup dan menyediakan operasi terbatas untuk membuat akun pending serta menambahkan audit event. Alur registrasi/verifikasi lengkap, pengiriman OTP melalui penyedia nyata, aktivasi akun, login, middleware sesi, dan pemulihan akun pada runtime masih belum lengkap. Setiap tahap runtime tetap harus melalui review skema, implementasi, pengujian, dan persetujuan operasional sesuai cakupannya.
+## 3. Alur registrasi
 
-## Kebijakan Identity Core yang telah disetujui
+1. Pengguna memilih Business Owner atau Investor.
+2. Pengguna memilih satu kontak awal: email atau nomor telepon/WhatsApp.
+3. Pengguna memasukkan nama tampilan publik, kontak, password, konfirmasi password, dan penerimaan Terms of Service serta Privacy Policy. Nama registrasi adalah nama tampilan publik, bukan klaim identitas legal.
+4. Consent marketing ditawarkan secara terpisah, opsional, dan tidak dicentang sebelumnya.
+5. Backend menormalisasi kontak, memvalidasi input, menerapkan kontrol anti-penyalahgunaan, dan membuat akun pending beserta profil dan catatan penerimaan kebijakan secara atomik.
+6. Backend membuat verification session dan challenge OTP. Tujuan pengiriman dilindungi enkripsi; fingerprint tujuan menggunakan HMAC.
+7. Provider mengirim OTP melalui kanal yang dipilih setelah reservasi pengiriman dicatat.
+8. Pengguna mengirim kode. Backend memeriksa tujuan, expiry, status challenge, batas percobaan, lock, dan status akun.
+9. OTP valid mengonsumsi challenge, memverifikasi sesi, dan mengaktifkan akun secara atomik.
+10. Setelah aktif, pengguna melanjutkan onboarding sesuai role.
 
-### Google OAuth dan model kata sandi
+Penerimaan Terms dan Privacy disimpan terpisah per versi. Consent marketing hanya dicatat sebagai `granted` bila pengguna secara eksplisit opt-in. Versi kebijakan ditentukan backend dari konfigurasi server-side, bukan dipercaya dari input browser. Versi final belum boleh diaktifkan sebelum dokumen publik disetujui; lihat [Registry Versi Kebijakan Publik](../legal/policy-version-registry.md).
 
-Google OAuth tetap digunakan untuk pendaftaran dan login. Pengguna baru harus memilih tepat satu role klien yang tidak dapat diubah (Owner atau Investor) sebelum memulai OAuth; pilihan role diikat ke state OAuth yang dikelola server. Pendaftaran yang hanya menggunakan Google tidak mewajibkan pembuatan kata sandi lokal. Tidak ada OTP tambahan pada tahap pertama. Klaim email hanya ditandai terverifikasi jika token Google tervalidasi menyatakan `email_verified=true`; klaim tersebut tidak boleh digunakan untuk menggabungkan akun secara otomatis.
+## 4. Baseline OTP dan masa pending
 
-Pendaftaran menggunakan email atau nomor HP wajib memiliki kata sandi lokal. Login kata sandi menggunakan email atau nomor HP terdaftar beserta kata sandinya. OTP tidak digunakan untuk registrasi/login tahap pertama; saat diaktifkan kelak, OTP hanya menjadi mekanisme verifikasi kontak atau faktor tambahan yang dirancang terpisah, bukan kredensial password atau token reset. Alur penambahan kata sandi lokal untuk akun yang hanya menggunakan Google masih menjadi keputusan produk terpisah jika kelak diperlukan.
+Baseline runtime yang disetujui dan diuji:
 
-Identitas Google yang sudah terhubung hanya dapat mengautentikasi akun yang sudah terhubung tersebut. Jangan menghubungkan akun secara otomatis hanya karena alamat email cocok. Penghubungan memerlukan sesi akun yang sudah terautentikasi serta bukti terbaru atas kendali identitas baru, atau proses pemulihan aman yang secara khusus disetujui. Validasi state, nonce, issuer, audience, signature, expiry, redirect URI yang tepat, provider subject, dan perlindungan terhadap callback yang diputar ulang. Akun Admin tidak boleh dibuat melalui OAuth publik.
+- Kode OTP numerik enam digit.
+- Masa berlaku challenge: 10 menit.
+- Jeda resend: 60 detik.
+- Maksimal lima pengiriman per kontak dalam 60 menit, lintas sesi.
+- Maksimal lima percobaan verifikasi gagal dalam konteks sesi/kontak yang ditetapkan.
+- Setelah lima kegagalan, sesi dikunci selama satu jam.
+- Penguncian tidak direset oleh pengiriman challenge baru, refresh halaman, atau pembuatan sesi baru.
+- Pengguna boleh meminta OTP baru saat sesi terkunci jika cooldown dan rate limit pengiriman mengizinkan; semua percobaan verifikasi tetap ditolak sampai lock berakhir.
+- Setelah lock berakhir, penghitung kegagalan sesi direset secara atomik. Batas pengiriman lintas sesi tetap berlaku.
+- Masa pending akun: 30 menit. Akun pending yang kedaluwarsa ditangani melalui cleanup terkontrol; jangan mengaktifkan akun setelah batas tersebut.
 
-### OTP dan siklus pendaftaran
+Semua batas harus ditegakkan di server dan aman terhadap request bersamaan. Hitung mundur frontend hanya informatif. Detail status sesi/challenge, event, rate limit, dan SQL function terdapat pada [Runtime Registrasi & Verifikasi](identity-core-registration-verification-runtime.md), [Kontrak Migration 0002](identity-core-migration-0002-verification-contract.md), [Kontrak Migration 0007](identity-core-migration-0007-verification-operations-contract.md) jika tersedia pada branch yang memuatnya, dan [Tinjauan Kontak Pemulihan Bersama](identity-core-shared-recovery-contacts.md).
 
-- Masa berlaku OTP adalah **10 menit**.
-- Maksimal **5 percobaan gagal** untuk setiap sesi verifikasi.
-- Setelah kegagalan kelima, sesi verifikasi dikunci selama **1 jam**. Selama penguncian, semua percobaan verifikasi pada sesi tersebut ditolak, termasuk dengan OTP baru.
-- Setelah satu jam berlalu, sesi yang sama boleh digunakan kembali dan penghitung kegagalan sesi direset. Reset hanya terjadi setelah masa penguncian benar-benar berakhir; permintaan atau pengiriman OTP baru tidak dapat mempercepatnya.
-- Batas pengiriman per kontak dan rate limit lintas sesi tetap berlaku setelah sesi dibuka kembali. Membuat sesi baru tidak boleh menghindari batas percobaan atau pengiriman yang berlaku pada konteks kontak/tujuan.
-- Jeda pengiriman ulang adalah **60 detik**.
-- Maksimal **5 pengiriman per jam untuk setiap alamat kontak**, ditambah pembatasan adaptif berdasarkan IP/jaringan, akun, tujuan, dan aktivitas mencurigakan.
-- Pengiriman OTP baru langsung membatalkan kode sebelumnya untuk tujuan dan alamat kontak yang sama.
-- Kode baru tidak menghapus status penguncian sesi verifikasi, tidak mereset penghitung kegagalan, dan tidak menghapus batas pengiriman.
-- Semua penghitung, masa berlaku, pembatalan, dan jeda harus ditegakkan di server serta aman terhadap proses bersamaan. Hitung mundur di sisi klien hanya untuk tampilan.
-- OTP berupa kode angka dengan jumlah digit yang belum ditetapkan. Kode dibuat menggunakan sumber acak kriptografis yang aman, disimpan sebagai keyed hash, tidak pernah dicatat dalam log sebagai teks asli, terikat pada tujuan dan alamat penerima, serta hanya dapat digunakan satu kali secara atomik.
-- Kegagalan pengiriman tidak pernah menandai kontak sebagai terverifikasi. Respons tidak boleh mengungkap apakah kontak sudah terdaftar.
-- Masa berlaku pendaftaran tertunda adalah **30 menit**, terpisah dari masa berlaku OTP 10 menit. Pembersihan kedaluwarsa harus idempotent dan tidak boleh menghapus akun yang sudah aktif.
+## 5. Provider OTP
 
-### Pengelolaan sesi
+Kandidat awal untuk demonstrasi:
+- Resend untuk email OTP.
+- FlowKirim untuk WhatsApp OTP.
 
-- Beberapa perangkat boleh memiliki sesi aktif secara bersamaan.
-- Sediakan halaman Sesi Aktif pada Pengaturan Keamanan, pencabutan sesi individual, dan fitur logout dari semua perangkat.
-- Pencabutan sesi ditegakkan oleh server; sesi mencurigakan dapat dicabut berdasarkan sinyal risiko.
-- Batas awal sesi adalah **7 hari tanpa aktivitas** dan **30 hari secara absolut**.
-- Fitur “Ingat perangkat ini” dapat mengaktifkan sesi browser persisten, tetapi tidak boleh melewati kedua batas waktu atau pencabutan dari server. Menutup browser saja tidak mengakhiri sesi yang memang dibuat persisten.
-- Gunakan cookie Secure dan HttpOnly serta strategi SameSite/CSRF yang sesuai. Tindakan sensitif dapat meminta autentikasi ulang. Logout manual langsung mencabut sesi.
-
-### Siklus hidup akun
-
-- Penonaktifan sementara dan penghapusan permanen merupakan dua alur terpisah yang dimulai oleh pengguna.
-- Penonaktifan sementara menyembunyikan profil publik dan membatasi akses normal, tetapi data akun serta role tetap disimpan. Pengaktifan kembali memerlukan login dan pemeriksaan keamanan.
-- Penghapusan permanen memerlukan konfirmasi eksplisit dan autentikasi ulang, lalu **masa tunggu 30 hari**. Selama masa tersebut, akun disembunyikan/dibatasi dan pengguna dapat membatalkan permintaan melalui pemeriksaan keamanan ulang.
-- Setelah masa tunggu, proses penghapusan dimulai. Catatan yang wajib dipertahankan untuk kebutuhan hukum/keamanan dan cadangan mengikuti kebijakan retensi transparan berdasarkan kategori data; jangan menjanjikan penghapusan seketika dari cadangan.
-- Kontak tidak otomatis dapat digunakan kembali setelah akun ditutup/dihapus. Prosedur pelepasan harus diverifikasi dan tahan terhadap penyalahgunaan sebelum diterapkan.
-
-### Pemulihan akun
-
-Dukung alur **lupa kata sandi** dan **lupa email** hanya melalui kanal pemulihan yang sudah dibuktikan kepemilikannya. Kontak pemulihan bersifat opsional saat pendaftaran dan harus diverifikasi sebelum digunakan. Karena OTP ditunda, kontak yang belum diverifikasi tidak boleh dipakai sebagai bukti pemulihan; mekanisme verifikasi/pengiriman reset yang aman harus diselesaikan sebelum fitur reset dirilis. Akun Google-only dapat menggunakan pemulihan Google.
-
-- Lupa kata sandi: verifikasi kepemilikan melalui metode pemulihan yang memenuhi syarat sebelum mengizinkan pengaturan ulang kata sandi. OTP pendaftaran tidak dapat digunakan sebagai kredensial reset.
-- Lupa email: setelah kontak pemulihan yang terhubung ke akun berhasil diverifikasi, pengguna boleh melihat alamat email utama secara lengkap. Jangan tampilkan sebelum verifikasi berhasil.
-- Gunakan respons publik yang seragam, pembatasan permintaan, notifikasi, dan penilaian risiko untuk mencegah enumerasi akun serta penyalahgunaan.
-- Pemulihan dilakukan berlapis dan berdasarkan risiko. Pertimbangkan perangkat tepercaya, sesi sebelumnya, faktor pemulihan yang sudah diverifikasi, aktivitas mencurigakan, dan perubahan faktor pemulihan terbaru. Terapkan jeda perlindungan atau pemeriksaan tambahan jika diperlukan.
-- Jika pengguna kehilangan akses ke kontak utama dan seluruh kontak pemulihan, terima permintaan pemulihan alternatif dan periksa perangkat tepercaya, sesi sebelumnya, serta sinyal kepemilikan lainnya. Jika bukti otomatis belum cukup, eskalasikan ke pemeriksaan manual oleh petugas support dengan kewenangan khusus. Pemulihan berisiko tinggi dapat ditunda atau ditolak. Beri tahu pengguna melalui kanal aman yang tersedia dan catat setiap tindakan dalam audit.
-- Pemeriksaan manual harus menerapkan hak akses minimum, kriteria bukti yang terdokumentasi, persetujuan dua pihak untuk pengecualian/risiko tinggi jika diperlukan, serta catatan audit yang tidak dapat diubah sembarangan. Petugas support tidak boleh mengubah role utama yang bersifat tetap melalui proses pemulihan.
-- Perlindungan setelah pemulihan menyesuaikan risiko: cabut sesi mencurigakan, beri notifikasi kepada pengguna, dan minta verifikasi tambahan untuk perubahan sensitif jika diperlukan.
-
-### Operasional penyedia layanan dan keputusan teknis tersisa
-
-Penyedia email dan WhatsApp Business/API belum dipilih. Gunakan adapter penyedia yang dapat diganti, simpan kredensial di sisi server, dan tetapkan pemantauan pengiriman, percobaan ulang, batas biaya, persyaratan pengirim/template, penanggung jawab operasional, serta penanganan insiden sebelum produksi. Parameter hashing kata sandi, konfigurasi penyedia, jadwal retensi, MFA/pemulihan Admin, dan ambang operasional juga harus ditetapkan melalui tinjauan keamanan. Jangan membuat kredensial produksi atau menyimpan rahasia di source control.
-
-## Gerbang implementasi
-
-Migration Identity Core 0001–0005 untuk akun, verifikasi, sesi, pemulihan, dan audit sudah tersedia di repository serta diuji di CI. Tahap berikutnya berfokus pada penyelarasan skema melalui migration lanjutan, runtime registrasi password/Google OAuth, autentikasi sesi, dan kontrol keamanan. Integrasi verifikasi kontak/OTP dilakukan pada tahap terpisah setelah metode pembuktian kontak dan provider siap. Setiap tahap hanya boleh dimulai setelah kontrak API, tanggung jawab penyedia layanan, konkurensi, kedaluwarsa, cleanup, privasi, threat model, dan rencana pengujian ditinjau. Migration produksi, provisioning kredensial produksi, dan deployment tetap merupakan operasi terpisah yang memerlukan persetujuan eksplisit. Pemilihan penyedia layanan, ambang operasional terperinci, jadwal retensi, panjang kode OTP, dan pengaturan kata sandi lokal untuk akun Google saja masih menjadi keputusan teknis/produk yang terbuka. Pendaftaran melalui email/nomor HP wajib menggunakan kata sandi; pendaftaran Google OAuth tidak memerlukan kata sandi lokal. OTP melalui telepon/WhatsApp bukan metode login. Seluruh kebijakan tetap dapat ditinjau ulang melalui evaluasi produk dan keamanan.
-
-
-## Tambahan keputusan: kontak pemulihan bersama dan UX pemilihan akun
-
-- Satu email atau nomor HP pemulihan yang sudah diverifikasi boleh digunakan oleh beberapa akun. Jangan menerapkan keunikan global pada nilai email maupun nomor HP di `recovery_contacts`. Aturan ini tidak mengubah keunikan dan reservasi kontak utama pendaftaran.
-- Jika satu kontak pemulihan terhubung ke beberapa akun, gunakan pendekatan hybrid: verifikasi kontak terlebih dahulu, lalu tampilkan pilihan akun dengan petunjuk pembeda yang aman. Jangan mengungkap jumlah atau daftar akun sebelum verifikasi, dan jangan menampilkan data sensitif atau kontak lengkap.
-- Keberhasilan verifikasi kontak hanya membuktikan kendali atas kontak tersebut; bukan bukti tunggal kepemilikan semua akun yang terhubung. Akun yang dipilih tetap menjalani pemeriksaan kepemilikan dan risiko.
-- Kolom verification_sessions.user_id boleh NULL sementara hanya pada alur pemulihan sebelum akun tujuan dipilih. Untuk pendaftaran dan verifikasi akun tertentu, user_id wajib. Setelah akun dipilih dan pemeriksaan yang sesuai selesai, sesi/kasus dikaitkan ke akun tersebut secara atomik dan satu kali.
-- Batas percobaan dan pengiriman harus berlaku lintas sesi dan instance, sehingga membuat sesi baru tidak mengatur ulang batas. Penghitung dan penguncian ditegakkan di server serta tahan terhadap request bersamaan.
-- Kontak utama tetap direservasi selama masa tunggu penghapusan permanen 30 hari. Kontak tersebut baru dapat dilepas setelah proses penghapusan selesai dan sesuai kebijakan retensi/pelepasan identitas. Aturan ini tidak berlaku pada kontak pemulihan bersama.
-
-- `account_recovery_cases` boleh dibuat sebelum akun tujuan diketahui. `target_user_id` sementara NULL dan kasus tetap terhubung ke tepat satu `verification_session_id` melalui foreign key wajib dan unique. Satu sesi verifikasi hanya boleh memiliki satu kasus pemulihan; pengiriman ulang OTP menggunakan sesi/kasus yang sama, sedangkan percobaan pemulihan baru membuat sesi dan kasus baru. Setelah pemilihan akun serta pemeriksaan keamanan selesai, target dikaitkan secara atomik dan satu kali. Kasus tanpa target tetap tercatat dan dapat masuk antrean pemeriksaan tanpa membuka identitas akun.
-
-Rincian teknis dan checklist migrasi terdapat pada [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md).
-
-### Pemisahan status siklus hidup dan penguncian sesi
-
-Status siklus hidup sesi verifikasi dan kondisi penguncian sementara merupakan dua dimensi yang terpisah.
-
-Status siklus hidup yang menjadi baseline:
-- `pending`: sesi masih menunggu proses verifikasi yang sah.
-- `verified`: tujuan verifikasi telah berhasil dipenuhi; status terminal.
-- `expired`: masa berlaku sesi berakhir; status terminal.
-- `cancelled`: sesi dibatalkan; status terminal.
-
-Kondisi penguncian sementara dicatat secara terpisah melalui `failed_attempt_count` dan `locked_until`, bukan dengan mengganti status siklus hidup menjadi `locked`.
-
-Konsekuensinya:
-- Sesi `pending` tanpa penguncian dapat menerima percobaan verifikasi sesuai aturan OTP.
-- Sesi `pending` dengan `locked_until` yang masih berlaku tetap berstatus `pending`, tetapi semua percobaan verifikasi ditolak sampai waktu penguncian berakhir.
-- Setelah penguncian berakhir, server secara atomik mereset penghitung kegagalan sesi dan sesi `pending` yang sama dapat digunakan kembali. Batas pengiriman dan rate limit lintas sesi tetap berlaku.
-- Status `verified`, `expired`, dan `cancelled` tidak dapat dibuka kembali. Penguncian yang berakhir tidak menghidupkan kembali sesi atau challenge yang sudah terminal.
-- Status challenge OTP individual tetap dikelola terpisah dari status sesi verifikasi. Challenge yang kedaluwarsa, dibatalkan/digantikan, atau telah digunakan tidak diaktifkan kembali.
-
-Status lifecycle akun sudah diterapkan pada migration akun pertama. Daftar status sesi verifikasi dan challenge di atas tetap merupakan baseline konseptual; nama kolom, constraint, transisi lengkap, dan pemetaan status challenge harus difinalisasi pada rancangan migration verifikasi tersendiri.
-
-
-
-### Mesin status challenge OTP individual
-
-Challenge OTP individual memiliki siklus hidup terpisah dari sesi verifikasi. Baseline status:
-
-- `pending`: challenge masih aktif dan dapat diverifikasi selama sesi induk mengizinkan.
-- `consumed`: kode berhasil diverifikasi dan hanya dapat digunakan satu kali.
-- `expired`: masa berlaku challenge berakhir.
-- `superseded`: challenge digantikan oleh challenge baru.
-- `cancelled`: sesi verifikasi induk dibatalkan sehingga challenge tidak lagi berlaku.
-
-Transisi yang diizinkan:
-- `pending` → `consumed` setelah verifikasi berhasil.
-- `pending` → `expired` setelah masa berlaku berakhir.
-- `pending` → `superseded` ketika challenge baru diterbitkan untuk sesi dan tujuan yang sama.
-- `pending` → `cancelled` ketika sesi induk dibatalkan.
-
-Semua status selain `pending` bersifat terminal. Satu sesi hanya boleh memiliki satu challenge aktif pada satu waktu. Kegagalan memasukkan kode dihitung pada sesi verifikasi, bukan dengan membuat challenge baru. Verifikasi berhasil harus mengonsumsi challenge dan menyelesaikan sesi secara atomik. Challenge terminal tidak boleh diaktifkan kembali.
-
-### Prinsip UX OTP yang diadopsi
-
-Gunakan pola yang familier dari alur verifikasi aplikasi yang telah digunakan luas, tanpa menyalin implementasi internal penyedia tertentu:
-
-- Tampilkan tujuan pengiriman dengan penyamaran yang cukup agar pengguna tahu ke mana kode dikirim.
-- Sediakan input kode yang mendukung autofill sistem operasi/browser jika tersedia, paste, dan input manual.
-- Tampilkan masa berlaku kode dan hitung mundur sebelum resend tersedia. Waktu di UI hanya informatif; server tetap menjadi sumber kebenaran.
-- Sediakan cara memperbaiki tujuan pengiriman jika pengguna salah memasukkan email/nomor.
-- Berikan umpan balik kesalahan yang jelas dan pertahankan input ketika aman, misalnya saat terjadi gangguan jaringan.
-- Saat sesi dikunci, jelaskan bahwa pengguna perlu menunggu dan tampilkan sisa waktu secara jelas. Jangan memberi kesan bahwa meminta kode baru dapat melewati penguncian.
-- Ingatkan pengguna agar tidak membagikan kode kepada siapa pun.
-- Jangan tampilkan status internal seperti `consumed` atau `superseded` kepada pengguna; gunakan bahasa tindakan yang sederhana.
-
-Panjang kode OTP tetap belum ditetapkan. Pilihan kanal alternatif, termasuk apakah tersedia metode pengiriman cadangan, juga belum ditetapkan. Penerapan autofill harus mengikuti kemampuan platform dan tidak boleh meminta izin luas untuk membaca SMS. Verifikasi kode selalu dilakukan di server.
-
-Acuan pola UX dan kemampuan platform:
-- WhatsApp Help Center, [Cara Mendaftarkan Nomor Telepon](https://faq.whatsapp.com/684051319521343/?cms_platform=android&locale=id_ID).
-- Google for Developers, [Automatic SMS Verification with the SMS Retriever API](https://developers.google.com/identity/sms-retriever/overview).
-- Android Developers, [Secure user authentication](https://developer.android.com/security/fraud-prevention/authentication).
-
-Kebijakan penerbitan OTP selama sesi terkunci telah ditetapkan pada bagian **Keputusan: penerbitan OTP selama penguncian sesi** di bawah. Tidak ada keputusan kebijakan OTP tambahan yang perlu dibuka pada tahap dokumentasi ini. Untuk pengalaman pengguna, USahapintar mengadopsi pola verifikasi yang telah digunakan luas dan mengikuti dokumentasi resmi platform serta penyedia yang kelak dipilih; detail integrasi dan konfigurasi dibahas saat implementasi.
-
-
-### Keputusan: penerbitan OTP selama penguncian sesi
-
-Pengguna **boleh meminta dan menerima OTP baru selama sesi verifikasi terkunci**, selama jeda resend, batas pengiriman per kontak, dan rate limit lain terpenuhi.
+Keduanya merupakan kandidat integrasi, bukan provider produksi yang telah dikonfigurasi atau diuji dengan pengiriman nyata. Adapter provider harus dapat diganti. Business logic OTP tetap berada di backend Rust.
 
 Ketentuan:
-- Pengiriman OTP baru tidak menghapus, memperpendek, atau mengatur ulang penguncian satu jam.
-- Semua percobaan verifikasi tetap ditolak sampai `locked_until` berakhir, termasuk untuk challenge baru yang diterbitkan selama penguncian.
-- Challenge baru menggantikan challenge sebelumnya sesuai aturan `superseded`; challenge lama tidak dapat digunakan kembali.
-- Jika challenge baru kedaluwarsa sebelum sesi terbuka, pengguna dapat meminta OTP berikutnya setelah batas resend/pengiriman mengizinkan.
-- Setelah penguncian berakhir, sesi `pending` yang sama dapat digunakan kembali sesuai aturan reset penghitung kegagalan yang sudah disetujui.
-- Penerbitan OTP tetap tunduk pada batas lima pengiriman per kontak per jam dan rate limit lintas sesi/instance.
+- Kredensial hanya berada pada secret/environment server.
+- CI memakai mock provider; tidak mengirim pesan nyata.
+- Gunakan penerima demo yang menyetujui pengiriman.
+- Simpan ID pesan, status dispatch, dan kategori kegagalan tanpa OTP plaintext.
+- Timeout dengan hasil tidak pasti dicatat sebagai `unknown`; jangan mengembalikan kuota secara otomatis.
+- Harga, kuota, watermark, masa token, syarat pengirim, dan kebijakan provider diverifikasi ulang sebelum demo.
 
-Tujuan UX: pengguna tetap dapat memperoleh kode terbaru saat menunggu, tanpa membuat kode tersebut menjadi jalan pintas untuk melewati penguncian keamanan.
+## 6. Kontak pemulihan dan pemulihan akun
+
+- Kontak pemulihan bersifat opsional dan harus diverifikasi secara terpisah.
+- Email atau nomor telepon pemulihan yang sama boleh terhubung ke beberapa akun. Jangan menerapkan unique constraint global pada nilai kontak pemulihan.
+- Verifikasi kontak bersama hanya membuktikan kendali atas kontak tersebut; bukan kepemilikan semua akun yang terhubung.
+- Jangan mengungkap daftar atau jumlah akun sebelum kontak diverifikasi. Setelah verifikasi, pemilihan akun sasaran tetap memerlukan pemeriksaan kepemilikan dan risiko.
+- `verification_sessions.user_id` boleh NULL sementara hanya untuk alur recovery sebelum akun sasaran dipilih. Registrasi dan verifikasi spesifik akun tetap memerlukan `user_id`.
+- Reset password hanya boleh dilakukan melalui kanal pemulihan yang sudah diverifikasi.
+- Jika seluruh kanal tidak tersedia, gunakan pemulihan alternatif berbasis risiko dan pemeriksaan manual oleh petugas berwenang. Pemulihan berisiko tinggi dapat ditunda atau ditolak.
+- Rate limit dan lock berlaku lintas sesi; membuat sesi baru tidak boleh mengatur ulang anggaran percobaan atau pengiriman.
+
+Detail lengkap berada di [Tinjauan Skema Identity Core — Verifikasi dan Pemulihan](identity-core-shared-recovery-contacts.md) dan [Kontrak Migration 0004](identity-core-migration-0004-account-recovery-contract.md).
+
+## 7. Sesi dan siklus hidup akun
+
+- Beberapa sesi aktif diperbolehkan.
+- Batas sesi: tujuh hari tanpa aktivitas dan 30 hari absolut.
+- Pengguna harus dapat melihat sesi aktif, mencabut sesi individual, dan logout dari semua perangkat.
+- Cookie sesi menggunakan atribut Secure dan HttpOnly serta perlindungan CSRF/origin yang sesuai.
+- Penonaktifan sementara, suspensi Admin, dan penghapusan permanen adalah proses yang berbeda.
+- Penghapusan permanen yang diminta pengguna memiliki masa tunggu 30 hari untuk pembatalan sebelum proses penghapusan dimulai.
+- Masa tunggu 30 hari bukan janji bahwa seluruh data dan backup hilang tepat pada hari ke-30. Retensi numerik per kategori masih memerlukan tinjauan hukum dan operasional.
+- Admin tidak boleh menghapus akun secara permanen secara sepihak.
+
+## 8. Status implementasi repository
+
+Pada snapshot keputusan ini:
+- Migration Identity Core 0001–0010 tersedia di repository dan diuji melalui PostgreSQL CI.
+- Rust `VerificationService` mengorkestrasi registrasi, issue/resend OTP, dispatch, verifikasi, dan aktivasi dengan fake provider pada tes.
+- Migration 0010 menyimpan nama tampilan publik, penerimaan Terms/Privacy per versi, dan consent marketing opsional secara atomik dengan pembuatan akun.
+- Endpoint HTTP registrasi/verifikasi belum dibuat.
+- Provider Resend/FlowKirim nyata belum diimplementasikan atau dikonfigurasi.
+- Versi Terms/Privacy final belum ditetapkan; registry belum memiliki versi penerimaan aktif.
+- Migration belum diterapkan ke database produksi. Bootstrap privilege, provisioning, dan deployment merupakan operasi terpisah.
+
+## 9. Dokumen rujukan
+
+- [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
+- [Runtime Registrasi & Verifikasi](identity-core-registration-verification-runtime.md).
+- [Tinjauan Kontak Pemulihan Bersama](identity-core-shared-recovery-contacts.md).
+- [Keputusan Teknis Identity Core](identity-core-technical-decisions.md).
+- [Kontrak Migration 0001–0005](identity-core-migration-0001-contract.md).
+- [Kontrak Migration 0010 — Profil Publik dan Penerimaan Kebijakan](identity-core-migration-0010-contract.md).
+- [Registry Versi Kebijakan Publik](../legal/policy-version-registry.md).
+
+Dokumen ini adalah keputusan produk dan engineering. Dokumen ini bukan pendapat hukum atau klaim bahwa endpoint, provider, atau deployment produksi sudah aktif.
