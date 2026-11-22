@@ -909,10 +909,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         candidates_payload["accounts"][0]["user_id"],
         registered.user_id
     );
-    assert_eq!(
-        candidates_payload["accounts"][0]["role"],
-        "business_owner"
-    );
+    assert_eq!(candidates_payload["accounts"][0]["role"], "business_owner");
 
     let selected = recovery_router
         .oneshot(make_recovery_request(
