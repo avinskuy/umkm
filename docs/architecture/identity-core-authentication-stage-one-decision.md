@@ -26,13 +26,13 @@ Login rutin menggunakan email atau nomor telepon + password. OTP tidak diminta p
 
 1. Pengguna memilih role Owner atau Investor.
 2. Pengguna memilih tepat satu kontak awal: email atau nomor telepon/WhatsApp.
-3. Pengguna mengisi nama, kontak, password, konfirmasi password, serta persetujuan Ketentuan dan Kebijakan Privasi.
+3. Pengguna mengisi nama tampilan publik, kontak, password, konfirmasi password, serta persetujuan Ketentuan dan Kebijakan Privasi. Nama yang dimasukkan menjadi nama tampilan publik, bukan klaim identitas legal. Persetujuan marketing ditawarkan terpisah dan opsional.
 4. Backend menormalisasi kontak, memeriksa reservasi identifier, menerapkan rate limit, dan membuat akun pending_verification.
 5. Backend membuat verification session dan challenge OTP. Tujuan pengiriman dilindungi enkripsi; fingerprint tujuan menggunakan HMAC.
 6. Provider mengirim kode melalui Resend (email) atau FlowKirim (WhatsApp) setelah reservasi pengiriman dicatat secara atomik.
 7. Pengguna memasukkan OTP. Backend memverifikasi tujuan, expiry, status challenge, batas percobaan, dan status akun dalam transaksi.
 8. Setelah OTP valid, akun diaktifkan dan timestamp verifikasi kontak dicatat secara atomik.
-9. Pengguna melanjutkan onboarding sesuai role.
+9. Pengguna melanjutkan onboarding sesuai role. Nama tampilan, penerimaan kebijakan wajib beserta versinya, dan consent marketing bila dipilih sudah tercatat atomik bersama pembuatan akun.
 
 Kegagalan atau timeout provider tidak boleh mengaktifkan akun. Respons publik untuk konflik identifier harus generik dan tidak menjadi oracle enumerasi akun.
 
