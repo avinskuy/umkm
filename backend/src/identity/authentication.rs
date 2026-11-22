@@ -290,7 +290,7 @@ pub fn normalize_identifier(value: &str) -> Result<String, AuthenticationError> 
         .chars()
         .filter(|character| !matches!(character, ' ' | '-' | '(' | ')'))
         .collect::<String>();
-    let digits = compact.strip_prefix('+').unwrap_or_default();
+    let digits = compact.strip_prefix('+').ok_or(AuthenticationError::InvalidInput)?;
     if !(8..=15).contains(&digits.len())
         || digits.starts_with('0')
         || !digits.bytes().all(|byte| byte.is_ascii_digit())
@@ -361,6 +361,7 @@ mod tests {
         assert_eq!(normalize_identifier(""), Err(AuthenticationError::InvalidInput));
         assert_eq!(normalize_identifier("user@@example.test"), Err(AuthenticationError::InvalidInput));
         assert_eq!(normalize_identifier("081234567890"), Err(AuthenticationError::InvalidInput));
+        assert_eq!(normalize_identifier("6281234567890"), Err(AuthenticationError::InvalidInput));
         assert_eq!(normalize_identifier("+62abcdefgh"), Err(AuthenticationError::InvalidInput));
     }
 
