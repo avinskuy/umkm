@@ -12,8 +12,8 @@ use std::net::{IpAddr, SocketAddr};
 use zeroize::Zeroizing;
 
 use super::super::authentication::{
-    AuthenticatedSession, AuthenticationError, AuthenticationRateLimitKey,
-    AuthenticationService, LoginRole,
+    AuthenticatedSession, AuthenticationError, AuthenticationRateLimitKey, AuthenticationService,
+    LoginRole,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
@@ -90,9 +90,10 @@ fn login_error(error_value: AuthenticationError) -> Response {
             StatusCode::UNAUTHORIZED,
             "Email/nomor telepon atau password salah.",
         ),
-        AuthenticationError::InvalidSession => {
-            error(StatusCode::UNAUTHORIZED, "Sesi tidak valid atau sudah berakhir.")
-        },
+        AuthenticationError::InvalidSession => error(
+            StatusCode::UNAUTHORIZED,
+            "Sesi tidak valid atau sudah berakhir.",
+        ),
         AuthenticationError::RateLimited => error(
             StatusCode::TOO_MANY_REQUESTS,
             "Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.",
@@ -166,14 +167,15 @@ async fn require_session(
 }
 
 fn unauthorized_session() -> Response {
-    let mut response = error(StatusCode::UNAUTHORIZED, "Sesi tidak valid atau sudah berakhir.");
+    let mut response = error(
+        StatusCode::UNAUTHORIZED,
+        "Sesi tidak valid atau sudah berakhir.",
+    );
     clear_session_cookie(&mut response);
     response
 }
 
-async fn current_session(
-    Extension(session): Extension<AuthenticatedSession>,
-) -> Response {
+async fn current_session(Extension(session): Extension<AuthenticatedSession>) -> Response {
     (
         StatusCode::OK,
         Json(CurrentSessionResponse {
@@ -202,7 +204,9 @@ async fn refresh_session(
 
     match state.service().rotate_session(token.as_str()).await {
         Ok(session) => {
-            let max_age = session.expires_in_seconds.clamp(1, i64::from(SESSION_MAX_AGE_SECONDS));
+            let max_age = session
+                .expires_in_seconds
+                .clamp(1, i64::from(SESSION_MAX_AGE_SECONDS));
             let cookie = Zeroizing::new(format!(
                 "{SESSION_COOKIE}={}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Lax",
                 session.token.as_str()
@@ -411,10 +415,14 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             header::COOKIE,
-            HeaderValue::from_static("theme=dark; __Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            HeaderValue::from_static(
+                "theme=dark; __Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            ),
         );
         assert_eq!(
-            session_cookie(&headers).map(|token| token.as_str().to_owned()).as_deref(),
+            session_cookie(&headers)
+                .map(|token| token.as_str().to_owned())
+                .as_deref(),
             Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         );
 
