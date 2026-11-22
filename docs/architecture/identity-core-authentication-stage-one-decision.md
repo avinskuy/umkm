@@ -1,7 +1,7 @@
 # Keputusan Autentikasi Identity Core — Password dan OTP
 
 > Cakupan: registrasi, login, verifikasi kontak, pemulihan akun, dan provider OTP.
-> Status implementasi: fondasi registrasi/verifikasi tersedia; router belum dipasang pada aplikasi HTTP default dan provider nyata belum terintegrasi.
+> Status implementasi: login password Owner/Investor dan logout tersedia pada runtime; middleware sesi untuk endpoint terproteksi, registrasi HTTP publik, dan provider OTP nyata belum diaktifkan.
 
 ## 1. Keputusan autentikasi
 
@@ -39,7 +39,7 @@ Kegagalan atau timeout provider tidak boleh mengaktifkan akun. Respons publik un
 
 - Pengguna masuk menggunakan email atau nomor telepon + password.
 - Login rutin tidak meminta OTP.
-- Terapkan Argon2id, rate limit login, perlindungan brute-force/credential stuffing, respons generik, sesi server-side, cookie aman, CSRF/origin checks, TLS, dan audit event.
+- Terapkan Argon2id, rate limit PostgreSQL berbasis HMAC (10 percobaan per identifier dan 30 per IP dalam 15 menit), perlindungan brute-force/credential stuffing, respons generik, sesi server-side 30 hari dengan idle limit 7 hari, cookie `__Host-` HttpOnly/Secure/SameSite=Lax, TLS, dan audit event. Middleware untuk validasi sesi pada endpoint terproteksi serta CSRF/origin checks untuk operasi state-changing masih harus diselesaikan sebelum fitur akun lain dibuka.
 - Ketidaksesuaian role ditangani backend; role tidak dapat diganti dari halaman login.
 
 ## 5. Provider OTP
