@@ -7,7 +7,7 @@
 
 Dokumen ini menetapkan kontrak historis skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
 
-> **Catatan keputusan 22 November 2026:** migration ini masih mensyaratkan verifikasi kontak sebelum aktivasi dan belum sesuai dengan keputusan autentikasi tahap pertama (email/telepon + password atau Google OAuth tanpa OTP registrasi/login). Jangan mengubah file migration ini; buat migration lanjutan yang menyelaraskan constraint, trigger, fungsi pembuatan akun, dan tes sebelum runtime dibuat. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
+> **Catatan keputusan 22 November 2026:** kebijakan terbaru mewajibkan OTP untuk pendaftaran email/WhatsApp + password; Google OAuth tidak memerlukan OTP tambahan bila token tervalidasi dan email_verified=true. Lifecycle pending dan verifikasi kontak di migration ini menjadi dasar alur password. Jalur pembuatan akun Google tanpa OTP tetap harus diaudit terhadap constraint dan trigger. Jangan mengubah file migration ini; bila penyesuaian diperlukan, buat migration lanjutan dan tes. Lihat [Keputusan Autentikasi Identity Core — Registrasi OTP dan Google OAuth](identity-core-authentication-stage-one-decision.md).
 
 Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`. File implementasinya adalah `20261121170000_create_identity_accounts.sql`.
 
