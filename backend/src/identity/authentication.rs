@@ -33,7 +33,7 @@ impl AuthenticationRateLimitKey {
             return Err(AuthenticationConfigError::InvalidRateLimitKey);
         }
 
-        let mut key = [0_u8; 32];
+        let mut key = Zeroizing::new([0_u8; 32]);
         for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
             let high = hex_nibble(pair[0]).ok_or(AuthenticationConfigError::InvalidRateLimitKey)?;
             let low = hex_nibble(pair[1]).ok_or(AuthenticationConfigError::InvalidRateLimitKey)?;
@@ -44,7 +44,7 @@ impl AuthenticationRateLimitKey {
             return Err(AuthenticationConfigError::InvalidRateLimitKey);
         }
 
-        Ok(Self(Arc::new(Zeroizing::new(key))))
+        Ok(Self(Arc::new(key)))
     }
 
     fn fingerprint(&self, purpose: &[u8], value: &[u8]) -> [u8; 32] {
@@ -111,7 +111,7 @@ impl std::error::Error for AuthenticationError {}
 pub struct LoginSession {
     pub user_id: String,
     pub role: LoginRole,
-    pub token: String,
+    pub token: Zeroizing<String>,
 }
 
 pub struct AuthenticationService<'a> {
@@ -232,7 +232,7 @@ impl<'a> AuthenticationService<'a> {
         Ok(LoginSession {
             user_id,
             role,
-            token: raw_token,
+            token: Zeroizing::new(raw_token),
         })
     }
 
@@ -328,11 +328,11 @@ fn ip_rate_limit_subject(ip: IpAddr) -> Vec<u8> {
 }
 
 fn random_session_token() -> Result<String, AuthenticationError> {
-    let mut bytes = [0_u8; 32];
+    let mut bytes = Zeroizing::new([0_u8; 32]);
     ring::rand::SystemRandom::new()
         .fill(&mut bytes)
         .map_err(|_| AuthenticationError::Internal)?;
-    Ok(hex_encode(&bytes))
+    Ok(hex_encode(&bytes[..]))
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
