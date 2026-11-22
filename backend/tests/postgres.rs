@@ -987,9 +987,10 @@ async fn assert_verification_database_operations(pool: &PgPool) {
 
     let session_id: String = sqlx::query_scalar(
         "SELECT public.create_registration_verification_session(\
-            $1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', \
+            $1::uuid, $2::uuid, 'email', $3, $4, 'enc-v1', $5, 'hmac-v1', \
             clock_timestamp() + INTERVAL '10 minutes')::text",
     )
+    .bind("11111111-1111-4111-8111-111111111111")
     .bind(&user_id)
     .bind(vec![1_u8])
     .bind(vec![2_u8])
@@ -997,6 +998,7 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("controlled function should create a registration verification session");
+    assert_eq!(session_id, "11111111-1111-4111-8111-111111111111");
 
     let session_destination: (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String) = sqlx::query_as(
         "SELECT channel, destination_ciphertext, destination_nonce, encryption_key_version, \
@@ -1016,14 +1018,16 @@ async fn assert_verification_database_operations(pool: &PgPool) {
 
     let (challenge_id, delivery_event_id): (String, String) = sqlx::query_as(
         "SELECT challenge_id::text, delivery_event_id::text \
-         FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
+         FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",
     )
     .bind(&session_id)
+    .bind("22222222-2222-4222-8222-222222222222")
     .bind(vec![4_u8; 32])
     .bind(vec![vec![3_u8; 32]])
     .fetch_one(pool)
     .await
     .expect("controlled function should reserve a challenge and delivery event");
+    assert_eq!(challenge_id, "22222222-2222-4222-8222-222222222222");
 
     let pending_challenge: (String, Vec<u8>, String) = sqlx::query_as(
         "SELECT challenge_id::text, code_hash, hash_key_version \
@@ -1044,13 +1048,16 @@ async fn assert_verification_database_operations(pool: &PgPool) {
         .expect("provider acceptance should be recorded");
 
     assert!(
-        sqlx::query("SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",)
-            .bind(&session_id)
-            .bind(vec![5_u8; 32])
-            .bind(vec![vec![3_u8; 32]])
-            .fetch_one(pool)
-            .await
-            .is_err(),
+        sqlx::query(
+            "SELECT * FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",
+        )
+        .bind(&session_id)
+        .bind("33333333-3333-4333-8333-333333333333")
+        .bind(vec![5_u8; 32])
+        .bind(vec![vec![3_u8; 32]])
+        .fetch_one(pool)
+        .await
+        .is_err(),
         "resend must respect the 60-second cooldown"
     );
 
@@ -1115,9 +1122,10 @@ async fn assert_verification_database_operations(pool: &PgPool) {
 
     let failed_session_id: String = sqlx::query_scalar(
         "SELECT public.create_registration_verification_session(\
-            $1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', \
+            $1::uuid, $2::uuid, 'email', $3, $4, 'enc-v1', $5, 'hmac-v1', \
             clock_timestamp() + INTERVAL '10 minutes')::text",
     )
+    .bind("44444444-4444-4444-8444-444444444444")
     .bind(&failed_user_id)
     .bind(vec![6_u8])
     .bind(vec![7_u8])
@@ -1127,9 +1135,10 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .expect("second verification session should be created");
 
     let failed_challenge_id: String = sqlx::query_scalar(
-        "SELECT challenge_id::text FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
+        "SELECT challenge_id::text FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",
     )
     .bind(&failed_session_id)
+    .bind("55555555-5555-4555-8555-555555555555")
     .bind(vec![9_u8; 32])
     .bind(vec![vec![8_u8; 32]])
     .fetch_one(pool)
@@ -1888,13 +1897,13 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.guard_identity_audit_event()', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.create_registration_verification_session(uuid,text,bytea,bytea,text,bytea,text,timestamptz)', 'EXECUTE'), \
+                    'public.create_registration_verification_session(uuid,uuid,text,bytea,bytea,text,bytea,text,timestamptz)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
                     'public.get_registration_verification_session(uuid)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
                     'public.get_pending_otp_challenge(uuid)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.reserve_otp_challenge(uuid,bytea,text,bytea[])', 'EXECUTE'), \
+                    'public.reserve_otp_challenge(uuid,uuid,bytea,text,bytea[])', 'EXECUTE'), \
                 has_function_privilege(current_user, \
                     'public.record_otp_delivery_result(uuid,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \

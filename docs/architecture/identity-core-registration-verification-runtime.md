@@ -275,3 +275,13 @@ Hal berikut tetap terbuka dan tidak boleh ditebak:
 - Endpoint HTTP final dan kontrak frontend.
 
 Tidak ada credential atau secret yang diminta melalui chat. Jangan mengirim OTP provider key, database password, atau production secret ke repository maupun percakapan.
+
+
+### Migration 0008 — ID dibuat runtime
+
+Migration `20261122170000_bind_verification_ids_from_runtime.sql` memperbarui dua operasi database:
+
+- `create_registration_verification_session` menerima `p_session_id` dari backend dan menyimpan UUID tersebut sebagai primary key sesi.
+- `reserve_otp_challenge` menerima `p_challenge_id` dari backend dan menyimpan UUID tersebut sebagai primary key challenge.
+
+Runtime wajib membuat UUID sebelum menghitung associated data AEAD atau keyed OTP digest. Database tetap memvalidasi akun pending, purpose, kanal, expiry, rate limit, dan binding sesi/challenge. Signature lama dihapus agar tidak ada jalur fungsi lama yang masih dapat dipanggil. Bootstrap 002 memverifikasi dan memberikan EXECUTE hanya pada signature baru; akses langsung ke tabel tetap ditolak.
