@@ -3,7 +3,7 @@
 > Cakupan: baseline teknis lintas migration Identity Core.
 > Registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
-Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0014 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP serta login password Owner/Investor dan logout dengan sesi opaque. Middleware validasi sesi, pembaruan idle timeout, rotasi token, dan logout semua perangkat tersedia pada endpoint identitas. Penerapan middleware pada endpoint fitur, router registrasi publik, adapter delivery OTP produksi, integrasi KMS, dan recovery runtime belum tersedia. Key ring environment dan rate limit HTTP registrasi berbasis HMAC sudah tersedia. HTTP startup tidak menjalankan migration otomatis.
+Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0014 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP serta login password Owner/Investor dan logout dengan sesi opaque. Middleware validasi sesi, pembaruan idle timeout, rotasi token, dan logout semua perangkat tersedia pada endpoint identitas. Penerapan middleware pada endpoint fitur, router registrasi publik, adapter delivery OTP produksi, integrasi KMS, dan recovery runtime belum tersedia. Key ring environment berversi dan guard rate limit HTTP registrasi berbasis HMAC sudah tersedia. HTTP startup tidak menjalankan migration otomatis.
 
 Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0006 menghapus dukungan Google OAuth dari skema aktif. Resend dan FlowKirim menjadi target adapter pengiriman; integrasi nyata belum tersedia. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
@@ -206,7 +206,7 @@ Gerbang migration akun pertama telah dipenuhi dan hasilnya sudah di-merge ke `ma
 
 ### Migration 0002 — verifikasi kontak dan OTP
 
-Migration 0002 telah di-merge ke `main` dan lulus CI PostgreSQL. Skema menyediakan sesi verifikasi, challenge, serta event percobaan/pengiriman. Runtime OTP, provider, abstraksi key provider, dan enforcement rate limit masih merupakan pekerjaan lanjutan; batas lima kegagalan per kontak dalam 60 menit tetap wajib ditegakkan secara atomik lintas sesi dan instance.
+Migration 0002 telah di-merge ke `main` dan lulus CI PostgreSQL. Skema menyediakan sesi verifikasi, challenge, serta event percobaan/pengiriman. Runtime OTP, adapter delivery produksi, dan pemasangan router registrasi masih merupakan pekerjaan lanjutan; batas lima kegagalan per kontak dalam 60 menit tetap wajib ditegakkan secara atomik lintas sesi dan instance.
 
 ### Migration 0003 — sesi autentikasi
 
