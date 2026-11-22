@@ -260,8 +260,8 @@ pub(crate) fn encode_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn reset_url_base_requires_https_and_no_existing_fragment_or_query() {
+    #[tokio::test]
+    async fn reset_url_base_requires_https_and_no_existing_fragment_or_query() {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres://user:pass@localhost/db")
             .expect("lazy pool configuration should be valid");
