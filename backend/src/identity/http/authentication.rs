@@ -90,6 +90,9 @@ fn login_error(error_value: AuthenticationError) -> Response {
             StatusCode::UNAUTHORIZED,
             "Email/nomor telepon atau password salah.",
         ),
+        AuthenticationError::InvalidSession => {
+            error(StatusCode::UNAUTHORIZED, "Sesi tidak valid atau sudah berakhir.")
+        },
         AuthenticationError::RateLimited => error(
             StatusCode::TOO_MANY_REQUESTS,
             "Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.",
@@ -411,7 +414,7 @@ mod tests {
             HeaderValue::from_static("theme=dark; __Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
         );
         assert_eq!(
-            session_cookie(&headers).as_deref(),
+            session_cookie(&headers).map(|token| token.to_string()).as_deref(),
             Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         );
 
