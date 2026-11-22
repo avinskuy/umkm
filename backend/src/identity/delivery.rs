@@ -37,6 +37,23 @@ pub trait OtpDeliveryProvider: Send + Sync {
     ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>>;
 }
 
+/// Pesan reset password. Token hanya disertakan pada fragment URL agar tidak
+/// ikut terkirim dalam HTTP request atau access log server tujuan.
+pub struct PasswordResetDeliveryMessage {
+    pub destination: Zeroizing<String>,
+    pub channel: DeliveryChannel,
+    pub reset_url: Zeroizing<String>,
+    pub expires_at_unix: i64,
+}
+
+/// Provider terpisah dari OTP agar pesan reset tidak disalahartikan sebagai kode verifikasi.
+pub trait PasswordResetDeliveryProvider: Send + Sync {
+    fn dispatch<'a>(
+        &'a self,
+        message: PasswordResetDeliveryMessage,
+    ) -> Pin<Box<dyn Future<Output = DispatchStatus> + Send + 'a>>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
