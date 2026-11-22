@@ -5,7 +5,9 @@
 > Basis: keputusan teknis Identity Core yang telah disetujui sebagai baseline
 > Cakupan: akun, role permanen, kontak utama, dan identitas Google
 
-Dokumen ini menetapkan kontrak skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
+Dokumen ini menetapkan kontrak historis skema Identity Core slice pertama. Implementasi SQL tersedia di `backend/migrations/20261121170000_create_identity_accounts.sql` dan diuji melalui `backend/tests/postgres.rs`. Migration belum dijalankan pada database produksi dan belum mengaktifkan runtime registrasi/login.
+
+> **Catatan keputusan 22 November 2026:** migration ini masih mensyaratkan verifikasi kontak sebelum aktivasi dan belum sesuai dengan keputusan autentikasi tahap pertama (email/telepon + password atau Google OAuth tanpa OTP registrasi/login). Jangan mengubah file migration ini; buat migration lanjutan yang menyelaraskan constraint, trigger, fungsi pembuatan akun, dan tes sebelum runtime dibuat. Lihat [Keputusan Autentikasi Identity Core — Tahap Pertama](identity-core-authentication-stage-one-decision.md).
 
 Istilah **migration 0001** di dokumen ini adalah nama slice implementasi. SQLx menggunakan nama file migration berversi berbasis timestamp, bukan nomor urut literal `0001`. File implementasinya adalah `20261121170000_create_identity_accounts.sql`.
 
@@ -138,7 +140,7 @@ Aturan:
 
 - `password_hash` menyimpan encoded hash hasil password-hashing library yang dipilih kemudian. Parameter dan library final bukan bagian dari migration.
 - Registrasi email/telepon wajib menyediakan password lokal.
-- Registrasi Google OAuth tidak mewajibkan password lokal, tetapi tetap wajib memverifikasi kontak awal yang dipilih secara terpisah sebelum aktivasi.
+- Registrasi Google OAuth tidak mewajibkan password lokal. Untuk kebijakan tahap pertama, OTP tambahan tidak diminta; klaim email hanya ditandai terverifikasi bila token tervalidasi menyatakan `email_verified=true`. Ketentuan ini belum tercermin penuh dalam constraint migration historis.
 - OTP pendaftaran bukan password, bukan login credential, dan bukan token reset password.
 - `email_verified_at` dan `phone_verified_at` adalah fakta verifikasi untuk nilai kontak saat ini; ketika kontak diganti, timestamp lama tidak boleh dipakai untuk menyatakan nilai baru telah terverifikasi.
 - `initial_contact_channel` dan `initial_contact_verified_at` menyimpan provenance metode registrasi awal. Keduanya tidak berubah saat pengguna mengganti atau menghapus salah satu kontak utama setelah akun aktif.
@@ -255,7 +257,7 @@ Sebelum SQL migration dibuat, review harus memastikan:
 - [x] Tes PostgreSQL untuk constraint, role immutability, provider identity, reservasi kontak, dan konkurensi telah dijalankan di CI.
 - [x] Tidak ada kebutuhan verifikasi, session, recovery, atau audit yang terselip ke migration pertama.
 
-Migration pertama telah dibuat dan diuji pada PostgreSQL sementara. Sebelum runtime diaktifkan, tahap berikutnya tetap harus menyelesaikan bootstrap privilege untuk runtime/provisioning Admin, mengintegrasikan operasi registrasi dengan fungsi database, dan menambahkan migration verifikasi secara terpisah. Tidak ada database produksi atau deployment pada tahap ini.
+Migration pertama telah dibuat dan diuji pada PostgreSQL sementara. Sebelum runtime registrasi tahap pertama diaktifkan, buat migration lanjutan untuk menyelaraskan lifecycle akun dan status verifikasi kontak dengan keputusan autentikasi terbaru, lalu uji fungsi database, constraint, privilege, dan konkurensinya. Migration verifikasi 0002 tetap disimpan sebagai fondasi tahap OTP berikutnya. Tidak ada database produksi atau deployment pada tahap ini.
 
 ## 9. Referensi
 
