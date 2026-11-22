@@ -998,6 +998,7 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("controlled function should create a registration verification session");
+    assert_eq!(session_id, "11111111-1111-4111-8111-111111111111");
 
     let session_destination: (String, Vec<u8>, Vec<u8>, String, Vec<u8>, String) = sqlx::query_as(
         "SELECT channel, destination_ciphertext, destination_nonce, encryption_key_version, \
@@ -1026,6 +1027,7 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("controlled function should reserve a challenge and delivery event");
+    assert_eq!(challenge_id, "22222222-2222-4222-8222-222222222222");
 
     let pending_challenge: (String, Vec<u8>, String) = sqlx::query_as(
         "SELECT challenge_id::text, code_hash, hash_key_version \
