@@ -65,10 +65,11 @@ Belum ada login endpoint atau cookie sesi. Setelah verifikasi, pengguna perlu me
 ## 6. Pengujian
 
 - Validasi label versi kebijakan dan penolakan label kosong/berformat salah.
-- Validasi kanal dan pasangan kontak.
-- Format verification ID acak.
+- Validasi kanal dan pasangan kontak sebelum hashing password.
+- Format verification ID acak dan label versi kebijakan.
 - Router default tidak memasang endpoint registrasi.
-- Integration test PostgreSQL untuk create/resend/verify, rate limit, enumerasi identifier, serta dispatch provider masih menjadi gerbang sebelum router dipasang pada runtime.
+- Integration test PostgreSQL mencakup registrasi email, pengiriman melalui fake provider, verifikasi/aktivasi, serta respons generik untuk identifier duplikat.
+- Tes tambahan untuk resend, rate-limit decision, invalid/expired OTP, marketing opt-in, dan kegagalan provider masih menjadi gerbang sebelum router dipasang pada runtime.
 
 ## 7. Gerbang aktivasi
 
