@@ -1,6 +1,6 @@
 # Desain Runtime Registrasi dan Verifikasi Identity Core
 
-> **Status: rancangan untuk implementasi berikutnya.** OTP wajib untuk pendaftaran menggunakan email/WhatsApp + password. Google OAuth merupakan jalur alternatif tanpa OTP tambahan bila identitas Google tervalidasi dan email dinyatakan verified. Login rutin menggunakan password atau Google OAuth tanpa OTP.
+> **Status: rancangan untuk implementasi berikutnya.** Registrasi email + password wajib diverifikasi melalui OTP email; registrasi nomor telepon/WhatsApp + password wajib diverifikasi melalui OTP WhatsApp. Login rutin menggunakan email/nomor telepon + password tanpa OTP.
 
 > **Status nama produk:** Nama produk belum final. Nama yang pernah digunakan di repository hanya working title dan dapat diganti. Dokumen ini menggunakan istilah netral seperti *aplikasi*, *platform*, dan *layanan* agar keputusan teknis tidak mengikat identitas merek.
 
@@ -11,13 +11,13 @@
 
 ## 1. Tujuan dan prinsip
 
-Runtime tahap berikutnya harus menyelesaikan verifikasi kontak Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi email/WhatsApp + password menunggu verifikasi OTP sebelum aktivasi. Pendaftaran Google OAuth yang lolos validasi provider tidak memerlukan OTP tambahan.
+Runtime tahap berikutnya harus menyelesaikan verifikasi kontak Business Owner atau Investor tanpa membuka akses langsung aplikasi ke tabel identitas dan verifikasi. Registrasi email/WhatsApp + password menunggu verifikasi OTP sebelum aktivasi. Login sosial/OAuth tidak termasuk cakupan autentikasi saat ini.
 
 Prinsip wajib:
 1. Backend menjadi sumber kebenaran untuk validasi, role, status akun, expiry, limit, dan aktivasi.
 2. Registrasi publik hanya menerima `business_owner` atau `investor`; Admin tidak dibuat melalui jalur ini.
-3. Pendaftaran password membuat akun `pending_verification`, berlaku maksimal 30 menit, dan belum dapat login atau memakai fitur akun aktif sampai OTP valid. Jalur Google OAuth yang tervalidasi mengikuti pengecualian tanpa OTP.
-4. Aktivasi akun password hanya terjadi setelah challenge registrasi yang tepat berhasil diverifikasi dan seluruh syarat database terpenuhi. Google OAuth dapat membuat akun aktif melalui operasi terpisah yang memvalidasi token dan email_verified.
+3. Pendaftaran email/WhatsApp + password membuat akun `pending_verification`, berlaku maksimal 30 menit, dan belum dapat login atau memakai fitur akun aktif sampai OTP valid.
+4. Aktivasi akun hanya terjadi setelah challenge registrasi yang tepat berhasil diverifikasi dan seluruh syarat database terpenuhi.
 5. Pembuatan akun, sesi verifikasi, dan audit awal harus atomik.
 6. Challenge OTP hanya dapat dipakai sekali; resend menggantikan challenge lama.
 7. Penghitung dan batas lintas sesi disimpan serta diserialisasi di PostgreSQL, bukan hanya di memori proses.
@@ -35,7 +35,6 @@ Backend menerima role klien, satu kanal kontak awal, kontak yang sesuai kanal, d
 - Nomor telepon dinormalisasi ke E.164.
 - Tepat satu kontak awal dipilih: email atau WhatsApp.
 - Tepat satu metode autentikasi awal digunakan sesuai kontrak Identity Core.
-- Google subject hanya diterima dari proses OAuth yang telah memvalidasi identitas provider; tidak boleh dipercaya dari payload klien.
 - Password plaintext hanya berada sementara di memori pada boundary request. Jangan teruskan ke repository, audit, tracing, atau database.
 - Respons publik untuk konflik kontak harus generik dan tidak menjadi oracle enumerasi akun.
 
@@ -60,8 +59,6 @@ Dalam satu transaksi PostgreSQL:
 2. Buat `verification_sessions` dengan `purpose='registration'`, `user_id` wajib, kanal email atau WhatsApp sesuai kontak awal, tujuan terenkripsi, fingerprint HMAC, dan expiry tidak melewati `users.pending_expires_at`.
 3. Buat audit event `identity.registration.requested`.
 4. Commit seluruh perubahan bersama-sama.
-
-Pendaftaran Google OAuth tidak membuat sesi OTP registrasi. Jalur itu harus memvalidasi token provider, state/nonce, stable subject, serta email_verified sebelum membuat akun dan identitas Google dalam transaksi atomik; role tetap wajib dipilih dan terikat ke state. **Migration 0001 saat ini belum mendukung hasil akhir tersebut:** `create_client_user` selalu membuat status pending dan tidak merekam email_verified. Buat migration lanjutan dan tes terpisah sebelum mengaktifkan jalur Google tanpa OTP.
 
 Jika satu langkah gagal, seluruh transaksi rollback. Unique reservation kontak utama tetap menjadi pengaman race antarregistrasi.
 
@@ -239,7 +236,7 @@ CI menjalankan format, Clippy, unit tests, PostgreSQL integration tests dengan p
 
 ## 10. Tahapan implementasi
 
-Tahapan pada dokumen ini baru dimulai setelah autentikasi password/Google tahap pertama berjalan dan kebutuhan verifikasi kontak disetujui. Urutan tahap verifikasi berikutnya:
+Tahapan pada dokumen ini dimulai setelah fondasi registrasi password dan verifikasi OTP disetujui untuk implementasi runtime. Urutan tahap verifikasi berikutnya:
 1. **Database operations:** migration dan operasi terkontrol untuk sesi/challenge/rate limit serta bootstrap privilege sempit.
 2. **Verification orchestration:** sesi verifikasi, fake delivery provider, audit, dan transaksi atomik.
 3. **OTP lifecycle:** issue/resend, dispatch result, verify, lock, dan cross-session limits.
