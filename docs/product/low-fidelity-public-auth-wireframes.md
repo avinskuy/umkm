@@ -196,14 +196,15 @@ Kedua halaman login menggunakan tata letak yang sama. Perbedaannya hanya pada ju
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │   ┌───────────────────────────────┐    ┌────────────────────────────────┐  │
-│   │ KONTEKS AUTENTIKASI                  │    │ MASUK SEBAGAI                  │  │
+│   │ KONTEKS AUTENTIKASI           │    │ MASUK SEBAGAI                  │  │
 │   │                               │    │ [Pemilik Usaha / Investor]     │  │
-│   │ Pesan singkat sesuai role   │    │                                │  │
-│   │ dan ilustrasi sederhana │    │ [Email atau nomor telepon]     │  │
+│   │ Pesan singkat sesuai role     │    │                                │  │
+│   │ dan ilustrasi sederhana       │    │ [Email atau nomor telepon]     │  │
 │   │                               │    │ [Kata sandi             (eye)]  │  │
 │   │                               │    │ (Lupa kata sandi?)             │  │
 │   │                               │    │ [Masuk]                        │  │
-│   │                               │   │                               │    │ Belum punya akun? [Daftar]     │  │
+│   │                               │    │                                │  │
+│   │                               │    │ Belum punya akun? [Daftar]     │  │
 │   └───────────────────────────────┘    └────────────────────────────────┘  │
 │                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -219,14 +220,13 @@ Kedua halaman login menggunakan tata letak yang sama. Perbedaannya hanya pada ju
 │                             │
 │ MASUK SEBAGAI               │
 │ Pemilik Usaha / Investor    │
-│ Deskripsi singkat sesuai role    │
+│ Deskripsi singkat sesuai role│
 │                             │
 │ [Email atau nomor telepon]  │
 │ [Kata sandi           (eye)]│
 │ (Lupa kata sandi?)          │
 │                             │
 │ [Masuk]                     │
-│                             │
 │                             │
 │ Belum punya akun? [Daftar]  │
 │                             │
