@@ -71,9 +71,6 @@ mod tests {
         let ipv6_b: IpAddr = "2001:db8:abcd:12::ffff".parse().unwrap();
 
         assert_eq!(ip_rate_limit_subject(ipv4).len(), 5);
-        assert_eq!(
-            ip_rate_limit_subject(ipv6_a),
-            ip_rate_limit_subject(ipv6_b)
-        );
+        assert_eq!(ip_rate_limit_subject(ipv6_a), ip_rate_limit_subject(ipv6_b));
     }
 }
