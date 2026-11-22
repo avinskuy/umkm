@@ -2115,24 +2115,21 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     };
 
     let incorrect_code = if code == "000000" { "000001" } else { "000000" };
-    assert!(
-        !service
-            .verify(&started.session_id, incorrect_code)
-            .await
-            .expect("incorrect OTP should be recorded as a failed attempt")
-    );
+    assert!(!service
+        .verify(&started.session_id, incorrect_code)
+        .await
+        .expect("incorrect OTP should be recorded as a failed attempt"));
     assert!(service
         .verify(&started.session_id, &code)
         .await
         .expect("correct OTP should verify and activate the pending account"));
 
-    let account_status: String = sqlx::query_scalar(
-        "SELECT account_status FROM public.users WHERE id = $1::uuid",
-    )
-    .bind(&started.user_id)
-    .fetch_one(migrator_pool)
-    .await
-    .expect("test migrator should inspect the activated account");
+    let account_status: String =
+        sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
+            .bind(&started.user_id)
+            .fetch_one(migrator_pool)
+            .await
+            .expect("test migrator should inspect the activated account");
     assert_eq!(account_status, "active");
 
     let email_audit_counts: (i64, i64, i64, i64) = sqlx::query_as(
@@ -2210,4 +2207,3 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .expect("migrator should inspect delivery result audit events");
     assert!(accepted_delivery_audits >= 3);
 }
-
