@@ -42,11 +42,11 @@ Daftar ini menunjukkan batas tanggung jawab secara logis, bukan kewajiban untuk 
 
 ## Keputusan Identity Core
 
-Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Skema Identity Core tersedia melalui migration 0001–0010, mencakup akun, verifikasi, sesi, pemulihan, audit, penghapusan dukungan OAuth, operasi database verifikasi, pengikatan ID verifikasi, audit runtime verifikasi, serta profil dan penerimaan kebijakan. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP. Login dan login kembali setelah logout ditetapkan menggunakan password tanpa OTP rutin, tetapi endpoint login/logout, sesi HTTP, adapter provider nyata, dan recovery runtime belum tersedia.
+Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Skema Identity Core tersedia melalui migration 0001–0011, mencakup akun, verifikasi, sesi, pemulihan, audit, penghapusan dukungan OAuth, operasi database verifikasi, pengikatan ID verifikasi, audit runtime verifikasi, profil dan penerimaan kebijakan, serta kebijakan resend OTP saat lock verifikasi. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP. Login dan login kembali setelah logout ditetapkan menggunakan password tanpa OTP rutin, tetapi endpoint login/logout, sesi HTTP, adapter provider nyata, dan recovery runtime belum tersedia.
 
 ## Skema database
 
-Model relasional, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Migration Identity Core 0001–0010 tersedia dan tercakup dalam pengujian PostgreSQL di CI. Migration tersebut mencakup akun, verifikasi, sesi, pemulihan, audit, serta operasi runtime registrasi; migration domain produk lainnya belum tersedia. Penerapan migration dilakukan secara eksplisit melalui principal migrator dan tetap terpisah dari startup HTTP maupun deployment produksi.
+Model relasional, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Migration Identity Core 0001–0011 tersedia dan tercakup dalam pengujian PostgreSQL di CI. Migration tersebut mencakup akun, verifikasi, sesi, pemulihan, audit, serta operasi runtime registrasi; migration domain produk lainnya belum tersedia. Penerapan migration dilakukan secara eksplisit melalui principal migrator dan tetap terpisah dari startup HTTP maupun deployment produksi.
 
 ## Akses data dan privasi
 
