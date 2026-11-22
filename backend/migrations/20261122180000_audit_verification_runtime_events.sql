@@ -15,7 +15,7 @@ RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 DECLARE
     v_user public.users%ROWTYPE;
 BEGIN
@@ -65,7 +65,7 @@ BEGIN
 
     RETURN p_session_id;
 END;
-$;
+$$;
 
 
 CREATE OR REPLACE FUNCTION public.reserve_otp_challenge(
