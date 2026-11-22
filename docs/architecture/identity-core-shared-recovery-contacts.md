@@ -88,21 +88,21 @@ Rancangan constraint dan indeks harus membedakan kontak utama pada users dari re
 
 ## 7. Invariant database dan runtime
 
-- [ ] verification_sessions.user_id nullable hanya untuk purpose pemulihan sebelum pemilihan akun.
-- [ ] Setiap account_recovery_cases memiliki tepat satu verification_session_id yang wajib dan unique; satu sesi hanya memiliki maksimal satu kasus. OTP resend memakai kasus/sesi yang sama, percobaan baru membuat keduanya baru.
-- [ ] account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; target dikaitkan atomik setelah pemeriksaan.
-- [ ] Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
-- [ ] Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
-- [ ] Relasi kontak yang sama tidak dapat didaftarkan dua kali pada akun yang sama, tetapi tetap boleh dipakai akun berbeda.
-- [ ] Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
-- [ ] Nilai kontak yang perlu dipakai kembali dilindungi dengan enkripsi yang sesuai.
-- [ ] OTP terikat pada purpose, kanal, dan kontak; tidak dapat dipakai lintas akun atau tujuan.
-- [ ] Pemilihan akun tidak membocorkan daftar atau jumlah akun kepada pihak yang belum berwenang.
-- [ ] Pengaitan akun tujuan atomik, satu kali, dan diaudit.
-- [ ] Rate limit berlaku lintas sesi dan instance serta tahan terhadap request bersamaan.
-- [ ] Kontak utama tetap direservasi selama masa tunggu penghapusan 30 hari.
-- [ ] Kontak pemulihan email dan nomor HP tidak ikut terkena aturan keunikan kontak utama.
-- [ ] Tes integrasi mencakup kontak bersama, beberapa akun, pemilihan akun, enumerasi, concurrency, penguncian, kedaluwarsa, pembatalan penghapusan, dan pelepasan reservasi.
+- verification_sessions.user_id nullable hanya untuk purpose pemulihan sebelum pemilihan akun.
+- Setiap account_recovery_cases memiliki tepat satu verification_session_id yang wajib dan unique; satu sesi hanya memiliki maksimal satu kasus. OTP resend memakai kasus/sesi yang sama, percobaan baru membuat keduanya baru.
+- account_recovery_cases.target_user_id nullable hanya sebelum akun tujuan dipilih; target dikaitkan atomik setelah pemeriksaan.
+- Constraint/check atau validasi transaksi menolak kombinasi purpose/status/relasi yang tidak sah.
+- Email dan nomor HP pemulihan dapat terhubung ke beberapa akun tanpa unique constraint global.
+- Relasi kontak yang sama tidak dapat didaftarkan dua kali pada akun yang sama, tetapi tetap boleh dipakai akun berbeda.
+- Pencarian kontak pemulihan menggunakan keyed hash yang aman dan indeks non-unik.
+- Nilai kontak yang perlu dipakai kembali dilindungi dengan enkripsi yang sesuai.
+- OTP terikat pada purpose, kanal, dan kontak; tidak dapat dipakai lintas akun atau tujuan.
+- Pemilihan akun tidak membocorkan daftar atau jumlah akun kepada pihak yang belum berwenang.
+- Pengaitan akun tujuan atomik, satu kali, dan diaudit.
+- Rate limit berlaku lintas sesi dan instance serta tahan terhadap request bersamaan.
+- Kontak utama tetap direservasi selama masa tunggu penghapusan 30 hari.
+- Kontak pemulihan email dan nomor HP tidak ikut terkena aturan keunikan kontak utama.
+- Tes integrasi mencakup kontak bersama, beberapa akun, pemilihan akun, enumerasi, concurrency, penguncian, kedaluwarsa, pembatalan penghapusan, dan pelepasan reservasi.
 
 Migration dan operasi database untuk recovery telah tersedia. Perubahan skema berikutnya harus menggunakan migration baru dan mempertahankan invariant yang dijelaskan pada dokumen ini.
 
