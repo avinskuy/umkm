@@ -996,12 +996,25 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .await
     .expect("an active Admin reviewer should be provisioned for the test");
 
+    let reviewer_session_token = "b".repeat(64);
+    let reviewer_session_hash = hash_session_token(&reviewer_session_token);
+    sqlx::query(
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
+    )
+    .bind(&reviewer_id)
+    .bind(reviewer_session_hash.to_vec())
+    .execute(&admin_pool)
+    .await
+    .expect("active Admin session should be created for review");
+
     let review_service = RecoveryReviewService::new(&pool);
     assert!(
         review_service
             .review_case(
                 &recovery_case_id,
                 &registered.user_id,
+                &session_token,
                 RecoveryReviewDecision::Approve,
                 RecoveryReviewReason::OwnershipConfirmed,
             )
@@ -1014,6 +1027,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .review_case(
             &recovery_case_id,
             &reviewer_id,
+            &reviewer_session_token,
             RecoveryReviewDecision::Approve,
             RecoveryReviewReason::OwnershipConfirmed,
         )
