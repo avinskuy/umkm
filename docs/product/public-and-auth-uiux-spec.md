@@ -187,7 +187,7 @@ Sediakan tautan ke halaman login Investor. Server wajib menegakkan kecocokan rol
 - Kredensial tidak valid: **Email/nomor atau kata sandi belum sesuai. Periksa kembali lalu coba lagi.**
 - Rate limit: jelaskan bahwa percobaan masuk dibatasi sementara dan kapan pengguna dapat mencoba lagi jika waktunya diketahui.
 - Gangguan jaringan/server: **Belum bisa terhubung. Periksa koneksi lalu coba lagi.**
-- Kontak belum diverifikasi: arahkan ke alur verifikasi yang sesuai.
+- Kontak belum diverifikasi: pengguna tetap dapat login dengan password yang benar, tetapi kontak tidak boleh dipakai untuk pemulihan atau tindakan sensitif sampai dibuktikan kepemilikannya.
 - Jangan mengungkap apakah email atau nomor telepon terdaftar.
 - Sediakan jalur bantuan untuk masalah akses akun yang berulang.
 
@@ -302,7 +302,7 @@ Minta hanya field yang relevan dengan tahap yang dipilih:
 
 ### Halaman permintaan — `/lupa-kata-sandi`
 
-- Terima email atau nomor telepon akun yang sudah diverifikasi sebagai tujuan pemulihan, dengan challenge pemulihan terpisah. Kode aktivasi pendaftaran tidak boleh digunakan ulang.
+- Hanya terima kanal pemulihan yang sudah dibuktikan kepemilikannya. Kontak awal yang belum diverifikasi tidak boleh menjadi tujuan reset. Akun Google-only menggunakan pemulihan Google; akun telepon-only belum dapat dipulihkan melalui nomor sampai verifikasi telepon tersedia. Jangan merilis reset password sebelum kanal pengiriman token yang aman tersedia.
 - Gunakan pesan konfirmasi netral, baik akun ada maupun tidak.
 - Terapkan rate limit dan pemantauan penyalahgunaan.
 - Jangan mengungkap keberadaan akun.
