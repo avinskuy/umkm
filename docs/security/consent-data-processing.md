@@ -40,7 +40,9 @@ Setiap tujuan harus tetap dibatasi pada data yang relevan. Data yang tersedia ba
 - Penolakan atau pencabutan persetujuan marketing tidak boleh menghilangkan akses ke fungsi inti yang tidak bergantung pada aktivitas marketing.
 - Persetujuan untuk berbagi dokumen privat atau informasi bisnis kepada pihak tertentu harus spesifik dan terpisah dari persetujuan umum.
 - Jangan menggunakan kotak pilihan yang sudah dicentang sebelumnya untuk persetujuan opsional.
-- Catat versi pemberitahuan, tujuan, ruang lingkup, waktu, pilihan pengguna, dan perubahan atau pencabutan persetujuan.\n- Penerimaan Terms of Service dan Privacy Policy dicatat terpisah per versi sebagai bukti penerimaan wajib.\n- Persetujuan marketing dicatat sebagai event pemberian atau pencabutan yang terpisah dan append-only; tidak adanya event pemberian berarti marketing tidak disetujui.
+- Catat versi pemberitahuan, tujuan, ruang lingkup, waktu, pilihan pengguna, dan perubahan atau pencabutan persetujuan.
+- Penerimaan Terms of Service dan Privacy Policy dicatat terpisah per versi sebagai bukti penerimaan wajib.
+- Persetujuan marketing dicatat sebagai event pemberian atau pencabutan yang terpisah dan append-only; tidak adanya event pemberian berarti marketing tidak disetujui.
 
 ## 4. Perubahan tujuan pemrosesan
 
