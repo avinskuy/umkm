@@ -327,3 +327,22 @@ async fn verify(
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forwarded_client_ip_is_trusted_only_from_loopback_proxy() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-real-ip", "203.0.113.7".parse().unwrap());
+        assert_eq!(
+            resolved_client_ip(&headers, "127.0.0.1".parse().unwrap()),
+            "203.0.113.7".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            resolved_client_ip(&headers, "198.51.100.8".parse().unwrap()),
+            "198.51.100.8".parse::<IpAddr>().unwrap()
+        );
+    }
+}
