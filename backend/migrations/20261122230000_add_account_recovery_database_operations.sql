@@ -438,7 +438,7 @@ BEGIN
 
     RETURN TRUE;
 END;
-$;
+$$;
 
 CREATE FUNCTION public.bind_account_recovery_session_to_account(
     p_case_id UUID,
