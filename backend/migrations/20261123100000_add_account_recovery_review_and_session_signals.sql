@@ -27,6 +27,7 @@ CREATE TABLE public.account_recovery_review_decisions (
     recovery_case_id UUID NOT NULL UNIQUE,
     target_user_id UUID NOT NULL,
     reviewer_user_id UUID NOT NULL,
+    reviewer_session_id UUID NOT NULL,
     decision TEXT NOT NULL,
     reason_code TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
@@ -37,6 +38,9 @@ CREATE TABLE public.account_recovery_review_decisions (
     CONSTRAINT account_recovery_review_reviewer_fk
         FOREIGN KEY (reviewer_user_id)
         REFERENCES public.users (id) ON DELETE RESTRICT,
+    CONSTRAINT account_recovery_review_session_fk
+        FOREIGN KEY (reviewer_session_id)
+        REFERENCES public.sessions (id) ON DELETE RESTRICT,
     CONSTRAINT account_recovery_review_decision_check
         CHECK (decision IN ('approved', 'rejected')),
     CONSTRAINT account_recovery_review_reason_check
@@ -162,6 +166,7 @@ BEGIN
         pg_catalog.jsonb_build_object(
             'purpose', 'account_recovery',
             'recovery_case_id', p_case_id::text,
+            'session_id', v_reviewer_session_id::text,
             'session_id', v_session_id::text
         )
     );
@@ -173,6 +178,7 @@ $$;
 CREATE FUNCTION public.review_account_recovery_case(
     p_case_id UUID,
     p_reviewer_user_id UUID,
+    p_reviewer_session_token_hash BYTEA,
     p_decision TEXT,
     p_reason_code TEXT
 )
@@ -185,13 +191,14 @@ DECLARE
     v_target_user_id UUID;
     v_requested_action TEXT;
     v_case_status TEXT;
-    v_reviewer_role TEXT;
-    v_reviewer_status TEXT;
+    v_reviewer_session_id UUID;
     v_target_status TEXT;
     v_action_code TEXT;
 BEGIN
     IF p_case_id IS NULL
        OR p_reviewer_user_id IS NULL
+       OR p_reviewer_session_token_hash IS NULL
+       OR octet_length(p_reviewer_session_token_hash) <> 32
        OR p_decision IS NULL
        OR p_reason_code IS NULL
        OR p_decision NOT IN ('approved', 'rejected')
@@ -221,16 +228,21 @@ BEGIN
             USING ERRCODE = 'P0002';
     END IF;
 
-    SELECT primary_role, account_status
-      INTO v_reviewer_role, v_reviewer_status
-      FROM public.users
-     WHERE id = p_reviewer_user_id
-     FOR SHARE;
+    SELECT s.id
+      INTO v_reviewer_session_id
+      FROM public.sessions AS s
+      JOIN public.users AS u ON u.id = s.user_id
+     WHERE s.token_hash = p_reviewer_session_token_hash
+       AND s.user_id = p_reviewer_user_id
+       AND s.revoked_at IS NULL
+       AND s.expires_at > clock_timestamp()
+       AND s.last_seen_at > clock_timestamp() - INTERVAL '7 days'
+       AND u.primary_role = 'admin'
+       AND u.account_status = 'active'
+       AND p_reviewer_user_id <> v_target_user_id
+     FOR SHARE OF s, u;
 
-    IF NOT FOUND
-       OR v_reviewer_role <> 'admin'
-       OR v_reviewer_status <> 'active'
-       OR p_reviewer_user_id = v_target_user_id THEN
+    IF NOT FOUND THEN
         RAISE EXCEPTION 'recovery reviewer is not authorized'
             USING ERRCODE = '42501';
     END IF;
@@ -252,10 +264,10 @@ BEGIN
     END IF;
 
     INSERT INTO public.account_recovery_review_decisions (
-        recovery_case_id, target_user_id, reviewer_user_id, decision, reason_code
+        recovery_case_id, target_user_id, reviewer_user_id, reviewer_session_id, decision, reason_code
     )
     VALUES (
-        p_case_id, v_target_user_id, p_reviewer_user_id, p_decision, p_reason_code
+        p_case_id, v_target_user_id, p_reviewer_user_id, v_reviewer_session_id, p_decision, p_reason_code
     );
 
     UPDATE public.account_recovery_cases
@@ -291,7 +303,7 @@ REVOKE ALL ON TABLE public.account_recovery_case_signals FROM PUBLIC;
 REVOKE ALL ON TABLE public.account_recovery_review_decisions FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.guard_account_recovery_append_only() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_account_recovery_session_signal(UUID, BYTEA) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.review_account_recovery_case(UUID, UUID, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.review_account_recovery_case(UUID, UUID, BYTEA, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON TABLE public.account_recovery_case_signals IS
     'Append-only supplemental signals for manual account recovery review; an active prior session is not sufficient by itself to approve recovery.';
@@ -299,5 +311,5 @@ COMMENT ON TABLE public.account_recovery_review_decisions IS
     'Append-only manual review decisions tied to an active Admin reviewer and the selected recovery target.';
 COMMENT ON FUNCTION public.record_account_recovery_session_signal(UUID, BYTEA) IS
     'Records a match only when a valid, non-revoked, non-idle session for the selected account predates the recovery case.';
-COMMENT ON FUNCTION public.review_account_recovery_case(UUID, UUID, TEXT, TEXT) IS
-    'Applies an Admin review decision atomically, validating active Admin role, selected active target, reason code, state transition, and audit event.';
+COMMENT ON FUNCTION public.review_account_recovery_case(UUID, UUID, BYTEA, TEXT, TEXT) IS
+    'Applies an Admin review decision atomically, validating an active Admin session, selected active target, reason code, state transition, and audit event.';
