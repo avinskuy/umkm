@@ -2074,19 +2074,19 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("audit reader privileges should be queryable");
     assert_eq!(audit_reader_access, (true, false));
 
-    assert_verification_orchestration(&app_pool).await;
+    assert_verification_orchestration(&app_pool, pool).await;
 
     app_pool.close().await;
     admin_pool.close().await;
 }
 
-async fn assert_verification_orchestration(pool: &PgPool) {
+async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &PgPool) {
     let keys = VerificationTestKeys;
     let delivery = FakeOtpDelivery {
         messages: Mutex::new(Vec::new()),
         status: DispatchStatus::Accepted,
     };
-    let service = VerificationService::new(pool, &keys, &delivery);
+    let service = VerificationService::new(app_pool, &keys, &delivery);
     let registration = ClientRegistration {
         role: ClientRole::BusinessOwner,
         initial_contact_channel: ContactChannel::Email,
@@ -2129,7 +2129,7 @@ async fn assert_verification_orchestration(pool: &PgPool) {
         "SELECT account_status FROM public.users WHERE id = $1::uuid",
     )
     .bind(&started.user_id)
-    .fetch_one(pool)
+    .fetch_one(migrator_pool)
     .await
     .expect("test migrator should inspect the activated account");
     assert_eq!(account_status, "active");
