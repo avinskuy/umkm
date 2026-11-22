@@ -973,19 +973,17 @@ async fn assert_verification_schema_invariants(pool: &PgPool) {
     );
 }
 
-
 async fn assert_verification_database_operations(pool: &PgPool) {
-    let user_id: String = sqlx::query_scalar(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
-    )
-    .bind("business_owner")
-    .bind("email")
-    .bind("otp-operations-owner@example.test")
-    .bind(Option::<String>::None)
-    .bind("encoded-password-hash")
-    .fetch_one(pool)
-    .await
-    .expect("pending account should be created for OTP database operations");
+    let user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
+            .bind("business_owner")
+            .bind("email")
+            .bind("otp-operations-owner@example.test")
+            .bind(Option::<String>::None)
+            .bind("encoded-password-hash")
+            .fetch_one(pool)
+            .await
+            .expect("pending account should be created for OTP database operations");
 
     let session_id: String = sqlx::query_scalar(
         "SELECT public.create_registration_verification_session(\
@@ -1018,10 +1016,8 @@ async fn assert_verification_database_operations(pool: &PgPool) {
         .expect("provider acceptance should be recorded");
 
     assert!(
-        sqlx::query(
-            "SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
-        )
-        .bind(&session_id)
+        sqlx::query("SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",)
+            .bind(&session_id)
         .bind(vec![5_u8; 32])
         .bind(vec![vec![3_u8; 32]])
         .fetch_one(pool)
@@ -1057,26 +1053,24 @@ async fn assert_verification_database_operations(pool: &PgPool) {
             .expect("verification session status should be queryable");
     assert_eq!(session_status, "verified");
 
-    let challenge_status: String = sqlx::query_scalar(
-        "SELECT status FROM public.verification_challenges WHERE id = $1::uuid",
-    )
-    .bind(&challenge_id)
-    .fetch_one(pool)
-    .await
-    .expect("challenge status should be queryable");
+    let challenge_status: String =
+        sqlx::query_scalar("SELECT status FROM public.verification_challenges WHERE id = $1::uuid")
+            .bind(&challenge_id)
+            .fetch_one(pool)
+            .await
+            .expect("challenge status should be queryable");
     assert_eq!(challenge_status, "consumed");
 
-    let failed_user_id: String = sqlx::query_scalar(
-        "SELECT public.create_client_user($1, $2, $3, $4, $5)::text",
-    )
-    .bind("investor")
-    .bind("email")
-    .bind("otp-failure-owner@example.test")
-    .bind(Option::<String>::None)
-    .bind("encoded-password-hash")
-    .fetch_one(pool)
-    .await
-    .expect("second pending account should be created");
+    let failed_user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
+            .bind("investor")
+            .bind("email")
+            .bind("otp-failure-owner@example.test")
+            .bind(Option::<String>::None)
+            .bind("encoded-password-hash")
+            .fetch_one(pool)
+            .await
+            .expect("second pending account should be created");
 
     let failed_session_id: String = sqlx::query_scalar(
         "SELECT public.create_registration_verification_session(\
