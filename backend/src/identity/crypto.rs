@@ -16,6 +16,7 @@ const DIGEST_LEN: usize = 32;
 
 const CONTACT_DOMAIN: &[u8] = b"identity:contact-fingerprint:v1\0";
 const OTP_DOMAIN: &[u8] = b"identity:otp-verification:v1\0";
+const DEVICE_DOMAIN: &[u8] = b"identity:device-ip-prefix:v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeyPurpose {
