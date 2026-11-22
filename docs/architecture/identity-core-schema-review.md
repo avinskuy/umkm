@@ -3,7 +3,7 @@
 > Cakupan: hasil review skema, migration, privilege, dan kontrak runtime Identity Core.
 > Status implementasi harus dibaca bersama hasil CI dan kondisi deployment; migration yang tersedia belum berarti telah diterapkan pada database produksi.
 
-Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Migration 0001–0010 serta skrip bootstrap principal dan grant tersedia di repository dan diuji melalui CI. Migration dan bootstrap tidak dijalankan otomatis oleh HTTP runtime; penerapan pada database produksi merupakan operasi terpisah.
+Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Migration 0001–0011 serta skrip bootstrap principal dan grant tersedia di repository dan diuji melalui CI. Migration dan bootstrap tidak dijalankan otomatis oleh HTTP runtime; penerapan pada database produksi merupakan operasi terpisah.
 
 Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0001–0010 membentuk baseline skema saat ini; seluruh migration yang sudah diterapkan pada database bersama harus diperlakukan immutable. Lihat [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
