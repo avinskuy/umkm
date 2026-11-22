@@ -439,4 +439,3 @@ async fn select_account(
         Err(error_value) => recovery_error(error_value),
     }
 }
-
