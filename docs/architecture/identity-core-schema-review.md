@@ -11,7 +11,7 @@ Registrasi publik menggunakan email + password dengan OTP email atau nomor telep
 
 - Backend menggunakan Rust, Axum, Tokio, dan SQLx 0.8 dengan PostgreSQL 16 sebagai baseline.
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
-- `backend/migrations/` memiliki migration Identity Core 0001–0013, termasuk penghapusan OAuth, operasi database verifikasi, binding ID runtime, audit runtime verifikasi, profil publik, dan penerimaan kebijakan.
+- `backend/migrations/` memiliki migration Identity Core 0001–0016, termasuk penghapusan OAuth, operasi database verifikasi, binding ID runtime, audit runtime verifikasi, profil publik, dan penerimaan kebijakan.
 - HTTP server menyediakan `GET /api/v1/health` dan `GET /api/v1/readyz`. Pool PostgreSQL diinisialisasi saat startup menggunakan principal aplikasi.
 - Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, autentikasi password-only, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
 - Migration 0001–0016 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
