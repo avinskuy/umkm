@@ -163,5 +163,5 @@ COMMENT ON FUNCTION public.get_active_password_login_session(BYTEA) IS
     'Memvalidasi sesi opaque yang belum dicabut, belum melewati expiry absolut 30 hari atau idle 7 hari, memastikan akun aktif, dan memperbarui last_seen_at secara atomik.';
 COMMENT ON FUNCTION public.rotate_active_password_login_session(BYTEA, BYTEA) IS
     'Merotasi hash token sesi aktif secara atomik tanpa memperpanjang expiry absolut; token lama langsung tidak berlaku.';
-COMMENT ON FUNCTION public.revoke_all_password_login_sessions(UUID) IS
+COMMENT ON FUNCTION public.revoke_all_password_login_sessions(BYTEA) IS
     'Mencabut seluruh sesi aktif milik pemegang token sesi aktif yang diberikan dengan reason logout_all.';
