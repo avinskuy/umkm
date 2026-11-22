@@ -174,14 +174,14 @@ async fn register(
 
     let password_hash =
         match tokio::task::spawn_blocking(move || hash_password(password.as_bytes())).await {
-        Ok(Ok(hash)) => hash,
-        _ => {
-            return error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "Pendaftaran sementara tidak dapat diproses.",
-            );
-        }
-    };
+            Ok(Ok(hash)) => hash,
+            _ => {
+                return error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Pendaftaran sementara tidak dapat diproses.",
+                );
+            }
+        };
 
     let registration = ClientRegistration {
         display_name,
