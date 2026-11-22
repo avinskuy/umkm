@@ -7,6 +7,7 @@ use ring::{
     aead, hmac,
     rand::{SecureRandom, SystemRandom},
 };
+use std::net::IpAddr;
 use zeroize::Zeroizing;
 
 const KEY_LEN: usize = 32;
@@ -21,6 +22,7 @@ pub enum KeyPurpose {
     DataEncryption,
     ContactFingerprint,
     OtpVerification,
+    DeviceFingerprint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -199,6 +201,71 @@ pub fn decrypt(
     Ok(buffer)
 }
 
+/// Fingerprint prefix IP untuk sinyal risiko sesi; alamat IP mentah tidak disimpan.
+pub fn device_ip_fingerprint(
+    provider: &dyn KeyProvider,
+    ip: IpAddr,
+) -> Result<KeyedDigest, CryptoError> {
+    let versioned_key = provider.active_key(KeyPurpose::DeviceFingerprint)?;
+    device_ip_fingerprint_with_key(versioned_key.version, &versioned_key.key, ip)
+}
+
+/// Alias fingerprint untuk semua versi key perangkat yang masih didukung saat rotasi.
+pub fn device_ip_fingerprint_aliases(
+    provider: &dyn KeyProvider,
+    ip: IpAddr,
+) -> Result<Vec<KeyedDigest>, CryptoError> {
+    let active = provider.active_key(KeyPurpose::DeviceFingerprint)?;
+    let mut versions = provider.key_versions(KeyPurpose::DeviceFingerprint)?;
+    versions.push(active.version);
+    versions.sort_by_key(|version| version.0);
+    versions.dedup();
+
+    versions
+        .into_iter()
+        .map(|version| {
+            if version == active.version {
+                device_ip_fingerprint_with_key(version, &active.key, ip)
+            } else {
+                let key = provider.key(KeyPurpose::DeviceFingerprint, version)?;
+                device_ip_fingerprint_with_key(version, &key, ip)
+            }
+        })
+        .collect()
+}
+
+fn device_ip_fingerprint_with_key(
+    version: KeyVersion,
+    key_material: &SecretKey,
+    ip: IpAddr,
+) -> Result<KeyedDigest, CryptoError> {
+    let mut input = Zeroizing::new(DEVICE_DOMAIN.to_vec());
+    append_field(&mut input, &device_ip_prefix_subject(ip))?;
+    let key = hmac::Key::new(hmac::HMAC_SHA256, key_material.expose());
+    let tag = hmac::sign(&key, &input);
+    let mut digest = [0_u8; DIGEST_LEN];
+    digest.copy_from_slice(tag.as_ref());
+    Ok(KeyedDigest {
+        key_version: version,
+        digest,
+    })
+}
+
+fn device_ip_prefix_subject(ip: IpAddr) -> Vec<u8> {
+    match ip {
+        IpAddr::V4(address) => {
+            let mut subject = vec![4_u8];
+            subject.extend_from_slice(&address.octets()[..3]);
+            subject
+        }
+        IpAddr::V6(address) => {
+            let mut subject = vec![6_u8];
+            subject.extend_from_slice(&address.octets()[..7]);
+            subject
+        }
+    }
+}
+
 /// Fingerprint kontak untuk pencarian/rate-limit tanpa menyimpan kontak plaintext.
 pub fn contact_fingerprint(
     provider: &dyn KeyProvider,
@@ -370,6 +437,7 @@ mod tests {
                 KeyPurpose::DataEncryption => 0x11,
                 KeyPurpose::ContactFingerprint => 0x22,
                 KeyPurpose::OtpVerification => 0x33,
+                KeyPurpose::DeviceFingerprint => 0x44,
             };
             Ok(SecretKey::from_bytes([marker; KEY_LEN]))
         }
@@ -439,6 +507,7 @@ mod tests {
                 (KeyPurpose::ContactFingerprint, KeyVersion(7)) => 0x77,
                 (KeyPurpose::DataEncryption, _) => 0x11,
                 (KeyPurpose::OtpVerification, _) => 0x33,
+                (KeyPurpose::DeviceFingerprint, _) => 0x44,
                 _ => return Err(CryptoError::KeyUnavailable),
             };
             Ok(SecretKey::from_bytes([marker; KEY_LEN]))
@@ -511,6 +580,28 @@ mod tests {
             &digest.digest,
         )
         .unwrap());
+    }
+
+    #[test]
+    fn device_ip_fingerprints_group_prefixes_without_storing_raw_addresses() {
+        let provider = TestKeyProvider;
+        let first_v4 = device_ip_fingerprint(&provider, "203.0.113.10".parse().unwrap()).unwrap();
+        let second_v4 = device_ip_fingerprint(&provider, "203.0.113.240".parse().unwrap()).unwrap();
+        let other_v4 = device_ip_fingerprint(&provider, "203.0.114.10".parse().unwrap()).unwrap();
+        assert_eq!(first_v4.digest, second_v4.digest);
+        assert_ne!(first_v4.digest, other_v4.digest);
+
+        let first_v6 = device_ip_fingerprint(&provider, "2001:db8:abcd:1200::1".parse().unwrap()).unwrap();
+        let second_v6 = device_ip_fingerprint(&provider, "2001:db8:abcd:12ff::1".parse().unwrap()).unwrap();
+        assert_eq!(first_v6.digest, second_v6.digest);
+    }
+
+    #[test]
+    fn device_ip_fingerprints_are_separate_from_contact_fingerprints() {
+        let provider = TestKeyProvider;
+        let device = device_ip_fingerprint(&provider, "203.0.113.10".parse().unwrap()).unwrap();
+        let contact = contact_fingerprint(&provider, "email", "203.0.113.10").unwrap();
+        assert_ne!(device.digest, contact.digest);
     }
 
     #[test]
