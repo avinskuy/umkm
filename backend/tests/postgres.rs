@@ -2269,7 +2269,9 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         "concurrent review attempts must produce exactly one decision"
     );
     assert!(
-        first_review.or(second_review).expect("one review should succeed"),
+        first_review
+            .or(second_review)
+            .expect("one review should succeed"),
         "the winning review should be recorded"
     );
 
