@@ -158,9 +158,9 @@ Konten:
 1. Brand dan tautan singkat untuk kembali ke situs publik.
 2. Judul: **Masuk sebagai Pemilik Usaha**
 3. Teks pendukung: **Kelola profil usaha, bagikan peluang, dan kembangkan koneksi.**
-4. Formulir autentikasi menggunakan identifier/metode login yang telah disetujui.
-6. Tautan pendaftaran untuk Owner baru.
-7. Tautan privasi/ketentuan dan bantuan.
+4. Formulir autentikasi menggunakan email/nomor telepon dan password.
+5. Tautan pendaftaran untuk Owner baru.
+6. Tautan privasi/ketentuan dan bantuan.
 
 ### Field formulir dan perilaku
 
