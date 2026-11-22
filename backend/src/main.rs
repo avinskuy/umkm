@@ -4,7 +4,7 @@ use usahapintar_api::{
     app_with_authentication,
     config::server_address,
     database::{connect, DatabaseConfig},
-    identity::{AuthenticationApiState, AuthenticationRateLimitKey},
+    identity::{http::AuthenticationApiState, AuthenticationRateLimitKey},
 };
 
 #[tokio::main]
