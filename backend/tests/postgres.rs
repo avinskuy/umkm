@@ -1002,10 +1002,11 @@ async fn assert_verification_database_operations(pool: &PgPool) {
 
     let (challenge_id, delivery_event_id): (String, String) = sqlx::query_as(
         "SELECT challenge_id::text, delivery_event_id::text \
-         FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1')",
+         FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
     )
     .bind(&session_id)
     .bind(vec![4_u8; 32])
+    .bind(vec![vec![3_u8; 32]])
     .fetch_one(pool)
     .await
     .expect("controlled function should reserve a challenge and delivery event");
@@ -1018,10 +1019,11 @@ async fn assert_verification_database_operations(pool: &PgPool) {
 
     assert!(
         sqlx::query(
-            "SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1')",
+            "SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
         )
         .bind(&session_id)
         .bind(vec![5_u8; 32])
+        .bind(vec![vec![3_u8; 32]])
         .fetch_one(pool)
         .await
         .is_err(),
@@ -1029,10 +1031,11 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     );
 
     let verified: bool = sqlx::query_scalar(
-        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE)",
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
     )
     .bind(&session_id)
     .bind(&challenge_id)
+    .bind(vec![vec![3_u8; 32]])
     .fetch_one(pool)
     .await
     .expect("valid OTP result should be committed atomically");
@@ -1089,19 +1092,21 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .expect("second verification session should be created");
 
     let failed_challenge_id: String = sqlx::query_scalar(
-        "SELECT challenge_id::text FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1')",
+        "SELECT challenge_id::text FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
     )
     .bind(&failed_session_id)
     .bind(vec![9_u8; 32])
+    .bind(vec![vec![8_u8; 32]])
     .fetch_one(pool)
     .await
     .expect("second challenge should be reserved");
 
     let accepted: bool = sqlx::query_scalar(
-        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, FALSE)",
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, FALSE, $3)",
     )
     .bind(&failed_session_id)
     .bind(&failed_challenge_id)
+    .bind(vec![vec![8_u8; 32]])
     .fetch_one(pool)
     .await
     .expect("failed OTP attempt should be recorded");
@@ -1850,11 +1855,11 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                 has_function_privilege(current_user, \
                     'public.create_registration_verification_session(uuid,text,bytea,bytea,text,bytea,text,timestamptz)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.reserve_otp_challenge(uuid,bytea,text)', 'EXECUTE'), \
+                    'public.reserve_otp_challenge(uuid,bytea,text,bytea[])', 'EXECUTE'), \
                 has_function_privilege(current_user, \
                     'public.record_otp_delivery_result(uuid,text)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
-                    'public.record_otp_verification_attempt(uuid,uuid,boolean)', 'EXECUTE')",
+                    'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE')",
     )
     .fetch_one(&app_pool)
     .await
