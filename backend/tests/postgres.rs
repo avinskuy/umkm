@@ -2750,5 +2750,186 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .fetch_one(migrator_pool)
     .await
     .expect("migrator should inspect delivery result audit events");
+
     assert!(accepted_delivery_audits >= 3);
+
+    // The same verified recovery contact may belong to multiple active accounts.
+    // Selection must be explicit and must prove ownership inside PostgreSQL.
+    let shared_contact_hmac = vec![0x5au8; 32];
+    let recovery_contact_session_ids: Vec<String> = sqlx::query_scalar(
+        "INSERT INTO public.verification_sessions ( \
+             id, user_id, purpose, channel, destination_ciphertext, destination_nonce, \
+             encryption_key_version, destination_hmac, hmac_key_version, expires_at \
+         ) VALUES \
+             (gen_random_uuid(), $1::uuid, 'recovery_contact_add', 'email', decode('01','hex'), decode('02','hex'), 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '10 minutes'), \
+             (gen_random_uuid(), $2::uuid, 'recovery_contact_add', 'email', decode('01','hex'), decode('02','hex'), 'enc-v1', $3, 'hmac-v1', clock_timestamp() + INTERVAL '10 minutes') \
+         RETURNING id::text",
+    )
+    .bind(&started.user_id)
+    .bind(&phone_started.user_id)
+    .bind(&shared_contact_hmac)
+    .fetch_all(migrator_pool)
+    .await
+    .expect("recovery contact verification sessions should be created");
+    assert_eq!(recovery_contact_session_ids.len(), 2);
+
+    sqlx::query(
+        "UPDATE public.verification_sessions \
+            SET status = 'verified', verified_at = clock_timestamp() \
+          WHERE id IN ($1::uuid, $2::uuid)",
+    )
+    .bind(&recovery_contact_session_ids[0])
+    .bind(&recovery_contact_session_ids[1])
+    .execute(migrator_pool)
+    .await
+    .expect("recovery contact verification sessions should be verified");
+
+    sqlx::query(
+        "INSERT INTO public.recovery_contacts ( \
+             id, user_id, channel, contact_ciphertext, contact_nonce, encryption_key_version, \
+             contact_hmac, hmac_key_version, verification_session_id, verified_at \
+         ) \
+         SELECT gen_random_uuid(), user_id, channel, destination_ciphertext, destination_nonce, \
+                encryption_key_version, destination_hmac, hmac_key_version, id, verified_at \
+           FROM public.verification_sessions \
+          WHERE id IN ($1::uuid, $2::uuid) AND status = 'verified'",
+    )
+    .bind(&recovery_contact_session_ids[0])
+    .bind(&recovery_contact_session_ids[1])
+    .execute(migrator_pool)
+    .await
+    .expect("two active accounts may share one verified recovery contact");
+
+    let shared_contact_owners: i64 = sqlx::query_scalar(
+        "SELECT count(DISTINCT rc.user_id)::bigint \
+           FROM public.recovery_contacts AS rc \
+           JOIN public.users AS u ON u.id = rc.user_id \
+          WHERE rc.channel = 'email' AND rc.contact_hmac = $1 \
+            AND rc.revoked_at IS NULL AND u.account_status = 'active'",
+    )
+    .bind(&shared_contact_hmac)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("shared recovery contact owners should be queryable");
+    assert_eq!(shared_contact_owners, 2);
+
+    let (recovery_session_id, recovery_case_id): (String, String) =
+        sqlx::query_as("SELECT gen_random_uuid()::text, gen_random_uuid()::text")
+            .fetch_one(migrator_pool)
+            .await
+            .expect("recovery identifiers should be generated");
+    let (created_session_id, created_case_id): (String, String) = sqlx::query_as(
+        "SELECT session_id::text, case_id::text \
+           FROM public.create_account_recovery_verification_session( \
+               $1::uuid, $2::uuid, 'password_reset', 'email', decode('01','hex'), \
+               decode('02','hex'), 'enc-v1', $3, 'hmac-v1', \
+               clock_timestamp() + INTERVAL '10 minutes')",
+    )
+    .bind(&recovery_session_id)
+    .bind(&recovery_case_id)
+    .bind(&shared_contact_hmac)
+    .fetch_one(app_pool)
+    .await
+    .expect("application may create an unbound account recovery session");
+    assert_eq!(created_session_id, recovery_session_id);
+    assert_eq!(created_case_id, recovery_case_id);
+
+    let recovery_destination: (String, Vec<u8>) = sqlx::query_as(
+        "SELECT channel, destination_hmac \
+           FROM public.get_account_recovery_verification_session($1::uuid)",
+    )
+    .bind(&recovery_session_id)
+    .fetch_one(app_pool)
+    .await
+    .expect("application may load an eligible account recovery destination");
+    assert_eq!(
+        recovery_destination,
+        ("email".to_owned(), shared_contact_hmac.clone())
+    );
+
+    let (recovery_challenge_id, recovery_delivery_event_id): (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, delivery_event_id::text \
+                FROM public.reserve_otp_challenge( \
+                    $1::uuid, gen_random_uuid(), $2, 'otp-v1', $3)",
+    )
+    .bind(&recovery_session_id)
+    .bind(vec![0x33u8; 32])
+    .bind(vec![shared_contact_hmac.clone()])
+    .fetch_one(app_pool)
+    .await
+    .expect("shared OTP reservation must support account recovery purpose");
+
+    let pending_recovery_challenge: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.get_pending_otp_challenge($1::uuid)",
+    )
+    .bind(&recovery_session_id)
+    .fetch_one(app_pool)
+    .await
+    .expect("generic pending OTP lookup must support recovery");
+    assert_eq!(pending_recovery_challenge, 1);
+
+    sqlx::query("SELECT public.record_otp_delivery_result($1::uuid, 'accepted')")
+        .bind(&recovery_delivery_event_id)
+        .execute(app_pool)
+        .await
+        .expect("recovery OTP delivery result should be recorded");
+    let recovery_verified: bool = sqlx::query_scalar(
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
+    )
+    .bind(&recovery_session_id)
+    .bind(&recovery_challenge_id)
+    .bind(vec![shared_contact_hmac.clone()])
+    .fetch_one(app_pool)
+    .await
+    .expect("valid recovery OTP should advance the recovery case");
+    assert!(recovery_verified);
+
+    let recovery_case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&recovery_case_id)
+            .fetch_one(migrator_pool)
+            .await
+            .expect("migrator should inspect recovery case state");
+    assert_eq!(recovery_case_status, "account_selection_required");
+
+    let unrelated_user_id: String = sqlx::query_scalar("SELECT gen_random_uuid()::text")
+        .fetch_one(migrator_pool)
+        .await
+        .expect("unrelated user id should be generated");
+    let unrelated_selection = sqlx::query_scalar::<_, String>(
+        "SELECT public.bind_account_recovery_session_to_account($1::uuid, $2::uuid, $3)::text",
+    )
+    .bind(&recovery_case_id)
+    .bind(&unrelated_user_id)
+    .bind(vec![shared_contact_hmac.clone()])
+    .fetch_one(app_pool)
+    .await;
+    assert!(
+        unrelated_selection.is_err(),
+        "account selection must reject an account that does not own the verified contact"
+    );
+
+    let selected_user_id: String = sqlx::query_scalar(
+        "SELECT public.bind_account_recovery_session_to_account($1::uuid, $2::uuid, $3)::text",
+    )
+    .bind(&recovery_case_id)
+    .bind(&started.user_id)
+    .bind(vec![shared_contact_hmac.clone()])
+    .fetch_one(app_pool)
+    .await
+    .expect("a selected account owning the shared verified contact should bind");
+    assert_eq!(selected_user_id, started.user_id);
+
+    let selected_case: (String, String) = sqlx::query_as(
+        "SELECT status, target_user_id::text \
+           FROM public.account_recovery_cases WHERE id = $1::uuid",
+    )
+    .bind(&recovery_case_id)
+    .fetch_one(migrator_pool)
+    .await
+    .expect("migrator should inspect selected recovery account");
+    assert_eq!(
+        selected_case,
+        ("under_review".to_owned(), started.user_id.clone())
+    );
 }
