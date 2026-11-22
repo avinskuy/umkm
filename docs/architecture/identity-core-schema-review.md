@@ -1,6 +1,6 @@
 # Tinjauan Teknis Skema Identity Core
 
-> Status: migration 0001–0005 dan bootstrap principal/privilege tersedia di `main` serta diuji melalui CI; runtime Identity Core masih terbatas
+> Status: migration 0001–0005 dan bootstrap tersedia di `main`; migration 0006 password-only sedang disiapkan pada branch `feature/password-otp-only-auth` dan belum menunggu hasil CI.
 > Tanggal: 22 November 2026
 > Keputusan autentikasi: registrasi email/WhatsApp + password wajib OTP; login rutin tanpa OTP.
 > Basis pemeriksaan awal: `main` pada `e097db28b08235d5ef186b6212510718ccf9ad12`; pembaruan kontrak: branch `docs/identity-core-verification-contract`
@@ -15,7 +15,7 @@ Dokumen ini mencatat tinjauan desain dan status implementasi Identity Core. Doku
 - Konfigurasi database, connection pool, serta SQLx migrator sudah tersedia.
 - `backend/migrations/` memiliki migration akun 0001, verifikasi 0002, sesi autentikasi 0003, account recovery 0004, dan Identity Audit Events 0005.
 - HTTP server menyediakan `GET /api/v1/health` dan `GET /api/v1/readyz`. Pool PostgreSQL diinisialisasi saat startup menggunakan principal aplikasi.
-- Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, provider identity, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
+- Tes integrasi PostgreSQL memeriksa invariant akun, role immutable, reservasi kontak, autentikasi password-only, sesi verifikasi, challenge OTP, event fingerprint, lock, sesi autentikasi, rotasi token, expiry, pencabutan, serta audit event append-only dan validasi metadata.
 - Migration 0001–0005 diuji pada PostgreSQL sementara melalui CI. Pengujian principal/privilege menambahkan identitas migrator non-superuser dan login aplikasi terpisah. Tidak ada migration yang dijalankan pada database produksi.
 - Belum ada endpoint login/logout, provider OTP, cookie/session middleware, operasi enkripsi/HMAC runtime, atau aktivasi fitur autentikasi. Grant database minimal tidak berarti alur autentikasi telah aktif.
 
