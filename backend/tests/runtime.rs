@@ -58,11 +58,16 @@ async fn identity_runtime_access_uses_only_explicit_database_grants() {
     let email = format!("identity-runtime-{}@example.test", std::process::id());
 
     let registration = ClientRegistration {
+        display_name: "Runtime Test User",
         role: ClientRole::BusinessOwner,
         initial_contact_channel: ContactChannel::Email,
         email_normalized: Some(&email),
         phone_e164: None,
         password_hash: "$argon2id$test-only-placeholder",
+        terms_of_service_version: "terms-v1",
+        privacy_policy_version: "privacy-v1",
+        marketing_consent: false,
+        marketing_notice_version: None,
     };
 
     let mut transaction = pool

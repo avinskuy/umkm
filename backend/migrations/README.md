@@ -10,10 +10,11 @@ Direktori ini berisi migration SQLx berversi. Migration Identity Core yang terse
 - `20261122160000_add_verification_database_operations.sql` — menambahkan fungsi terkontrol untuk pembuatan/pembacaan sesi, reservasi challenge, pencatatan hasil dispatch, dan verifikasi OTP registrasi dengan rate limit lintas sesi.
 - `20261122170000_bind_verification_ids_from_runtime.sql` — mengubah fungsi pembuatan sesi dan reservasi challenge agar UUID dibuat runtime sebelum AEAD/AAD dan keyed OTP digest dihitung.
 - `20261122180000_audit_verification_runtime_events.sql` — menambahkan audit event untuk permintaan/hasil dispatch OTP dan percobaan verifikasi gagal, serta mengikat event registrasi/aktivasi ke akun terkait.
+- `20261122190000_add_public_profile_and_policy_acceptance.sql` — menambahkan profil publik satu-ke-satu, nama tampilan publik, catatan penerimaan Terms of Service dan Privacy Policy per versi, serta event consent marketing opsional yang append-only. Fungsi registrasi terkontrol menyimpan akun, profil, penerimaan kebijakan, dan pilihan marketing secara atomik.
 
 ## Status runtime
 
-Modul Rust `identity` menyediakan pembuatan akun pending dan `VerificationService` untuk registrasi email/WhatsApp, issue/resend OTP, pencatatan hasil dispatch, serta verifikasi dan aktivasi. Provider pengiriman masih berupa abstraksi; CI memakai fake provider dan tidak mengirim pesan nyata. Endpoint HTTP verifikasi, adapter provider nyata, dan konfigurasi key produksi belum tersedia.
+Modul Rust `identity` menyediakan pembuatan akun pending, profil publik, penerimaan kebijakan wajib per versi, consent marketing opsional, dan `VerificationService` untuk registrasi email/WhatsApp, issue/resend OTP, pencatatan hasil dispatch, serta verifikasi dan aktivasi. Provider pengiriman masih berupa abstraksi; CI memakai fake provider dan tidak mengirim pesan nyata. Endpoint HTTP verifikasi, adapter provider nyata, dan konfigurasi key produksi belum tersedia.
 
 Rate limit pengiriman dan percobaan verifikasi ditegakkan melalui fungsi PostgreSQL terkontrol. Batas pengiriman adalah lima kali per kontak dalam 60 menit dengan cooldown 60 detik; batas kegagalan verifikasi lintas sesi adalah lima kali per kontak dalam 60 menit, dengan lock sesi satu jam setelah lima kegagalan. Challenge berlaku maksimal 10 menit. Akun pending memiliki masa berlaku 30 menit.
 
@@ -27,7 +28,7 @@ HTTP runtime membuat pool PostgreSQL melalui `DatabaseConfig::from_app_env()` da
 
 Endpoint `GET /api/v1/health` merupakan liveness check yang tidak bergantung pada database. Endpoint `GET /api/v1/readyz` menjalankan `SELECT 1` melalui pool runtime dan mengembalikan HTTP 503 jika database tidak siap.
 
-Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0009 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
+Provisioning principal PostgreSQL berada terpisah dari SQLx migration di `backend/database/bootstrap/`. Jalankan `001_create_principals.sql` sebagai DBA pada database khusus sebelum migration, lalu jalankan seluruh migration sebagai `usahapintar_migrator`. Setelah migration 0001–0010 selesai, jalankan `002_identity_core_grants.sql` sebagai DBA; skrip memverifikasi ownership non-superuser sebelum memberi EXECUTE pada fungsi SECURITY DEFINER. CI menguji bootstrap dengan DBA sementara, migrator non-superuser, dan login aplikasi terpisah.
 
 Pengujian PostgreSQL untuk migration, invariant identitas, privilege principal, dan orchestration OTP berada di `backend/tests/postgres.rs`. Pengujian readiness runtime berada di `backend/tests/runtime.rs` dan memakai `APP_DATABASE_URL` melalui principal aplikasi. Keduanya dijalankan terhadap database disposable di CI.
 

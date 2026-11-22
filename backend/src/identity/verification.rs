@@ -91,11 +91,16 @@ impl<'a> VerificationService<'a> {
         let fingerprint = contact_fingerprint(self.keys, verification_channel, &contact)?;
 
         let normalized_registration = ClientRegistration {
+            display_name: registration.display_name,
             role: registration.role,
             initial_contact_channel: registration.initial_contact_channel,
             email_normalized: email.as_deref(),
             phone_e164: phone.as_deref(),
             password_hash: registration.password_hash,
+            terms_of_service_version: registration.terms_of_service_version,
+            privacy_policy_version: registration.privacy_policy_version,
+            marketing_consent: registration.marketing_consent,
+            marketing_notice_version: registration.marketing_notice_version,
         };
 
         let mut transaction = self.pool.begin().await?;
@@ -418,11 +423,16 @@ mod tests {
     #[test]
     fn registration_contact_is_normalized_and_channel_bound() {
         let registration = ClientRegistration {
+            display_name: "Test Owner",
             role: super::super::registration::ClientRole::BusinessOwner,
             initial_contact_channel: ContactChannel::Email,
             email_normalized: Some("  USER@example.test "),
             phone_e164: None,
             password_hash: "encoded-hash",
+            terms_of_service_version: "terms-v1",
+            privacy_policy_version: "privacy-v1",
+            marketing_consent: false,
+            marketing_notice_version: None,
         };
         let (channel, contact, email, phone) =
             normalized_registration_contact(&registration).unwrap();
@@ -435,11 +445,16 @@ mod tests {
     #[test]
     fn registration_rejects_mismatched_contact_channels() {
         let registration = ClientRegistration {
+            display_name: "Test Investor",
             role: super::super::registration::ClientRole::Investor,
             initial_contact_channel: ContactChannel::Phone,
             email_normalized: Some("user@example.test"),
             phone_e164: Some("+628123456789"),
             password_hash: "encoded-hash",
+            terms_of_service_version: "terms-v1",
+            privacy_policy_version: "privacy-v1",
+            marketing_consent: false,
+            marketing_notice_version: None,
         };
         assert!(matches!(
             normalized_registration_contact(&registration),
