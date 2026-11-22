@@ -18,6 +18,7 @@ DECLARE
     v_session_id UUID;
     v_user_id UUID;
     v_primary_role TEXT;
+    v_account_status TEXT;
     v_expires_at TIMESTAMPTZ;
     v_last_seen_at TIMESTAMPTZ;
 BEGIN
@@ -25,16 +26,34 @@ BEGIN
         RETURN;
     END IF;
 
-    SELECT s.id, s.user_id, u.primary_role, s.expires_at, s.last_seen_at
-      INTO v_session_id, v_user_id, v_primary_role, v_expires_at, v_last_seen_at
+    SELECT s.user_id INTO v_user_id
       FROM public.sessions AS s
-      JOIN public.users AS u ON u.id = s.user_id
      WHERE s.token_hash = p_token_hash
+       AND s.revoked_at IS NULL;
+
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+
+    SELECT u.primary_role, u.account_status
+      INTO v_primary_role, v_account_status
+      FROM public.users AS u
+     WHERE u.id = v_user_id
+     FOR SHARE;
+
+    IF NOT FOUND OR v_account_status <> 'active' THEN
+        RETURN;
+    END IF;
+
+    SELECT s.id, s.expires_at, s.last_seen_at
+      INTO v_session_id, v_expires_at, v_last_seen_at
+      FROM public.sessions AS s
+     WHERE s.token_hash = p_token_hash
+       AND s.user_id = v_user_id
        AND s.revoked_at IS NULL
        AND s.expires_at > clock_timestamp()
        AND s.last_seen_at > clock_timestamp() - INTERVAL '7 days'
-       AND u.account_status = 'active'
-     FOR UPDATE OF s;
+     FOR UPDATE;
 
     IF NOT FOUND
        OR v_expires_at <= clock_timestamp()
@@ -84,16 +103,34 @@ BEGIN
         RETURN;
     END IF;
 
-    SELECT s.id, s.user_id, u.primary_role, s.expires_at, s.last_seen_at
-      INTO v_session_id, v_user_id, v_primary_role, v_expires_at, v_last_seen_at
+    SELECT s.user_id INTO v_user_id
       FROM public.sessions AS s
-      JOIN public.users AS u ON u.id = s.user_id
      WHERE s.token_hash = p_token_hash
+       AND s.revoked_at IS NULL;
+
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+
+    SELECT u.primary_role, u.account_status
+      INTO v_primary_role, v_account_status
+      FROM public.users AS u
+     WHERE u.id = v_user_id
+     FOR SHARE;
+
+    IF NOT FOUND OR v_account_status <> 'active' THEN
+        RETURN;
+    END IF;
+
+    SELECT s.id, s.expires_at, s.last_seen_at
+      INTO v_session_id, v_expires_at, v_last_seen_at
+      FROM public.sessions AS s
+     WHERE s.token_hash = p_token_hash
+       AND s.user_id = v_user_id
        AND s.revoked_at IS NULL
        AND s.expires_at > clock_timestamp()
        AND s.last_seen_at > clock_timestamp() - INTERVAL '7 days'
-       AND u.account_status = 'active'
-     FOR UPDATE OF s;
+     FOR UPDATE;
 
     IF NOT FOUND
        OR v_expires_at <= clock_timestamp()
