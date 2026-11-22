@@ -2247,16 +2247,31 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .await
     .expect("second recovery case should enter review");
 
-    let rejected: bool = sqlx::query_scalar(
+    let first_review = sqlx::query_scalar::<_, bool>(
         "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'rejected', 'insufficient_evidence')",
     )
     .bind(&rejected_case_id)
     .bind(&reviewer_user_id)
     .bind(&reviewer_session_hash)
-    .fetch_one(pool)
-    .await
-    .expect("active Admin may reject an eligible recovery case");
-    assert!(rejected);
+    .fetch_one(pool);
+    let second_review = sqlx::query_scalar::<_, bool>(
+        "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'rejected', 'insufficient_evidence')",
+    )
+    .bind(&rejected_case_id)
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool);
+
+    let (first_review, second_review) = tokio::join!(first_review, second_review);
+    assert_ne!(
+        first_review.is_ok(),
+        second_review.is_ok(),
+        "concurrent review attempts must produce exactly one decision"
+    );
+    assert!(
+        first_review.or(second_review).expect("one review should succeed"),
+        "the winning review should be recorded"
+    );
 
     let rejected_status: (String, bool) = sqlx::query_as(
         "SELECT status, resolved_at IS NOT NULL FROM public.account_recovery_cases WHERE id = $1::uuid",
