@@ -62,9 +62,8 @@ pub trait KeyProvider: Send + Sync {
     fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError>;
 
     /// Versi key yang masih dapat dipakai untuk membaca event dalam jendela rotasi.
-    fn key_versions(&self, purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
-        let active = self.active_key(purpose)?;
-        Ok(vec![active.version])
+    fn key_versions(&self, _purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
+        Ok(Vec::new())
     }
 }
 
