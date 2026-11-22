@@ -117,7 +117,7 @@ END;
 $$;
 
 CREATE FUNCTION public.revoke_all_password_login_sessions(
-    p_user_id UUID
+    p_current_token_hash BYTEA
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -126,16 +126,28 @@ SET search_path = pg_catalog
 AS $$
 DECLARE
     v_revoked_count INTEGER;
+    v_user_id UUID;
 BEGIN
-    IF p_user_id IS NULL THEN
-        RAISE EXCEPTION 'user ID is required to revoke sessions'
-            USING ERRCODE = '22023';
+    IF p_current_token_hash IS NULL OR octet_length(p_current_token_hash) <> 32 THEN
+        RETURN 0;
+    END IF;
+
+    SELECT user_id INTO v_user_id
+      FROM public.sessions
+     WHERE token_hash = p_current_token_hash
+       AND revoked_at IS NULL
+       AND expires_at > clock_timestamp()
+       AND last_seen_at > clock_timestamp() - INTERVAL '7 days'
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN 0;
     END IF;
 
     UPDATE public.sessions
        SET revoked_at = clock_timestamp(),
            revocation_reason = 'logout_all'
-     WHERE user_id = p_user_id
+     WHERE user_id = v_user_id
        AND revoked_at IS NULL;
 
     GET DIAGNOSTICS v_revoked_count = ROW_COUNT;
@@ -145,11 +157,11 @@ $$;
 
 REVOKE ALL ON FUNCTION public.get_active_password_login_session(BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rotate_active_password_login_session(BYTEA, BYTEA) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.revoke_all_password_login_sessions(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.revoke_all_password_login_sessions(BYTEA) FROM PUBLIC;
 
 COMMENT ON FUNCTION public.get_active_password_login_session(BYTEA) IS
     'Memvalidasi sesi opaque yang belum dicabut, belum melewati expiry absolut 30 hari atau idle 7 hari, memastikan akun aktif, dan memperbarui last_seen_at secara atomik.';
 COMMENT ON FUNCTION public.rotate_active_password_login_session(BYTEA, BYTEA) IS
     'Merotasi hash token sesi aktif secara atomik tanpa memperpanjang expiry absolut; token lama langsung tidak berlaku.';
 COMMENT ON FUNCTION public.revoke_all_password_login_sessions(UUID) IS
-    'Mencabut seluruh sesi aktif milik satu akun dengan reason logout_all.';
+    'Mencabut seluruh sesi aktif milik pemegang token sesi aktif yang diberikan dengan reason logout_all.';
