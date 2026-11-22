@@ -317,8 +317,8 @@ pub(crate) fn decrypt_destination(
     };
     let aad = destination_associated_data(session_id, &session.0, purpose);
     let plaintext = decrypt(keys, &payload, &aad)?;
-    let contact = String::from_utf8(plaintext.to_vec())
-        .map_err(|_| VerificationError::InvalidStoredData)?;
+    let contact =
+        String::from_utf8(plaintext.to_vec()).map_err(|_| VerificationError::InvalidStoredData)?;
     Ok(Zeroizing::new(contact))
 }
 
@@ -415,7 +415,11 @@ fn delivery_channel(channel: &str) -> DeliveryChannel {
     }
 }
 
-pub(crate) fn destination_associated_data(session_id: &str, channel: &str, purpose: &str) -> Vec<u8> {
+pub(crate) fn destination_associated_data(
+    session_id: &str,
+    channel: &str,
+    purpose: &str,
+) -> Vec<u8> {
     format!("identity:verification-destination:v1:{session_id}:{purpose}:{channel}").into_bytes()
 }
 
