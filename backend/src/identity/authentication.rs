@@ -1,9 +1,7 @@
 //! Autentikasi password dan lifecycle sesi opaque.
 
+use ring::{digest, hmac, rand::SecureRandom};
 use std::{net::IpAddr, sync::Arc};
-use ring::rand::SecureRandom;
-
-use ring::{digest, hmac};
 use sqlx::PgPool;
 use zeroize::Zeroizing;
 
