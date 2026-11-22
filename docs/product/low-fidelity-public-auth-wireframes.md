@@ -290,22 +290,27 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Konfirmasi — Akun dibuat
+### Verifikasi — Kode OTP dikirim
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar]                         Pendaftaran berhasil │
+│ [USahapintar]                                  Verifikasi   │
 │                                                              │
-│ Akun berhasil dibuat                                         │
-│ Kamu dapat masuk menggunakan kontak dan kata sandi.          │
+│ Masukkan kode yang dikirim ke kontak pilihanmu.              │
+│ Kanal: Email atau WhatsApp                                    │
+│ Tujuan: [alamat/nomor disamarkan]                             │
 │                                                              │
-│ Status kontak: Belum diverifikasi                             │
-│ Kontak perlu dibuktikan sebelum dipakai untuk pemulihan atau  │
-│ tindakan sensitif.                                           │
+│ Kode OTP              [_] [_] [_] [_] [_] [_]                 │
+│ Masa berlaku: 10 menit                                       │
 │                                                              │
-│ [Lanjutkan ke profil]                                        │
+│ [Verifikasi dan aktifkan akun]                                │
+│ Kirim ulang kode tersedia setelah cooldown.                  │
+│                                                              │
+│ Status: Menunggu verifikasi                                   │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+Setelah kode valid, akun berubah menjadi aktif dan pengguna dapat melanjutkan onboarding. Jangan tampilkan status berhasil atau izinkan login sebelum verifikasi selesai.
 
 Setelah formulir registrasi dikirim, tampilkan layar verifikasi OTP sesuai kanal: email untuk email, atau WhatsApp untuk nomor telepon. Akun tetap pending sampai kode berhasil diverifikasi. Sediakan status pengiriman, expiry, cooldown resend, batas percobaan, dan pesan error generik yang tidak membocorkan apakah identifier telah terdaftar.
 
