@@ -463,7 +463,7 @@ Ini merupakan dasar model ancaman, bukan pengganti uji penetrasi atau penilaian 
 - Role utama tidak dapat diubah setelah akun dibuat; tidak ada alur profil, bantuan, atau Admin yang boleh mengubahnya.
 - Pendaftaran terpisah diwajibkan untuk membuat akun dengan role klien lainnya.
 - Email, nomor telepon, atau identitas penyedia yang duplikat tidak dapat dihubungkan ke akun kedua.
-- Masa berlaku challenge verifikasi, batas percobaan, dan konsumsi satu kali.
+- Masa berlaku challenge verifikasi, batas percobaan, dan konsumsi satu kali (pengujian tahap verifikasi kontak berikutnya).
 - Masa berlaku token reset kata sandi dan perilaku penggunaan satu kali.
 - Masa berlaku dan pencabutan sesi.
 - Keputusan kebijakan otorisasi.
@@ -476,7 +476,9 @@ Ini merupakan dasar model ancaman, bukan pengganti uji penetrasi atau penilaian 
 - Login Investor menolak akun Owner dan tidak membuat sesi.
 - Pendaftaran Admin publik tidak tersedia dan tidak dapat dipanggil.
 - Perilaku kontak yang belum diverifikasi sesuai dengan kebijakan yang disetujui.
-- Batas kirim ulang dan konfirmasi OTP ditegakkan di sisi server.
+- Registrasi password dapat membuat akun aktif tanpa OTP; kontak yang belum diverifikasi tidak diterima sebagai bukti pemulihan.
+- Pendaftaran Google baru wajib memilih role sebelum OAuth; state/nonce salah, kedaluwarsa, atau diputar ulang ditolak.
+- Google `email_verified` hanya diterima dari token yang tervalidasi; kecocokan email tidak menggabungkan akun.
 - Respons pemulihan tidak mengungkap keberadaan akun.
 - Reset token cannot be reused.
 - Logout dan logout semua perangkat mencabut sesi.
@@ -505,7 +507,7 @@ Ini merupakan dasar model ancaman, bukan pengganti uji penetrasi atau penilaian 
 - Password show/hide is accessible.
 - Pesan validasi dan error terhubung dengan field terkait.
 - Tombol kirim tidak dapat dipicu berulang saat proses masih berjalan.
-- OTP mendukung paste dan navigasi keyboard.
+- UI tahap pertama tidak menampilkan input OTP; dukungan OTP/paste/keyboard diuji saat tahap verifikasi kontak.
 - Progres pendaftaran dan perilaku tombol kembali/lanjut dapat diprediksi.
 - OAuth cancel/failure state is recoverable.
 - Mobile layouts do not overflow horizontally.
@@ -514,11 +516,12 @@ Ini merupakan dasar model ancaman, bukan pengganti uji penetrasi atau penilaian 
 
 1. **Reproducibilitas dependency — selesai:** lockfile frontend/backend tersedia dan CI menggunakan instalasi dependency yang terkunci.
 2. **Fondasi database — selesai:** pool PostgreSQL saat runtime, pemisahan principal aplikasi/migrator, migration Identity Core 0001–0005, serta akses terbatas untuk pembuatan akun pending dan penambahan audit event sudah tersedia. Migration produksi tetap merupakan operasi terpisah.
-3. **Tipe domain:** definisikan User, PrimaryRole, AccountStatus, Session, VerificationChallenge, dan kode error bertipe.
-4. **Pendaftaran:** implementasikan pendaftaran Owner/Investor dengan validasi dan status pending yang aman.
-5. **Verifikasi:** implementasikan siklus hidup challenge email dan telepon di balik interface penyedia.
-6. **Autentikasi kata sandi:** implementasikan hashing, login sesuai role, cookie sesi, logout, dan pemulihan akun.
-7. **Google OAuth:** implementasikan login/pendaftaran yang terikat pada role; akun baru harus memilih role sebelum OAuth, tidak memerlukan kata sandi lokal terpisah, dan tetap harus menyelesaikan verifikasi kontak terpilih melalui email atau WhatsApp.
+3. **Penyelarasan skema:** rancang migration lanjutan agar akun dapat aktif tanpa OTP dan status verifikasi kontak terpisah; uji constraint, trigger, fungsi pembuatan akun, dan reservasi identifier.
+4. **Tipe domain:** definisikan User, PrimaryRole, AccountStatus, Session, dan kode error bertipe.
+5. **Pendaftaran dan password login:** implementasikan registrasi Owner/Investor, Argon2id, login sesuai role, cookie sesi, logout, serta kontrol anti-penyalahgunaan.
+6. **Google OAuth:** implementasikan login/pendaftaran dengan pemilihan role wajib sebelum OAuth untuk akun baru, validasi OIDC lengkap, dan pengaitan akun eksplisit.
+7. **Pemulihan akun:** implementasikan hanya setelah kanal pemulihan terbukti kepemilikannya dan pengiriman token reset aman tersedia.
+8. **Verifikasi kontak/OTP:** implementasikan pada tahap berikutnya, bukan sebagai prasyarat registrasi/login.
 8. **Otorisasi:** tambahkan kebijakan role/sumber daya di backend dan pengujian negatif.
 9. **Fondasi Admin:** provisioning, MFA, izin, dan audit trail.
 10. **Penguatan keamanan:** tinjau rate limit, pengujian keamanan, logging, aksesibilitas, dan konfigurasi deployment.
@@ -531,10 +534,11 @@ Hal-hal berikut harus ditetapkan sebelum sistem siap digunakan di lingkungan pro
 
 - Pemilihan penyedia email dan WhatsApp Business/API, persyaratan pengirim/template, keandalan pengiriman di Indonesia, percobaan ulang, pemantauan, batas biaya, dan penanggung jawab operasional.
 - Konfigurasi klien Google OAuth, alamat callback produksi, dan pengelolaan rahasia.
+- Mitigasi account squatting/penyalahgunaan identifier yang belum diverifikasi, termasuk batas registrasi, kebijakan reservasi, dan jalur bantuan yang tidak membocorkan akun.
 - Parameter hashing kata sandi yang tepat dan perilaku pemulihan kredensial untuk akun yang hanya menggunakan Google jika pengaturan kata sandi lokal kelak disediakan.
 - Masa retensi numerik berdasarkan kategori data, jadwal backup, dan durasi penyelesaian penghapusan. Kebijakan produk telah menetapkan masa tunggu pembatalan 30 hari; kontak utama baru dapat digunakan kembali setelah penghapusan selesai dan kontak dilepas secara sah. Kontak pemulihan bersama tetap diperbolehkan.
 - Metode dan penyedia MFA Admin, serta pemetaan izin teknis untuk petugas khusus yang menangani pemeriksaan pemulihan manual. Kebijakan pemulihan berbasis risiko dan standar bukti telah disetujui.
 - Penyimpanan pembatasan permintaan terdistribusi dan ambang operasional; penegakannya harus berlaku di seluruh instance aplikasi.
 - Skema metadata bukti pemulihan, pembobotan sinyal, kontrol eskalasi, dan kebutuhan persetujuan dua pihak untuk kasus berisiko tinggi; dokumen identitas atau selfie bukan metode standar pemulihan.
 
-Batas awal produk yang telah disetujui (OTP, masa berlaku pendaftaran tertunda, durasi sesi, masa tunggu penonaktifan/penghapusan, dan perilaku pemulihan) sudah didokumentasikan di atas dan bukan lagi keputusan yang belum ditetapkan.
+Keputusan tahap pertama adalah password + Google OAuth tanpa OTP registrasi/login. OTP dan verifikasi kontak ditunda; lifecycle `pending_verification` 30 menit pada migration saat ini perlu diselaraskan melalui migration lanjutan. Durasi sesi dan masa tunggu penonaktifan/penghapusan tetap mengikuti kebijakan yang telah disetujui.
