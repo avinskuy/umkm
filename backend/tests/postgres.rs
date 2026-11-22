@@ -987,10 +987,11 @@ async fn assert_verification_database_operations(pool: &PgPool) {
 
     let session_id: String = sqlx::query_scalar(
         "SELECT public.create_registration_verification_session(\
-            $1::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', \
+            $1::uuid, $2::uuid, 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', \
             clock_timestamp() + INTERVAL '10 minutes')::text",
     )
     .bind(&user_id)
+    .bind(uuid::Uuid::new_v4())
     .bind(vec![1_u8])
     .bind(vec![2_u8])
     .bind(vec![3_u8; 32])
@@ -1019,6 +1020,7 @@ async fn assert_verification_database_operations(pool: &PgPool) {
          FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",
     )
     .bind(&session_id)
+    .bind(uuid::Uuid::new_v4())
     .bind(vec![4_u8; 32])
     .bind(vec![vec![3_u8; 32]])
     .fetch_one(pool)
@@ -1044,8 +1046,9 @@ async fn assert_verification_database_operations(pool: &PgPool) {
         .expect("provider acceptance should be recorded");
 
     assert!(
-        sqlx::query("SELECT * FROM public.reserve_otp_challenge($1::uuid, $2, 'otp-hmac-v1', $3)",)
+        sqlx::query("SELECT * FROM public.reserve_otp_challenge($1::uuid, $2::uuid, $3, 'otp-hmac-v1', $4)",)
             .bind(&session_id)
+            .bind(uuid::Uuid::new_v4())
             .bind(vec![5_u8; 32])
             .bind(vec![vec![3_u8; 32]])
             .fetch_one(pool)
