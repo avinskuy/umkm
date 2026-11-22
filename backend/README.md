@@ -80,11 +80,18 @@ Lapisan `usahapintar_api::identity` menyediakan operasi terbatas untuk registras
 - `create_client_user` memanggil fungsi database `SECURITY DEFINER` untuk membuat akun pending dengan role Business Owner atau Investor. Aplikasi tidak memperoleh hak INSERT langsung ke tabel identitas.
 - `append_audit_event` menambahkan event ke tabel audit append-only. Principal aplikasi tidak memperoleh hak membaca, mengubah, atau menghapus event audit.
 - `VerificationService` mengorkestrasi registrasi, penerbitan/resend OTP, pencatatan hasil pengiriman, verifikasi, dan aktivasi akun. Password diproses menggunakan komponen hashing backend; password plaintext tidak disimpan atau diteruskan ke provider.
-- `registration_router` menyediakan endpoint registrasi, resend, dan verifikasi. Router ini telah memiliki pengujian runtime, tetapi sengaja belum dipasang pada `app()`/`main()` sehingga belum tersedia melalui HTTP server default.
+- `RecoveryService` memakai mekanisme OTP bersama dengan purpose separation untuk membuat sesi recovery tanpa akun terikat, verifikasi kontak, daftar kandidat akun setelah verifikasi, dan pemilihan akun dengan validasi kepemilikan kontak di PostgreSQL.
+- `registration_router` dan `recovery_router` menyediakan komponen endpoint HTTP yang diinjeksi dengan key provider, delivery provider, dan abuse guard. Keduanya belum dipasang pada `app()`/`main()` default. `app_with_authentication_and_recovery` menyediakan builder eksplisit untuk pemasangan terkontrol.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login Owner/Investor menggunakan email/nomor telepon + password tanpa OTP rutin dan sudah tersedia pada runtime. Router registrasi HTTP publik, penerapan middleware sesi ke endpoint fitur, daftar/pencabutan sesi perangkat melalui UI, dan recovery runtime belum tersedia.
+Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login Owner/Investor menggunakan email/nomor telepon + password tanpa OTP rutin dan sudah tersedia pada runtime. Recovery HTTP tersedia sebagai router terinjeksi, tetapi belum dipasang pada server default karena key provider, delivery provider, dan abuse guard produksi belum dikonfigurasi. Recovery saat ini berhenti pada status `under_review`; persetujuan manual, pemeriksaan sinyal perangkat tepercaya, penerbitan token reset, reset password, notifikasi keamanan, dan pencabutan sesi pasca-reset masih menjadi tahapan terpisah. Penerapan middleware sesi pada endpoint fitur dan UI daftar/pencabutan sesi perangkat juga belum tersedia.
 
 Provider pengiriman masih berupa abstraksi. Resend (email) dan FlowKirim (WhatsApp) merupakan target adapter, bukan integrasi nyata yang telah dikonfigurasi atau diuji dengan pengiriman langsung. CI menggunakan fake provider dan tidak mengirim pesan.
+
+Endpoint recovery pada router terinjeksi:
+- `POST /api/v1/identity/recovery` membuat sesi dan kasus recovery tanpa mengungkap apakah kontak terdaftar.
+- `POST /api/v1/identity/recovery/{verification_id}/resend` dan `POST /api/v1/identity/recovery/{verification_id}/verify` mengelola OTP.
+- `GET /api/v1/identity/recovery/cases/{case_id}/accounts` hanya menampilkan kandidat setelah kontak berhasil diverifikasi.
+- `POST /api/v1/identity/recovery/cases/{case_id}/select` mengikat akun yang dipilih setelah PostgreSQL memastikan akun aktif memiliki kontak pemulihan terverifikasi yang cocok.
 
 Untuk menjaga konsistensi, operasi pembuatan akun, profil, penerimaan Terms/Privacy, consent opsional, dan event audit yang terkait harus menggunakan transaksi sesuai kontrak database dan hanya commit setelah seluruh operasi berhasil. Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya, bukan payload klien. Metadata hanya boleh memuat key allowlist non-sensitif; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
 
