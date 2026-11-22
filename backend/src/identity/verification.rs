@@ -135,11 +135,7 @@ impl<'a> VerificationService<'a> {
     }
 
     /// Memeriksa OTP, mencatat percobaan, dan mengaktifkan akun secara atomik di database.
-    pub async fn verify(
-        &self,
-        session_id: &str,
-        code: &str,
-    ) -> Result<bool, VerificationError> {
+    pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
         validate_uuid(session_id)?;
         if code.len() != OTP_DIGITS as usize || !code.bytes().all(|byte| byte.is_ascii_digit()) {
             return Err(VerificationError::InvalidInput);
@@ -361,13 +357,10 @@ fn destination_associated_data(session_id: &str, channel: &str) -> Vec<u8> {
 
 fn validate_uuid(value: &str) -> Result<(), VerificationError> {
     if value.len() != 36
-        || !value
-            .bytes()
-            .enumerate()
-            .all(|(index, byte)| match index {
-                8 | 13 | 18 | 23 => byte == b'-',
-                _ => byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte),
-            })
+        || !value.bytes().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte),
+        })
     {
         return Err(VerificationError::InvalidInput);
     }
