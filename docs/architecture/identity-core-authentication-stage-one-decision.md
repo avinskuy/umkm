@@ -44,6 +44,16 @@ Password lokal wajib untuk akun yang dibuat melalui formulir email/telepon. Akun
 - Jika email Google cocok dengan akun lokal yang sudah ada, jangan membuat tautan otomatis atau menggabungkan akun. Pengguna harus masuk ke akun yang ada dan menjalankan proses pengaitan eksplisit dengan autentikasi ulang.
 - Akun Google-only tetap dapat login melalui identitas Google yang sudah terhubung walaupun tidak memiliki password lokal.
 
+### Risiko identifier yang belum diverifikasi
+
+Tanpa pembuktian kontak saat pendaftaran, seseorang dapat mencoba mendaftarkan email/nomor milik orang lain dan menahan identifier tersebut. Ini adalah trade-off nyata dari keputusan tanpa OTP, bukan risiko yang hilang hanya karena login memakai password.
+
+- Terapkan rate limit dan deteksi pola registrasi massal/penyalahgunaan berdasarkan sinyal yang proporsional dan minim data.
+- Pertahankan respons generik agar sistem tidak membocorkan apakah identifier digunakan akun lain.
+- Jangan mengirim notifikasi yang mengungkap data akun atau mengizinkan pengambilalihan melalui dukungan tanpa pemeriksaan kepemilikan.
+- Rancang prosedur pelepasan reservasi dan penanganan klaim identifier yang aman sebelum pendaftaran publik dibuka luas.
+- Threat model dan uji penyalahgunaan harus secara eksplisit mengevaluasi account squatting. Jika mitigasinya tidak memadai, metode pembuktian alternatif (misalnya tautan verifikasi, bukan OTP) harus dibahas sebagai keputusan produk terpisah sebelum produksi.
+
 ## 4. Batas pemulihan akun pada tahap pertama
 
 - Password reset harus menggunakan token acak, sekali pakai, kedaluwarsa, disimpan dalam bentuk hash, dan dikirim melalui kanal yang telah dibuktikan kepemilikannya.
