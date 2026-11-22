@@ -414,7 +414,7 @@ mod tests {
             HeaderValue::from_static("theme=dark; __Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
         );
         assert_eq!(
-            session_cookie(&headers).map(|token| token.to_string()).as_deref(),
+            session_cookie(&headers).map(|token| token.as_str().to_owned()).as_deref(),
             Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         );
 
