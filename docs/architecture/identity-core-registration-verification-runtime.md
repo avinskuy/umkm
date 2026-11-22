@@ -61,7 +61,7 @@ Dalam satu transaksi PostgreSQL:
 3. Buat audit event `identity.registration.requested`.
 4. Commit seluruh perubahan bersama-sama.
 
-Pendaftaran Google OAuth tidak membuat sesi OTP registrasi. Jalur itu harus memvalidasi token provider, state/nonce, stable subject, serta email_verified sebelum membuat akun dan identitas Google dalam transaksi atomik; role tetap wajib dipilih dan terikat ke state.
+Pendaftaran Google OAuth tidak membuat sesi OTP registrasi. Jalur itu harus memvalidasi token provider, state/nonce, stable subject, serta email_verified sebelum membuat akun dan identitas Google dalam transaksi atomik; role tetap wajib dipilih dan terikat ke state. **Migration 0001 saat ini belum mendukung hasil akhir tersebut:** `create_client_user` selalu membuat status pending dan tidak merekam email_verified. Buat migration lanjutan dan tes terpisah sebelum mengaktifkan jalur Google tanpa OTP.
 
 Jika satu langkah gagal, seluruh transaksi rollback. Unique reservation kontak utama tetap menjadi pengaman race antarregistrasi.
 
