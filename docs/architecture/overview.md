@@ -1,62 +1,73 @@
 # Gambaran Arsitektur
 
-## Arah pengembangan
+## Arsitektur sistem
 
-USahapintar dimulai dengan pendekatan **modular monolith**. Frontend dan backend merupakan aplikasi terpisah yang dapat di-deploy secara mandiri, sedangkan modul-modul domain backend tetap berada dalam satu layanan. Pendekatan ini menjaga batas tanggung jawab tetap jelas tanpa menambah kerumitan operasional yang belum diperlukan.
+USahapintar menggunakan **modular monolith**. Frontend dan backend merupakan aplikasi terpisah, sedangkan domain backend berada dalam satu layanan. Pemisahan layanan hanya dilakukan jika kebutuhan operasional dan batas domain membenarkannya.
 
-## Aplikasi
+## Teknologi
 
 ### Frontend
 
-- React dan TypeScript.
+- React, TypeScript, dan Vite.
 - Struktur kode berorientasi fitur.
-- Komponen UI umum ditempatkan terpisah dari komponen khusus domain.
-- Style komponen diletakkan berdekatan dengan komponennya dan dibatasi cakupannya (gunakan CSS Modules jika sesuai).
-- Style global dibatasi pada reset, design tokens, dan aturan yang benar-benar berlaku secara global.
-- Implementasi frontend masih berupa shell awal; alur produk seperti profil, discovery, koneksi, pesan, membership, dan Admin belum tersedia.
+- Komponen bersama dipisahkan dari komponen khusus domain.
+- Style global dibatasi pada reset, design tokens, dan aturan global.
+
+Frontend saat ini masih berupa shell awal. Fitur produk utama belum tersedia secara lengkap.
 
 ### Backend
 
 - Rust dan Axum.
-- Modul berorientasi domain dengan pemisahan tanggung jawab API, application, domain, dan infrastructure secara eksplisit sesuai kebutuhan kompleksitas.
-- PostgreSQL 16 menjadi baseline database relasional.
-- Fondasi runtime SQLx 0.8 sudah tersedia. HTTP server membuat connection pool saat startup menggunakan `APP_DATABASE_URL` milik principal aplikasi dengan hak minimum.
-- Endpoint `GET /api/v1/health` menyediakan liveness check yang tidak bergantung pada database. Endpoint `GET /api/v1/readyz` memeriksa kesiapan koneksi database melalui pool runtime.
-- Migration dijalankan secara eksplisit menggunakan principal migrator yang terpisah. HTTP server tidak menjalankan migration otomatis saat startup.
-- Modul `identity` menyediakan hashing password, `VerificationService` untuk registrasi email/WhatsApp dengan OTP, dan router HTTP registrasi/resend/verifikasi yang diuji tetapi belum dipasang pada aplikasi HTTP default. Kebijakan produk mewajibkan OTP saat registrasi; login dan login kembali setelah logout menggunakan password tanpa OTP rutin. Login password Owner/Investor dan logout sudah tersedia dengan cookie aman, sesi server-side, serta rate limit PostgreSQL. Middleware validasi sesi, pembaruan idle timeout, refresh/rotasi token, dan logout semua perangkat tersedia pada endpoint identitas. Penerapan middleware pada endpoint fitur, adapter provider nyata, dan runtime recovery belum tersedia.
-- Otorisasi ditegakkan di sisi server.
+- Modul berorientasi domain dengan batas API, application, domain, dan infrastructure sesuai kebutuhan.
+- PostgreSQL 16 sebagai database relasional.
+- SQLx untuk connection pool dan migration.
+- HTTP runtime menggunakan `APP_DATABASE_URL` dengan principal aplikasi berhak minimum.
+- Migration dijalankan secara eksplisit menggunakan principal migrator. Server HTTP tidak menjalankan migration otomatis.
+- `GET /api/v1/health` menyediakan liveness check; `GET /api/v1/readyz` memeriksa kesiapan database.
 
-## Batas domain awal
+## Identity Core
 
-- Identitas dan autentikasi
-- Profil pemilik usaha dan bisnis
-- Profil investor
-- Peluang dan permintaan kemitraan
-- Koneksi dan pesan
-- Keanggotaan
-- Data dan verifikasi bisnis
-- Asisten dan intelijen berbasis AI
-- Moderasi dan administrasi
+Identity Core menyediakan fondasi akun Business Owner dan Investor, password authentication, OTP verification, session management, audit events, serta account recovery.
 
-Daftar ini menunjukkan batas tanggung jawab secara logis, bukan kewajiban untuk membuat modul kosong sejak awal. Buat modul ketika sudah ada perilaku nyata dan kontrak yang jelas.
+- Registrasi memerlukan password dan OTP melalui email atau WhatsApp.
+- Login rutin menggunakan email/nomor telepon dan password tanpa OTP.
+- Password menggunakan Argon2id.
+- Sesi menggunakan token opaque yang disimpan sebagai hash, cookie aman, idle timeout tujuh hari, dan absolute expiry 30 hari.
+- Session validation, refresh/rotation, logout, dan logout semua perangkat tersedia pada endpoint identitas.
+- Recovery database operations, service core, dan HTTP router tersedia. Router recovery belum dipasang pada server default dan proses berakhir pada status `under_review`.
+- Router registrasi juga belum dipasang pada server default.
+- Adapter OTP nyata, production key provider, approval recovery, password reset, dan integrasi middleware sesi ke endpoint fitur belum tersedia.
 
-## Keputusan Identity Core
+Lihat [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md), [Kontrak HTTP Registrasi](identity-core-registration-http-api.md), dan [Kontrak Migration Recovery](identity-core-migration-0004-account-recovery-contract.md).
 
-Keputusan pendaftaran, verifikasi kontak, dan siklus hidup akun yang sudah disetujui maupun yang masih terbuka dicatat dalam [Keputusan Pendaftaran Identity Core](identity-core-registration-decisions.md). Skema Identity Core tersedia melalui migration 0001–0013, mencakup akun, verifikasi, sesi, pemulihan, audit, penghapusan dukungan OAuth, operasi database verifikasi, pengikatan ID verifikasi, audit runtime verifikasi, profil dan penerimaan kebijakan, serta kebijakan resend OTP saat lock verifikasi. Runtime menyediakan orkestrasi registrasi dan verifikasi OTP. Login dan login kembali setelah logout ditetapkan menggunakan password tanpa OTP rutin, sementara login/logout dan pembuatan sesi tersedia melalui runtime; middleware sesi, refresh token, dan logout semua perangkat tersedia pada endpoint identitas; penerapan pada endpoint fitur, adapter provider nyata, dan recovery runtime belum tersedia.
+## Domain produk
 
-## Skema database
+Batas domain yang direncanakan:
 
-Model relasional, batasan integritas, batas privasi, dan urutan migrasi dijelaskan dalam [Rancangan Skema Database PostgreSQL](database-schema-design.md). Migration Identity Core 0001–0013 tersedia dan tercakup dalam pengujian PostgreSQL di CI. Migration tersebut mencakup akun, verifikasi, sesi, pemulihan, audit, serta operasi runtime registrasi; migration domain produk lainnya belum tersedia. Penerapan migration dilakukan secara eksplisit melalui principal migrator dan tetap terpisah dari startup HTTP maupun deployment produksi.
+- Identitas dan autentikasi.
+- Profil Business Owner, bisnis, dan listing.
+- Profil Investor dan peluang investasi.
+- Discovery, koneksi, dan permintaan kemitraan.
+- Pesan dan komunitas.
+- Membership dan entitlement.
+- Verifikasi bisnis.
+- Asisten berbasis AI.
+- Moderasi dan administrasi.
 
-## Akses data dan privasi
+Daftar domain tidak mengharuskan pembuatan modul kosong. Implementasikan modul saat perilaku, kontrak, dan kebutuhan datanya jelas.
 
-Pemilik bisnis menentukan informasi bisnis mana yang boleh dibagikan. Data yang ditampilkan kepada investor harus mendapat izin secara eksplisit dan tidak boleh mencakup detail transaksi pada tingkat pelanggan. Data perlu menyertakan asal-usul, periode pelaporan, waktu pembaruan, dan status verifikasi.
+## Data dan otorisasi
 
-## Batasan arsitektur
+- Backend menjadi sumber kebenaran untuk role, status akun, dan kepemilikan resource.
+- Gunakan RBAC + ABAC, least privilege, dan deny-by-default.
+- Setiap request yang mengakses resource terlindungi harus memeriksa izin pada tingkat objek.
+- Data bisnis hanya dibagikan sesuai visibilitas dan persetujuan yang berlaku.
+- Perubahan penting harus menggunakan transaksi dan menghasilkan audit event sesuai kebijakan.
 
-- Tidak menggunakan microservices untuk produk tahap awal.
-- Hindari folder penampung umum seperti `utils` atau `common` tanpa tanggung jawab yang jelas.
+## Batasan desain
+
+- Jangan menambahkan microservices tanpa kebutuhan yang terukur.
+- Hindari folder generik seperti `utils` atau `common` tanpa tanggung jawab spesifik.
 - Hindari ketergantungan melingkar antarfitur.
-- Kode bersama harus memiliki lebih dari satu pengguna nyata atau tanggung jawab tingkat platform yang jelas.
-- Pisahkan kebutuhan transport/API dari aturan domain.
-- Jangan mempercayai klaim role atau kepemilikan yang berasal dari frontend.
+- Jangan menduplikasi aturan domain atau kontrol keamanan pada frontend.
+- Tambahkan abstraksi bersama hanya jika ada pemakai nyata atau tanggung jawab platform yang jelas.
