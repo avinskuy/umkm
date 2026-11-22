@@ -84,9 +84,10 @@ fn resolved_client_ip(headers: &HeaderMap, peer_ip: IpAddr) -> IpAddr {
 
 fn login_error(error_value: AuthenticationError) -> Response {
     match error_value {
-        AuthenticationError::InvalidCredentials => {
-            error(StatusCode::UNAUTHORIZED, "Email/nomor telepon atau password salah.")
-        }
+        AuthenticationError::InvalidCredentials => error(
+            StatusCode::UNAUTHORIZED,
+            "Email/nomor telepon atau password salah.",
+        )
         AuthenticationError::RateLimited => error(
             StatusCode::TOO_MANY_REQUESTS,
             "Terlalu banyak percobaan login. Coba lagi dalam beberapa menit.",
@@ -117,7 +118,10 @@ async fn login_owner(
     Json(request): Json<LoginRequest>,
 ) -> Response {
     if is_cross_site_request(&headers) {
-        return error(StatusCode::FORBIDDEN, "Permintaan login lintas situs ditolak.");
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan login lintas situs ditolak.",
+        );
     }
     login(state, resolved_client_ip(&headers, peer.ip()), request, LoginRole::BusinessOwner).await
 }
@@ -129,7 +133,10 @@ async fn login_investor(
     Json(request): Json<LoginRequest>,
 ) -> Response {
     if is_cross_site_request(&headers) {
-        return error(StatusCode::FORBIDDEN, "Permintaan login lintas situs ditolak.");
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan login lintas situs ditolak.",
+        );
     }
     login(state, resolved_client_ip(&headers, peer.ip()), request, LoginRole::Investor).await
 }
@@ -164,7 +171,9 @@ async fn login(
                 }),
             )
                 .into_response();
-            response.headers_mut().insert(header::SET_COOKIE, cookie_value);
+            response
+                .headers_mut()
+                .insert(header::SET_COOKIE, cookie_value);
             response
                 .headers_mut()
                 .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -174,12 +183,12 @@ async fn login(
     }
 }
 
-async fn logout(
-    State(state): State<AuthenticationApiState>,
-    headers: HeaderMap,
-) -> Response {
+async fn logout(State(state): State<AuthenticationApiState>, headers: HeaderMap) -> Response {
     if is_cross_site_request(&headers) {
-        return error(StatusCode::FORBIDDEN, "Permintaan logout lintas situs ditolak.");
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan logout lintas situs ditolak.",
+        );
     }
     let token = session_cookie(&headers);
     if let Some(token) = token {
