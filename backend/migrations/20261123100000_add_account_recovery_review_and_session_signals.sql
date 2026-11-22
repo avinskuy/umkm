@@ -19,9 +19,6 @@ CREATE TABLE public.account_recovery_case_signals (
         UNIQUE (recovery_case_id, signal_code)
 );
 
-CREATE INDEX account_recovery_case_signals_session_idx
-    ON public.account_recovery_case_signals (session_id, created_at DESC);
-
 CREATE TABLE public.account_recovery_review_decisions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     recovery_case_id UUID NOT NULL UNIQUE,
@@ -60,9 +57,6 @@ CREATE TABLE public.account_recovery_review_decisions (
     CONSTRAINT account_recovery_review_actor_check
         CHECK (reviewer_user_id <> target_user_id)
 );
-
-CREATE INDEX account_recovery_review_reviewer_idx
-    ON public.account_recovery_review_decisions (reviewer_user_id, created_at DESC);
 
 CREATE FUNCTION public.guard_account_recovery_append_only()
 RETURNS TRIGGER
