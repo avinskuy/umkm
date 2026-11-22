@@ -271,7 +271,7 @@ Pendaftaran dilakukan secara bertahap. Akun dibuat sebelum pengguna diminta meng
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar]                               Langkah 1 dari 4 │
+│ [USahapintar]                               Langkah 1 dari 3 │
 │                                                              │
 │ Buat akun Pemilik Usaha                                      │
 │                                                              │
@@ -313,7 +313,7 @@ OTP tidak diminta pada registrasi maupun login tahap pertama. Verifikasi kontak 
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar]                               Langkah 3 dari 4 │
+│ [USahapintar]                               Langkah 2 dari 3 │
 │                                                              │
 │ Sejauh mana perjalanan usahamu?                              │
 │                                                              │
@@ -330,7 +330,7 @@ OTP tidak diminta pada registrasi maupun login tahap pertama. Verifikasi kontak 
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ [USahapintar]                               Langkah 4 dari 4 │
+│ [USahapintar]                               Langkah 3 dari 3 │
 │                                                              │
 │ Ceritakan sedikit tentang usahamu                            │
 │                                                              │
@@ -351,7 +351,7 @@ Jika tahap usaha masih berupa ide, beri label nama usaha sebagai nama ide/proyek
 
 ### Langkah 1 dan 2
 
-Gunakan kembali tata letak akun dan konfirmasi pembuatan akun dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
+Gunakan kembali tata letak akun dan konfirmasi pembuatan akun tanpa OTP dari pendaftaran Owner; cukup ubah teks yang menunjukkan role.
 
 ### Langkah 3 — Preferensi Investor
 
@@ -475,7 +475,7 @@ Tempatkan style komponen dekat fitur terkait atau dalam CSS Modules. Jangan memu
 - [ ] Tidak ada pemilih role pada profil pengguna yang sudah login seolah-olah role dapat diganti kapan saja.
 - [ ] Semua formulir memiliki label yang terlihat, validasi inline, dan status error dari server.
 - [ ] Registrasi dan login tahap pertama tidak meminta OTP; kontak belum terverifikasi diberi batas penggunaan yang jelas.
-- [ ] Google OAuth mempertahankan konteks role serta menangani status dibatalkan/error.
+- [ ] Google OAuth mempertahankan pemilihan role wajib untuk akun baru, konteks role pada state server, dan menangani status dibatalkan/error.
 - [ ] Tata letak mobile tidak overflow secara horizontal dan tetap nyaman digunakan saat keyboard layar terbuka.
 - [ ] Keanggotaan copy preserves free approved-connection chat.
 - [ ] Tidak ada UI yang menyiratkan jaminan pendanaan, hasil investasi, atau metrik terverifikasi tanpa bukti.
