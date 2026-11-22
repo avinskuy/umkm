@@ -2055,14 +2055,13 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
         "selected recovery account cannot be changed"
     );
 
-    let unrelated_session_match: bool = sqlx::query_scalar(
-        "SELECT public.record_account_recovery_session_signal($1::uuid, $2)",
-    )
-    .bind(&recovery_case_id)
-    .bind(&unrelated_session_hash)
-    .fetch_one(pool)
-    .await
-    .expect("session signal check should safely reject a different account session");
+    let unrelated_session_match: bool =
+        sqlx::query_scalar("SELECT public.record_account_recovery_session_signal($1::uuid, $2)")
+            .bind(&recovery_case_id)
+            .bind(&unrelated_session_hash)
+            .fetch_one(pool)
+            .await
+            .expect("session signal check should safely reject a different account session");
     assert!(!unrelated_session_match);
 
     assert!(
@@ -2233,11 +2232,11 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("second recovery session should be verified");
 
     sqlx::query("UPDATE public.verification_sessions SET user_id = $2::uuid WHERE id = $1::uuid")
-    .bind(&rejected_session_id)
-    .bind(&second_user_id)
-    .execute(pool)
-    .await
-    .expect("verified recovery session should be bound to the selected account");
+        .bind(&rejected_session_id)
+        .bind(&second_user_id)
+        .execute(pool)
+        .await
+        .expect("verified recovery session should be bound to the selected account");
 
     sqlx::query(
         "UPDATE public.account_recovery_cases SET target_user_id = $2::uuid, status = 'under_review' WHERE id = $1::uuid",
