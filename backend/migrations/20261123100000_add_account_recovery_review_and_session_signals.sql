@@ -166,7 +166,6 @@ BEGIN
         pg_catalog.jsonb_build_object(
             'purpose', 'account_recovery',
             'recovery_case_id', p_case_id::text,
-            'session_id', v_reviewer_session_id::text,
             'session_id', v_session_id::text
         )
     );
@@ -291,13 +290,14 @@ BEGIN
         p_reason_code,
         pg_catalog.jsonb_build_object(
             'purpose', 'account_recovery',
-            'recovery_case_id', p_case_id::text
+            'recovery_case_id', p_case_id::text,
+            'session_id', v_reviewer_session_id::text
         )
     );
 
     RETURN TRUE;
 END;
-$$;
+$;
 
 REVOKE ALL ON TABLE public.account_recovery_case_signals FROM PUBLIC;
 REVOKE ALL ON TABLE public.account_recovery_review_decisions FROM PUBLIC;
