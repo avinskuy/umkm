@@ -327,6 +327,7 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         pool.clone(),
         AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
             .expect("test HMAC key should be valid"),
+        Arc::new(RuntimeKeys),
     ));
 
     let wrong_role = authentication
@@ -362,15 +363,28 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         "failed login must not create a session cookie"
     );
 
-    let logged_in = authentication
-        .clone()
-        .oneshot(make_request(
-            "/api/v1/identity/login/owner".to_owned(),
+    let mut login_request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/identity/login/owner")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::USER_AGENT, "runtime-test-browser/1.0")
+        .body(Body::from(
             serde_json::json!({
                 "identifier": email,
-                "password": "test-password-with-enough-length"
-            }),
+                "password": "test-password-with-enough-length",
+                "remember_device": true
+            })
+            .to_string(),
         ))
+        .expect("device-aware login request should be valid");
+    login_request.extensions_mut().insert(ConnectInfo(
+        "127.0.0.1:40000"
+            .parse::<SocketAddr>()
+            .expect("test socket address should be valid"),
+    ));
+    let logged_in = authentication
+        .clone()
+        .oneshot(login_request)
         .await
         .expect("owner login should respond");
     assert_eq!(logged_in.status(), axum::http::StatusCode::OK);
