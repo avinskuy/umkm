@@ -466,7 +466,10 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         Request::builder()
             .method(method)
             .uri(uri)
-            .header(header::COOKIE, format!("__Host-usahapintar_session={token}"))
+            .header(
+                header::COOKIE,
+                format!("__Host-usahapintar_session={token}"),
+            )
             .body(Body::empty())
             .expect("session request should be valid")
     };
@@ -550,18 +553,14 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         ))
         .await
         .expect("logout-all should respond");
-    assert_eq!(
-        logged_out_all.status(),
-        axum::http::StatusCode::NO_CONTENT
-    );
+    assert_eq!(logged_out_all.status(), axum::http::StatusCode::NO_CONTENT);
     let refreshed_hash = hash_session_token(&refreshed_token);
-    let all_revoked_reason: String = sqlx::query_scalar(
-        "SELECT revocation_reason FROM public.sessions WHERE token_hash = $1",
-    )
-    .bind(refreshed_hash.to_vec())
-    .fetch_one(&admin_pool)
-    .await
-    .expect("logout-all should persist the revocation reason");
+    let all_revoked_reason: String =
+        sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE token_hash = $1")
+            .bind(refreshed_hash.to_vec())
+            .fetch_one(&admin_pool)
+            .await
+            .expect("logout-all should persist the revocation reason");
     assert_eq!(all_revoked_reason, "logout_all");
 
     let after_logout_all = authentication
