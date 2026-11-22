@@ -3,7 +3,7 @@
 > Cakupan: baseline teknis lintas migration Identity Core.
 > Registrasi email/WhatsApp + password wajib OTP; login rutin menggunakan password tanpa OTP.
 
-Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0012 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP serta login password Owner/Investor dan logout dengan sesi opaque. Middleware validasi sesi untuk endpoint terproteksi, router registrasi publik, provider nyata, key produksi, dan recovery runtime belum tersedia. HTTP startup tidak menjalankan migration otomatis.
+Dokumen ini menetapkan baseline teknis Identity Core. Migration 0001–0013 dan bootstrap privilege tersedia serta diuji di CI. Runtime menyediakan orkestrasi registrasi/verifikasi OTP serta login password Owner/Investor dan logout dengan sesi opaque. Middleware validasi sesi, pembaruan idle timeout, rotasi token, dan logout semua perangkat tersedia pada endpoint identitas. Penerapan middleware pada endpoint fitur, router registrasi publik, provider nyata, key produksi, dan recovery runtime belum tersedia. HTTP startup tidak menjalankan migration otomatis.
 
 Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Login rutin menggunakan email atau nomor telepon + password tanpa OTP setiap kali login. Migration 0006 menghapus dukungan Google OAuth dari skema aktif. Resend dan FlowKirim menjadi target adapter pengiriman; integrasi nyata belum tersedia. Detail kebijakan ada di [Keputusan Autentikasi Identity Core — Password dan OTP](identity-core-authentication-stage-one-decision.md).
 
@@ -210,7 +210,7 @@ Migration 0002 telah di-merge ke `main` dan lulus CI PostgreSQL. Skema menyediak
 
 ### Migration 0003 — sesi autentikasi
 
-Migration 0003 telah di-merge dan lulus CI PostgreSQL. Skema menyediakan hash token sesi, batas absolut 30 hari, idle timeout 7 hari, rotasi token, pencabutan satu arah, dan pencabutan otomatis ketika status lifecycle akun berubah menjadi nonaktif. Endpoint, cookie, middleware, validasi sesi per request, audit event, serta pencabutan karena reset password/restriksi Admin tetap merupakan pekerjaan runtime.
+Migration 0003 telah di-merge dan lulus CI PostgreSQL. Skema menyediakan hash token sesi, batas absolut 30 hari, idle timeout 7 hari, rotasi token, pencabutan satu arah, dan pencabutan otomatis ketika status lifecycle akun berubah menjadi nonaktif. Login, cookie, validasi sesi per request pada endpoint identitas, pembaruan idle timeout, rotasi token, logout, dan logout semua perangkat tersedia. Daftar/pencabutan sesi perangkat melalui UI serta pencabutan karena reset password/restriksi Admin masih memerlukan integrasi runtime.
 
 ### Migration 0004 — pemulihan akun
 
