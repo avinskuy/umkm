@@ -159,6 +159,7 @@ Principal runtime hanya mendapat EXECUTE pada fungsi yang terdaftar, INSERT audi
 Migration 0007 menambahkan operasi terkontrol untuk tahap registrasi OTP:
 
 - `create_registration_verification_session`: membuat sesi verifikasi yang terikat pada akun pending dan kanal kontak awal.
+- `get_registration_verification_session` dan `get_pending_otp_challenge`: membaca tujuan terenkripsi serta hash challenge pending tanpa akses tabel langsung.
 - `reserve_otp_challenge`: mengganti challenge pending, mencatat reservasi pengiriman, dan menerapkan cooldown 60 detik serta batas lima pengiriman dalam 60 menit.
 - `record_otp_delivery_result`: menyimpan hasil dispatch provider satu kali.
 - `record_otp_verification_attempt`: mencatat hasil pemeriksaan OTP, menerapkan batas kegagalan lintas sesi, mengunci sesi setelah lima kegagalan, dan mengaktifkan akun secara atomik saat berhasil.
