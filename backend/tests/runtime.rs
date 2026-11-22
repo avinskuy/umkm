@@ -443,6 +443,23 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
         .connect(&admin_url)
         .await
         .expect("disposable DBA connection should succeed");
+    let device_metadata: (bool, Option<String>, Option<Vec<u8>>, Option<String>) =
+        sqlx::query_as(
+            "SELECT remember_device, user_agent_summary, ip_prefix_hash, ip_prefix_hmac_key_version \
+               FROM public.sessions WHERE token_hash = $1",
+        )
+        .bind(token_hash.to_vec())
+        .fetch_one(&admin_pool)
+        .await
+        .expect("login should persist privacy-preserving device metadata");
+    assert!(device_metadata.0);
+    assert_eq!(
+        device_metadata.1.as_deref(),
+        Some("runtime-test-browser/1.0")
+    );
+    assert_eq!(device_metadata.2.as_ref().map(Vec::len), Some(32));
+    assert_eq!(device_metadata.3.as_deref(), Some("v1"));
+
     let revoked_reason: String =
         sqlx::query_scalar("SELECT revocation_reason FROM public.sessions WHERE token_hash = $1")
             .bind(token_hash.to_vec())
