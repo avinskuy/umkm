@@ -65,7 +65,7 @@ Baseline runtime yang disetujui dan diuji:
 - Setelah lock berakhir, penghitung kegagalan sesi direset secara atomik. Batas pengiriman lintas sesi tetap berlaku.
 - Masa pending akun: 30 menit. Akun pending yang kedaluwarsa ditangani melalui cleanup terkontrol; jangan mengaktifkan akun setelah batas tersebut.
 
-Semua batas harus ditegakkan di server dan aman terhadap request bersamaan. Hitung mundur frontend hanya informatif. Detail status sesi/challenge, event, rate limit, dan SQL function terdapat pada [Runtime Registrasi & Verifikasi](identity-core-registration-verification-runtime.md), [Kontrak Migration 0002](identity-core-migration-0002-verification-contract.md), [Kontrak Migration 0007](identity-core-migration-0007-verification-operations-contract.md) jika tersedia pada branch yang memuatnya, dan [Tinjauan Kontak Pemulihan Bersama](identity-core-shared-recovery-contacts.md).
+Semua batas harus ditegakkan di server dan aman terhadap request bersamaan. Hitung mundur frontend hanya informatif. Detail status sesi/challenge, event, rate limit, dan SQL function terdapat pada [Runtime Registrasi & Verifikasi](identity-core-registration-verification-runtime.md), [Kontrak Migration 0002](identity-core-migration-0002-verification-contract.md), [Migration 0007 — Operasi Database Verifikasi](../../backend/migrations/20261122160000_add_verification_database_operations.sql), dan [Tinjauan Kontak Pemulihan Bersama](identity-core-shared-recovery-contacts.md).
 
 ## 5. Provider OTP
 
