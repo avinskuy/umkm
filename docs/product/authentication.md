@@ -6,7 +6,7 @@
 
 - Akun publik hanya memiliki satu role utama: `business_owner` atau `investor`.
 - Pendaftaran publik wajib meminta pengguna memilih role secara eksplisit.
-- Role tidak dapat diubah melalui pengaturan profil, support, tindakan Admin, migrasi akun, atau OAuth.
+- Role tidak dapat diubah melalui pengaturan profil, support, tindakan Admin, migrasi akun, atau proses internal lainnya.
 - Pengguna yang ingin menggunakan role klien lainnya harus membuat akun terpisah dengan identitas login yang memenuhi syarat dan belum terhubung ke akun lain.
 - Akun Admin disediakan melalui proses internal dan tidak pernah ditawarkan dalam pendaftaran publik.
 - Identitas utama yang dipakai untuk pendaftaran tunduk pada keunikan dan reservasi kontak akun; kontak pemulihan opsional dapat digunakan bersama oleh beberapa akun sesuai kebijakan Identity Core.
