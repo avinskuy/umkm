@@ -197,7 +197,7 @@ impl<'a> VerificationService<'a> {
         let session = self.load_session(session_id).await?;
         let channel = parse_delivery_channel(&session.0)?;
         let destination = self.decrypt_destination(session_id, &session)?;
-        let aliases = self.contact_aliases(channel, &destination)?;
+        let aliases = self.contact_aliases(channel, &destination, &session)?;
         let challenge_id = new_uuid()?;
         let code = generate_otp()?;
         let context = OtpVerificationContext {
