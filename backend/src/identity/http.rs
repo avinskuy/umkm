@@ -7,18 +7,26 @@ use super::{
     delivery::OtpDeliveryProvider,
     registration::ContactChannel,
     verification::VerificationService,
+    recovery::RecoveryService,
 };
 
 mod authentication;
 mod handlers;
+mod recovery;
 pub use authentication::{authentication_router, AuthenticationApiState};
 pub use handlers::registration_router;
+pub use recovery::{recovery_router, RecoveryApiState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegistrationAction {
     Create,
     Resend,
     Verify,
+    RecoveryStart,
+    RecoveryResend,
+    RecoveryVerify,
+    RecoveryCandidates,
+    RecoverySelect,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,6 +165,35 @@ impl RegistrationApiState {
 
     pub(super) fn verification_service(&self) -> VerificationService<'_> {
         VerificationService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+    }
+}
+
+
+#[derive(Clone)]
+pub struct RecoveryApiState {
+    pub(super) pool: PgPool,
+    pub(super) keys: Arc<dyn KeyProvider>,
+    pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
+    pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
+}
+
+impl RecoveryApiState {
+    pub fn new(
+        pool: PgPool,
+        keys: Arc<dyn KeyProvider>,
+        delivery: Arc<dyn OtpDeliveryProvider>,
+        abuse_guard: Arc<dyn RegistrationAbuseGuard>,
+    ) -> Self {
+        Self {
+            pool,
+            keys,
+            delivery,
+            abuse_guard,
+        }
+    }
+
+    pub(super) fn recovery_service(&self) -> RecoveryService<'_> {
+        RecoveryService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
     }
 }
 
