@@ -1902,6 +1902,20 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
         "consent history must be append-only"
     );
     assert!(
+        raw_sql("TRUNCATE TABLE public.policy_acceptance_records")
+            .execute(pool)
+            .await
+            .is_err(),
+        "policy acceptance history must reject TRUNCATE"
+    );
+    assert!(
+        raw_sql("TRUNCATE TABLE public.consent_events")
+            .execute(pool)
+            .await
+            .is_err(),
+        "consent history must reject TRUNCATE"
+    );
+    assert!(
         sqlx::query("SELECT public.create_client_user_with_profile_and_policy(\
             '   ', 'investor', 'email', 'invalid-display-name@example.test', NULL, \
             'encoded-password-hash', 'terms-v1', 'privacy-v1', FALSE, NULL)")
