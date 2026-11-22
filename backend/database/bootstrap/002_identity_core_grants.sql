@@ -1,4 +1,4 @@
--- Jalankan setelah migration Identity Core 0001–0012 selesai.
+-- Jalankan setelah migration Identity Core 0001–0013 selesai.
 -- Fail closed jika SECURITY DEFINER registration function bukan milik migrator non-superuser.
 
 DO $ownership_guard$
@@ -234,4 +234,43 @@ GRANT EXECUTE ON FUNCTION public.revoke_password_login_session(BYTEA)
 GRANT EXECUTE ON FUNCTION public.reserve_password_login_attempt(BYTEA, BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.clear_password_login_identifier_limit(BYTEA)
+    TO usahapintar_app;
+
+
+-- Session validation, token rotation and logout-all operations.
+DO $session_runtime_ownership_guard$
+DECLARE
+    v_signature TEXT;
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    FOREACH v_signature IN ARRAY ARRAY[
+        'public.get_active_password_login_session(bytea)',
+        'public.rotate_active_password_login_session(bytea,bytea)',
+        'public.revoke_all_password_login_sessions(uuid)'
+    ] LOOP
+        SELECT pg_catalog.pg_get_userbyid(p.proowner),
+               p.prosecdef,
+               COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+          INTO v_owner, v_is_security_definer, v_has_safe_search_path
+          FROM pg_catalog.pg_proc AS p
+         WHERE p.oid = pg_catalog.to_regprocedure(v_signature);
+
+        IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+           OR v_is_security_definer IS DISTINCT FROM TRUE
+           OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+            RAISE EXCEPTION
+                'Refusing session runtime grants: % must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path',
+                v_signature;
+        END IF;
+    END LOOP;
+END;
+$session_runtime_ownership_guard$;
+
+GRANT EXECUTE ON FUNCTION public.get_active_password_login_session(BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.rotate_active_password_login_session(BYTEA, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.revoke_all_password_login_sessions(UUID)
     TO usahapintar_app;
