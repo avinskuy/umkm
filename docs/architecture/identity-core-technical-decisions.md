@@ -4,7 +4,7 @@
 > Tanggal: 21 November 2026
 > Cakupan: keputusan teknis lintas migration Identity Core
 
-Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau mengaktifkan koneksi database pada HTTP startup. Migration 0001–0004 telah dibuat, diuji, dan di-merge; kontrak migration verifikasi, sesi, pemulihan, dan audit disusun terpisah. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
+Dokumen ini menetapkan baseline teknis untuk menerapkan kebijakan Identity Core yang sudah disetujui. Dokumen ini tidak mengubah kebijakan produk atau menjalankan migration otomatis pada HTTP startup. Migration 0001–0005 telah dibuat, diuji, dan di-merge. Runtime HTTP kini menginisialisasi pool PostgreSQL menggunakan principal aplikasi; operasi Identity Core yang tersedia masih terbatas pada pembuatan akun pending dan penambahan audit event. Detail provider, parameter kriptografi final, dan konfigurasi produksi tetap harus diverifikasi saat implementasi.
 
 ## 1. Perlindungan tujuan pengiriman OTP
 
@@ -198,7 +198,8 @@ Gerbang migration akun pertama telah dipenuhi dan hasilnya sudah di-merge ke `ma
 - [x] Principal migration dipisahkan secara konseptual dari runtime application dan provisioning Admin; GRANT lingkungan tetap belum dibuka.
 - [x] Tes PostgreSQL nyata untuk role immutable, penolakan pembuatan Admin melalui jalur klien, reservasi kontak, cleanup pending, provider identity, dan konkurensi berhasil di CI.
 - [x] Migration tidak memuat key, data pribadi, atau kredensial.
-- [x] Tidak mengaktifkan database pada HTTP startup dan tidak dijalankan pada database produksi.
+- [x] HTTP runtime menginisialisasi pool PostgreSQL menggunakan principal aplikasi dengan hak minimum; proses startup tidak menjalankan migration otomatis.
+- [x] Migration tidak dijalankan pada database produksi sebagai bagian dari pekerjaan ini.
 
 ### Migration 0002 — verifikasi kontak dan OTP
 
@@ -216,7 +217,7 @@ Migration 0004 menambahkan relasi kontak pemulihan yang boleh digunakan lintas a
 
 Migration 0005 menambahkan `identity_audit_events` sebagai jejak audit Identity Core. Event menyimpan actor type/ID, subject akun, action/outcome/reason code, request correlation ID, metadata terbatas, dan waktu kejadian yang ditetapkan database. Metadata JSONB dibatasi pada objek datar dengan key allowlist, nilai skalar, panjang string maksimum 128 karakter, dan ukuran maksimum 2 KiB. Trigger menolak UPDATE, DELETE, dan TRUNCATE; tabel tidak memberikan privilege kepada PUBLIC.
 
-Runtime tetap wajib memvalidasi aktor dan action-specific metadata, menulis event dalam transaksi bersama perubahan penting, menerapkan grant INSERT-only untuk principal aplikasi, memisahkan principal pembaca, dan mengelola retensi/forwarding eksternal. Fungsi validasi metadata hanya melakukan pemeriksaan struktur dan tidak memberi akses ke tabel audit.
+Runtime saat ini menyediakan operasi terbatas `append_audit_event` dan principal aplikasi memperoleh hak INSERT-only sesuai bootstrap privilege. Pemanggil tetap wajib memvalidasi aktor dan action-specific metadata serta menulis event dalam transaksi bersama perubahan penting. Integrasi audit untuk seluruh lifecycle identitas, principal pembaca, dan retensi/forwarding eksternal masih perlu diselesaikan. Fungsi validasi metadata hanya melakukan pemeriksaan struktur dan tidak memberi akses ke tabel audit.
 
 Jangan menjalankan migration 0001–0005 pada database produksi. Migration yang telah diterapkan pada database bersama tidak boleh diedit; semua perubahan berikutnya memakai migration baru.
 
