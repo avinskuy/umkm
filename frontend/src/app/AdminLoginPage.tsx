@@ -1,9 +1,5 @@
 import { useState, type FormEvent } from "react";
-import {
-  beginAdminLogin,
-  completeAdminLogin,
-  IdentityApiError,
-} from "./identityApi";
+import { beginAdminLogin, completeAdminLogin, IdentityApiError } from "./identityApi";
 import { navigateTo } from "./navigation";
 import styles from "./AdminLoginPage.module.css";
 
@@ -29,9 +25,7 @@ export function AdminLoginPage() {
       setCode("");
       setPhase("totp");
       setNoticeKind("success");
-      setNotice(
-        "Password diterima. Masukkan kode authenticator untuk melanjutkan.",
-      );
+      setNotice("Password diterima. Masukkan kode authenticator untuk melanjutkan.");
     } catch (error) {
       setNoticeKind("error");
       setNotice(
@@ -88,29 +82,17 @@ export function AdminLoginPage() {
         </p>
 
         <div className={styles.stepIndicator} aria-label="Tahap autentikasi">
-          <span
-            className={
-              phase === "password" ? styles.activeStep : styles.completeStep
-            }
-          >
+          <span className={phase === "password" ? styles.activeStep : styles.completeStep}>
             1 <span>Password</span>
           </span>
           <span className={styles.stepLine} aria-hidden="true" />
-          <span
-            className={
-              phase === "totp" ? styles.activeStep : styles.pendingStep
-            }
-          >
+          <span className={phase === "totp" ? styles.activeStep : styles.pendingStep}>
             2 <span>Authenticator</span>
           </span>
         </div>
 
         {phase === "password" ? (
-          <form
-            className={styles.form}
-            onSubmit={submitPassword}
-            aria-busy={pending}
-          >
+          <form className={styles.form} onSubmit={submitPassword} aria-busy={pending}>
             <label htmlFor="admin-identifier">Email atau nomor terdaftar</label>
             <input
               id="admin-identifier"
@@ -141,31 +123,22 @@ export function AdminLoginPage() {
 
             {notice && (
               <p
-                className={
-                  noticeKind === "success" ? styles.success : styles.notice
-                }
+                className={noticeKind === "success" ? styles.success : styles.notice}
                 role={noticeKind === "success" ? "status" : "alert"}
               >
                 {notice}
               </p>
             )}
 
-            <button
-              type="submit"
-              disabled={pending || !identifier.trim() || !password}
-            >
+            <button type="submit" disabled={pending || !identifier.trim() || !password}>
               {pending ? "Memeriksa..." : "Lanjutkan"}
             </button>
           </form>
         ) : (
-          <form
-            className={styles.form}
-            onSubmit={submitTotp}
-            aria-busy={pending}
-          >
+          <form className={styles.form} onSubmit={submitTotp} aria-busy={pending}>
             <p className={styles.stepDescription}>
-              Buka aplikasi authenticator yang terdaftar dan masukkan kode enam
-              digit. Challenge hanya berlaku dalam waktu singkat.
+              Buka aplikasi authenticator yang terdaftar dan masukkan kode enam digit.
+              Challenge hanya berlaku dalam waktu singkat.
             </p>
 
             <label htmlFor="admin-totp-code">Kode authenticator</label>
@@ -208,8 +181,7 @@ export function AdminLoginPage() {
         )}
 
         <p className={styles.securityNote}>
-          Sesi Admin menggunakan cookie aman terpisah dan akan berakhir
-          otomatis.
+          Sesi Admin menggunakan cookie aman terpisah dan akan berakhir otomatis.
         </p>
         <a className={styles.backLink} href="/">
           Kembali ke beranda
