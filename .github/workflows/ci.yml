@@ -58,6 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Provision disposable PostgreSQL principals
+        run: |
           psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
             -c "CREATE DATABASE usahapintar_test OWNER usahapintar_ci_admin"
           psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \
