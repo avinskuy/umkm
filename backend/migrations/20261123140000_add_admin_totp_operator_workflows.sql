@@ -46,7 +46,7 @@ BEGIN
     END IF;
 
     v_operator_reset := current_user = 'usahapintar_migrator'
-        AND pg_catalog.current_setting('usahapintar.admin_totp_reset', TRUE) = 'on';
+        AND COALESCE(pg_catalog.current_setting('usahapintar.admin_totp_reset', TRUE) = 'on', FALSE);
 
     IF NOT v_operator_reset
        AND OLD.enabled_at IS NOT NULL
