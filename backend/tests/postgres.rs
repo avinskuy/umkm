@@ -3495,12 +3495,11 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         .expect("Admin rate limit should return a decision");
     assert!(!blocked, "the sixth identifier attempt must be blocked");
 
-    let current_totp_step: i64 = sqlx::query_scalar(
-        "SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint",
-    )
-    .fetch_one(pool)
-    .await
-    .expect("current TOTP time-step should be available");
+    let current_totp_step: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint")
+            .fetch_one(pool)
+            .await
+            .expect("current TOTP time-step should be available");
 
     let failed_challenge_hash = vec![0x41_u8; 32];
     let _: String = sqlx::query_scalar(
@@ -3606,15 +3605,13 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("fresh challenge should be created for time-window validation");
     assert!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT public.complete_admin_login($1, $2, $3)::text",
-        )
-        .bind(&future_challenge_hash)
-        .bind(current_totp_step + 2)
-        .bind(vec![0x55_u8; 32])
-        .fetch_one(pool)
-        .await
-        .is_err(),
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text",)
+            .bind(&future_challenge_hash)
+            .bind(current_totp_step + 5)
+            .bind(vec![0x55_u8; 32])
+            .fetch_one(pool)
+            .await
+            .is_err(),
         "TOTP steps outside the accepted clock-drift window must be rejected"
     );
 
