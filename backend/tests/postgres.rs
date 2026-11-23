@@ -2697,6 +2697,7 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
     .await
     .expect("operator should prepare a fresh TOTP secret for end-to-end service coverage");
     assert!(reset_prepared);
+    // Assert operator activation before exercising the Admin login service.
     let reactivated: bool = sqlx::query_scalar(
         "SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)",
     )
