@@ -23,7 +23,8 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 | 0015 | `20261122240000_add_account_recovery_account_candidates.sql` | Daftar kandidat akun setelah OTP diverifikasi dan pencocokan kontak pemulihan. |
 | 0016 | `20261123100000_add_account_recovery_review_and_session_signals.sql` | Sinyal sesi aktif sebelumnya, keputusan review Admin append-only, dan audit event review. |
 | 0017 | `20261123110000_add_password_reset_runtime.sql` | Penerbitan dan pencabutan token reset, konsumsi satu kali, penggantian hash password atomik, pencabutan seluruh sesi, penyelesaian kasus, dan audit event. |
-| 0018 | `20261123120000_add_single_admin_totp_credentials.sql` | Membatasi akun Admin menjadi satu dan menyediakan penyimpanan kredensial TOTP terenkripsi dengan perlindungan replay-counter dan perubahan langsung. |\n| 0019 | `20261123130000_add_admin_authentication_database_runtime.sql` | Challenge login Admin sekali pakai, rate limit terpisah, sesi Admin terisolasi, konsumsi TOTP atomik, dan audit login berhasil. |\n| 0020 | `20261123140000_add_admin_totp_operator_workflows.sql` | Aktivasi enrollment dan reset/re-enrollment TOTP melalui prosedur operator internal, termasuk pencabutan challenge/sesi dan audit. |
+| 0018 | `20261123120000_add_single_admin_totp_credentials.sql` | Membatasi akun Admin menjadi satu dan menyediakan penyimpanan kredensial TOTP terenkripsi dengan perlindungan replay-counter dan perubahan langsung. 
+| 0019 | `20261123130000_add_admin_authentication_database_runtime.sql` | Challenge login Admin sekali pakai, rate limit terpisah, sesi Admin terisolasi, konsumsi TOTP atomik, dan audit login berhasil. |\n| 0020 | `20261123140000_add_admin_totp_operator_workflows.sql` | Aktivasi enrollment dan reset/re-enrollment TOTP melalui prosedur operator internal, termasuk pencabutan challenge/sesi dan audit. |
 
 ## Batas runtime
 
