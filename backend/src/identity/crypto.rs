@@ -450,7 +450,10 @@ impl AdminTotpKeyring {
             return Err(CryptoError::KeyUnavailable);
         }
 
-        Ok(Self { active_version, keys })
+        Ok(Self {
+            active_version,
+            keys,
+        })
     }
 }
 
