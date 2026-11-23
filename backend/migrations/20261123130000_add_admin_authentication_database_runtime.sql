@@ -205,7 +205,7 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
     IF p_identifier_hash IS NULL OR octet_length(p_identifier_hash) <> 32 THEN
         RAISE EXCEPTION 'Admin login identifier fingerprint is invalid'
@@ -216,7 +216,7 @@ BEGIN
      WHERE scope = 'identifier'
        AND key_hash = p_identifier_hash;
 END;
-$;
+$$;
 
 CREATE FUNCTION public.create_admin_login_challenge(p_user_id UUID, p_challenge_hash BYTEA)
 RETURNS TABLE (challenge_id UUID, expires_at_unix BIGINT)
