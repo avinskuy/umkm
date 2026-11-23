@@ -2558,7 +2558,7 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
         "database must reject a second Admin account"
     );
 
-    let operator_id = "00000000-0000-4000-8000-000000000001";
+    let operator_id = "00000000-0000-4000-8000-000000000002";
     let prepared: bool = sqlx::query_scalar(
         "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, 'v1', $4::uuid)",
     )
@@ -3459,7 +3459,7 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("operator enrollment and reset audit events should be recorded");
-    assert_eq!(audit_count, 3);
+    assert_eq!(audit_count, 4);
 }
 
 async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
