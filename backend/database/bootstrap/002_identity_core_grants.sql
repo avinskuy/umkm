@@ -443,7 +443,7 @@ BEGIN
         'public.complete_admin_login(bytea,bigint,bytea)',
         'public.get_active_admin_session(bytea)',
         'public.revoke_admin_session(bytea)',
-        'public.revoke_admin_authentication_when_inactive()'
+        'public.revoke_admin_authentication_when_inactive()',
         'public.activate_admin_totp_enrollment(uuid,bigint,uuid)',
         'public.reset_admin_totp_enrollment(uuid,bytea,bytea,text,text,uuid)'
     ] LOOP
