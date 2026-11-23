@@ -96,6 +96,12 @@ fn error(status: StatusCode, message: &'static str) -> Response {
     response(status, Json(ErrorResponse { error: message }))
 }
 
+async fn no_store_responses(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    no_store(&mut response);
+    response
+}
+
 fn no_store(response: &mut Response) {
     response
         .headers_mut()
@@ -210,7 +216,9 @@ pub fn admin_authentication_router(state: AdminAuthenticationApiState) -> Router
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
         .with_state(state);
 
-    public_routes.merge(protected_routes)
+    public_routes
+        .merge(protected_routes)
+        .layer(middleware::from_fn(no_store_responses))
 }
 
 async fn begin_login(
@@ -544,6 +552,10 @@ mod tests {
             .expect("router should answer unauthenticated Admin session request");
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-store"
+        );
         let cookies: Vec<_> = response
             .headers()
             .get_all(header::SET_COOKIE)
