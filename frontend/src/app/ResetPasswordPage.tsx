@@ -113,8 +113,8 @@ export function ResetPasswordPage() {
           </div>
         ) : !token ? (
           <div className={styles.notice} role="alert">
-            Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan
-            pemulihan baru melalui alur resmi USahapintar.
+            Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan pemulihan baru
+            melalui alur resmi USahapintar.
           </div>
         ) : (
           <form className={styles.form} onSubmit={submit}>
@@ -143,8 +143,8 @@ export function ResetPasswordPage() {
             />
 
             <p className={styles.hint}>
-              Password harus memenuhi kebijakan keamanan akun. Jangan gunakan
-              password yang pernah dipakai pada layanan lain.
+              Password harus memenuhi kebijakan keamanan akun. Jangan gunakan password
+              yang pernah dipakai pada layanan lain.
             </p>
 
             {notice && (
