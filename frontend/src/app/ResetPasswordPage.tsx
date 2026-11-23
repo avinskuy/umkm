@@ -103,8 +103,8 @@ export function ResetPasswordPage() {
         <p className={styles.eyebrow}>KEAMANAN AKUN</p>
         <h1 id="reset-title">Buat password baru</h1>
         <p className={styles.description}>
-          Gunakan password baru untuk mengamankan akun. Setelah berhasil,
-          semua sesi sebelumnya akan berakhir dan kamu perlu masuk kembali.
+          Gunakan password baru untuk mengamankan akun. Setelah berhasil, semua sesi
+          sebelumnya akan berakhir dan kamu perlu masuk kembali.
         </p>
 
         {completed ? (
