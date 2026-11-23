@@ -2746,12 +2746,10 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
         .await
         .expect("new Admin session should validate");
     assert_eq!(authenticated.user_id, admin_id);
-    assert!(
-        service
-            .logout(session.token.as_str())
-            .await
-            .expect("Admin logout should revoke the isolated session")
-    );
+    assert!(service
+        .logout(session.token.as_str())
+        .await
+        .expect("Admin logout should revoke the isolated session"));
     assert!(matches!(
         service.validate_session(session.token.as_str()).await,
         Err(usahapintar_api::identity::AdminAuthenticationError::InvalidSession)
