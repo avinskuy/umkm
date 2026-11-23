@@ -3411,7 +3411,7 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
            FROM public.admin_totp_credentials WHERE user_id = $1::uuid",
     )
     .bind(&admin_id)
-    .bind(vec![0xB6_u8; 32])
+    .bind(vec![0xB6_u8; 36])
     .bind(vec![0x6B_u8; 12])
     .fetch_one(pool)
     .await
