@@ -1,11 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminLoginPage } from "./AdminLoginPage";
-import {
-  beginAdminLogin,
-  completeAdminLogin,
-  IdentityApiError,
-} from "./identityApi";
+import { beginAdminLogin, completeAdminLogin, IdentityApiError } from "./identityApi";
 import { navigateTo } from "./navigation";
 
 vi.mock("./identityApi", async (importOriginal) => {
@@ -42,10 +38,7 @@ describe("AdminLoginPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Lanjutkan" }));
 
     await waitFor(() => {
-      expect(beginAdminLogin).toHaveBeenCalledWith(
-        "admin@example.test",
-        "demo-value",
-      );
+      expect(beginAdminLogin).toHaveBeenCalledWith("admin@example.test", "demo-value");
     });
     expect(await screen.findByLabelText("Kode authenticator")).toBeInTheDocument();
 
@@ -75,9 +68,7 @@ describe("AdminLoginPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Lanjutkan" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Login tidak berhasil.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Login tidak berhasil.");
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(completeAdminLogin).not.toHaveBeenCalled();
   });
