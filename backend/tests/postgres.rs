@@ -26,6 +26,7 @@ impl KeyProvider for VerificationTestKeys {
             KeyPurpose::DataEncryption => 0x11,
             KeyPurpose::ContactFingerprint => 0x22,
             KeyPurpose::OtpVerification => 0x33,
+            KeyPurpose::AdminTotpSecret => 0x44,
         };
         Ok(SecretKey::from_bytes([marker; 32]))
     }
