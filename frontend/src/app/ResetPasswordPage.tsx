@@ -100,14 +100,14 @@ export function ResetPasswordPage() {
           sebelumnya akan berakhir dan kamu perlu masuk kembali.
         </p>
 
-        {!token ? (
+        {completed ? (
+          <div className={styles.success} role="status">
+            {notice}
+          </div>
+        ) : !token ? (
           <div className={styles.notice} role="alert">
             Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan pemulihan baru
             melalui alur resmi USahapintar.
-          </div>
-        ) : completed ? (
-          <div className={styles.success} role="status">
-            {notice}
           </div>
         ) : (
           <form className={styles.form} onSubmit={submit}>
