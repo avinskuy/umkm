@@ -2558,6 +2558,7 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
         "database must reject a second Admin account"
     );
 
+    let operator_id = "00000000-0000-4000-8000-000000000001";
     let prepared: bool = sqlx::query_scalar(
         "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, 'v1', $4::uuid)",
     )
@@ -2570,7 +2571,6 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .expect("operator should prepare the initial encrypted TOTP enrollment");
     assert!(prepared);
 
-    let operator_id = "00000000-0000-4000-8000-000000000001";
     let enrollment_activated: bool =
         sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, 100, $2::uuid)")
             .bind(&admin_user_id)
@@ -2810,8 +2810,10 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         "application should execute only the explicit Admin authentication functions"
     );
 
-    let operator_function_access: (bool, bool) = sqlx::query_as(
+    let operator_function_access: (bool, bool, bool) = sqlx::query_as(
         "SELECT has_function_privilege(current_user, \
+                    'public.prepare_admin_totp_enrollment(uuid,bytea,bytea,text,uuid)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
                     'public.activate_admin_totp_enrollment(uuid,bigint,uuid)', 'EXECUTE'), \
                 has_function_privilege(current_user, \
                     'public.reset_admin_totp_enrollment(uuid,bytea,bytea,text,text,uuid)', 'EXECUTE')",
@@ -2821,8 +2823,8 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .expect("operator-only TOTP procedure privileges should be queryable");
     assert_eq!(
         operator_function_access,
-        (false, false),
-        "application principal must not execute operator-only TOTP recovery procedures"
+        (false, false, false),
+        "application principal must not execute operator-only TOTP provisioning or recovery procedures"
     );
 
     let created_user_id: String =
@@ -3358,18 +3360,6 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
     .expect("active Admin should exist for operator workflow tests");
 
     let operator_id = "00000000-0000-4000-8000-000000000002";
-    let app_can_prepare: bool = sqlx::query_scalar(
-        "SELECT pg_catalog.has_function_privilege( \
-            'usahapintar_app', \
-            'public.prepare_admin_totp_enrollment(uuid,bytea,bytea,text,uuid)', \
-            'EXECUTE' \
-        )",
-    )
-    .fetch_one(pool)
-    .await
-    .expect("Admin TOTP operator privilege should be inspectable");
-    assert!(!app_can_prepare, "application principal must not prepare Admin TOTP enrollment");
-
     let pending_challenge_hash = vec![0x71_u8; 32];
     let _: String = sqlx::query_scalar(
         "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
