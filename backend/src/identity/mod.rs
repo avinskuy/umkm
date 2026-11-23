@@ -18,11 +18,11 @@ mod registration;
 pub mod totp;
 pub mod verification;
 
-pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
 pub use admin_authentication::{
     AdminAuthenticatedSession, AdminAuthenticationError, AdminAuthenticationService,
     AdminLoginChallenge, AdminLoginSession,
 };
+pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
 pub use authentication::{
     AuthenticatedSession, AuthenticationConfigError, AuthenticationError,
     AuthenticationRateLimitKey, AuthenticationService, LoginRole, LoginSession, RotatedSession,
