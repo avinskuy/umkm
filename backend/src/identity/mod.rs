@@ -6,6 +6,7 @@
 //! sengaja belum dipasang pada aplikasi runtime.
 
 mod audit;
+pub mod admin_authentication;
 pub mod authentication;
 pub mod crypto;
 pub mod delivery;
@@ -18,6 +19,10 @@ pub mod totp;
 pub mod verification;
 
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
+pub use admin_authentication::{
+    AdminAuthenticatedSession, AdminAuthenticationError, AdminAuthenticationService,
+    AdminLoginChallenge, AdminLoginSession,
+};
 pub use authentication::{
     AuthenticatedSession, AuthenticationConfigError, AuthenticationError,
     AuthenticationRateLimitKey, AuthenticationService, LoginRole, LoginSession, RotatedSession,
