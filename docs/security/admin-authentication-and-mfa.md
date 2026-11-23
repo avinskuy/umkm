@@ -48,12 +48,16 @@ Setiap login berhasil/gagal, enrollment, reset MFA, penolakan otorisasi, dan kep
 
 ## 5. Status implementasi dan batas aktivasi
 
+Implementasi yang tersedia:
+- Modul TOTP RFC 6238 dengan secret 160-bit dari CSPRNG, kode enam digit, jendela toleransi satu time-step, verifikasi constant-time, dan hasil time-step untuk pemeriksaan replay.
+- Unit test TOTP mencakup vektor RFC, drift waktu, kode malformed, dan penolakan time-step yang sudah dipakai.
+
 Migration Identity Core 0018 menyediakan:
 - Batas database untuk satu akun Admin.
 - Tabel kredensial TOTP dengan secret terenkripsi, nonce, versi key, status enrollment, dan replay-counter.
 - Trigger untuk memastikan kredensial terikat pada akun Admin aktif, melindungi identitas kredensial, mencegah reset langsung setelah enrollment, menjaga replay-counter agar tidak mundur, dan melarang penghapusan/truncate.
 
-Migration ini adalah fondasi skema, bukan implementasi login Admin yang siap digunakan. Login dua faktor, provisioning internal, enrollment, verifikasi TOTP, operasi atomik replay protection, sesi Admin terpisah, endpoint Admin, dan UI Admin harus selesai serta lulus pengujian sebelum akun Admin diaktifkan. Migration production dan deployment tetap merupakan proses terpisah.
+Fondasi skema dan primitive TOTP ini belum menjadi implementasi login Admin yang siap digunakan. Login dua faktor, provisioning internal, enrollment dan konfirmasi secret, operasi atomik replay protection di PostgreSQL, sesi Admin terpisah, endpoint Admin, serta UI Admin harus selesai dan lulus pengujian sebelum akun Admin diaktifkan. Migration production dan deployment tetap merupakan proses terpisah.
 
 ## 6. Pengujian wajib
 
