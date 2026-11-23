@@ -33,8 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })?);
     let rate_limit_key = AuthenticationRateLimitKey::from_hex(rate_limit_key.as_str())?;
-    let authentication =
-        AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+    let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
 
     let admin_totp_keyring = Arc::new(AdminTotpKeyring::from_env().map_err(|_| {
         std::io::Error::new(
