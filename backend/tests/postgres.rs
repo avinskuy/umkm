@@ -3579,16 +3579,15 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert!(!challenge_id.is_empty());
     assert!(expires_at > 0);
 
-    let challenge_credential: (String, Vec<u8>, Vec<u8>, String, Option<i64>) =
-        sqlx::query_as(
-            "SELECT user_id::text, secret_ciphertext, secret_nonce, \
-                    encryption_key_version, last_accepted_step \
-               FROM public.get_admin_login_totp_credentials($1)",
-        )
-        .bind(&challenge_hash)
-        .fetch_one(pool)
-        .await
-        .expect("valid Admin challenge should resolve only its active TOTP credential");
+    let challenge_credential: (String, Vec<u8>, Vec<u8>, String, Option<i64>) = sqlx::query_as(
+        "SELECT user_id::text, secret_ciphertext, secret_nonce, \
+                encryption_key_version, last_accepted_step \
+           FROM public.get_admin_login_totp_credentials($1)",
+    )
+    .bind(&challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("valid Admin challenge should resolve only its active TOTP credential");
     assert_eq!(challenge_credential.0, admin_id);
     assert_eq!(challenge_credential.1.len(), 36);
     assert_eq!(challenge_credential.2.len(), 12);
