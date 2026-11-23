@@ -8,6 +8,7 @@ use usahapintar_api::{
             encrypt_admin_totp_secret, key_version_label, CryptoError, KeyProvider, KeyPurpose,
             KeyVersion, SecretKey, VersionedKey,
         },
+        password::hash_password,
         AdminAuthenticationService, AuthenticationRateLimitKey, ClientRegistration, ClientRole,
         ContactChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider, VerificationService,
     },
@@ -92,6 +93,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_single_admin_totp_schema(&pool).await;
     assert_admin_totp_operator_workflows(&pool).await;
     assert_admin_authentication_database_runtime(&pool).await;
+    assert_admin_authentication_service(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -2645,6 +2647,71 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
         credential_delete.is_err(),
         "Admin TOTP credential cannot be deleted directly"
     );
+}
+
+async fn assert_admin_authentication_service(pool: &PgPool) {
+    let (admin_id, admin_email): (String, String) = sqlx::query_as(
+        "SELECT id::text, email_normalized FROM public.users \
+          WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("active Admin fixture should be available for service integration");
+
+    let password_hash = hash_password(b"Admin-Service-Test-Password-2026!")
+        .expect("Admin integration password should be hashed");
+    sqlx::query("UPDATE public.users SET password_hash = $2 WHERE id = $1::uuid")
+        .bind(&admin_id)
+        .bind(password_hash)
+        .execute(pool)
+        .await
+        .expect("Admin integration password should be stored through test fixture setup");
+
+    let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"cd".repeat(32))
+        .expect("test Admin rate-limit key should be valid");
+    let service =
+        AdminAuthenticationService::new(pool, &rate_limit_key, &VerificationTestKeys);
+
+    let invalid_password = service
+        .begin_login(
+            &admin_email,
+            "Wrong-Admin-Password-2026!",
+            "192.0.2.44".parse().expect("test IP should be valid"),
+        )
+        .await;
+    assert!(matches!(
+        invalid_password,
+        Err(usahapintar_api::identity::AdminAuthenticationError::InvalidCredentials)
+    ));
+
+    let challenge = service
+        .begin_login(
+            &admin_email,
+            "Admin-Service-Test-Password-2026!",
+            "192.0.2.44".parse().expect("test IP should be valid"),
+        )
+        .await
+        .expect("valid Admin password should issue a TOTP challenge");
+    assert!(challenge.expires_at_unix > 0);
+
+    let invalid_totp = service
+        .complete_login(challenge.token.as_str(), "000000")
+        .await;
+    assert!(matches!(
+        invalid_totp,
+        Err(usahapintar_api::identity::AdminAuthenticationError::InvalidChallenge)
+    ));
+
+    let failed_audit_events: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+          WHERE actor_type = 'system' AND subject_user_id IS NULL \
+            AND action_code = 'identity.admin.login.failed' \
+            AND outcome = 'failure'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("failed Admin login audit events should be inspectable");
+    assert!(failed_audit_events >= 2);
 }
 
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
