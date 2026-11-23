@@ -49,3 +49,5 @@ Dokumen dalam direktori ini merangkum baseline keamanan, privasi, dan tata kelol
 ## Referensi utama
 
 Setiap kebijakan mencantumkan acuan yang relevan. Referensi digunakan sebagai dasar praktik, bukan pernyataan bahwa USahapintar telah diaudit atau memenuhi seluruh persyaratan suatu standar. Persyaratan hukum dan kontraktual harus ditinjau sesuai yurisdiksi serta layanan yang benar-benar digunakan.
+
+- [Autentikasi Admin dan MFA](admin-authentication-and-mfa.md)

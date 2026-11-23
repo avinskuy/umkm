@@ -16,7 +16,7 @@ RBAC menetapkan kemampuan dasar berdasarkan role kanonis:
 
 ABAC mengevaluasi konteks setiap permintaan, termasuk identitas peminta, status akun, kepemilikan resource, status publikasi, status koneksi, persetujuan berbagi dokumen, klasifikasi data, tindakan yang diminta, dan tujuan akses.
 
-Role utama Business Owner atau Investor bersifat tetap setelah pendaftaran. Admin disediakan melalui proses internal; tidak ada pendaftaran Admin publik. Kebijakan role dijelaskan lebih lanjut dalam dokumen Identity Core dan keputusan produk.
+Role utama Business Owner atau Investor bersifat tetap setelah pendaftaran. Hanya ada satu akun Admin untuk platform, dibuat melalui provisioning internal; tidak ada pendaftaran Admin publik maupun sub-role Admin. Akun Admin menggunakan autentikasi email + password dan TOTP authenticator 6 digit. Kebijakan teknis Admin dijelaskan dalam [Autentikasi Admin dan MFA](admin-authentication-and-mfa.md).
 
 ## 2. Prinsip wajib
 
@@ -55,9 +55,14 @@ Admin memiliki akses operasional yang luas sesuai kebutuhan tahap proyek, tetapi
 - Admin tidak dapat mengubah role utama yang immutable atau melakukan penghapusan permanen akun secara sepihak.
 - Perubahan password dan kontak utama harus melalui proses keamanan yang semestinya, bukan pengeditan langsung oleh Admin.
 
-## 5. Pemisahan tugas dan peninjauan
+## 5. Akun Admin tunggal
 
-Pisahkan tanggung jawab untuk tindakan sensitif jika layak, misalnya persetujuan akses istimewa, penanganan recovery berisiko tinggi, dan perubahan konfigurasi production. Tinjau izin secara berkala dan cabut hak yang tidak lagi diperlukan.
+- Platform hanya memiliki satu akun Admin aktif yang diprovisikan secara internal.
+- Tidak ada Super Admin, Verification Admin, sub-role, atau pendaftaran Admin publik.
+- Akun Admin memiliki izin operasional yang ditetapkan secara eksplisit, termasuk peninjauan pemulihan akun.
+- Semua tindakan sensitif wajib memiliki audit trail; akun Admin tidak boleh melihat password, OTP, secret TOTP plaintext, atau token reset.
+- Login Admin wajib menggunakan email + password dan TOTP authenticator 6 digit. Kode TOTP hanya dapat digunakan sekali per time-step.
+- Jika akun Admin terkunci atau authenticator hilang, pemulihan dilakukan melalui prosedur operator internal yang tercatat, bukan endpoint publik atau bypass MFA.
 
 ## 6. Pengujian wajib
 

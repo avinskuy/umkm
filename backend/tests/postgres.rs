@@ -85,6 +85,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_authentication_database_operations(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
+    assert_single_admin_totp_schema(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -2488,6 +2489,136 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
     );
 }
 
+async fn assert_single_admin_totp_schema(pool: &PgPool) {
+    let (is_unique, predicate): (bool, Option<String>) = sqlx::query_as(
+        "SELECT i.indisunique, pg_catalog.pg_get_expr(i.indpred, i.indrelid) \
+           FROM pg_catalog.pg_index AS i \
+          WHERE i.indexrelid = 'public.users_single_admin_account_uidx'::regclass",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("single-Admin uniqueness index should exist");
+    assert!(is_unique, "Admin account index must be unique");
+    assert!(
+        predicate
+            .as_deref()
+            .is_some_and(|value| value.contains("admin")),
+        "Admin uniqueness index must apply only to Admin accounts"
+    );
+
+    let required_columns: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+           FROM information_schema.columns \
+          WHERE table_schema = 'public' \
+            AND table_name = 'admin_totp_credentials' \
+            AND column_name = ANY(ARRAY[ \
+                'user_id', 'secret_ciphertext', 'secret_nonce', \
+                'encryption_key_version', 'enabled_at', 'last_accepted_step', \
+                'created_at', 'updated_at' \
+            ]::text[])",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("Admin TOTP credential columns should be inspectable");
+    assert_eq!(required_columns, 8);
+
+    let required_guards: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+           FROM pg_catalog.pg_trigger \
+          WHERE tgrelid = 'public.admin_totp_credentials'::regclass \
+            AND NOT tgisinternal \
+            AND tgname = ANY(ARRAY[ \
+                'admin_totp_credentials_10_guard', \
+                'admin_totp_credentials_20_no_delete', \
+                'admin_totp_credentials_30_no_truncate' \
+            ]::text[])",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("Admin TOTP credential guards should be inspectable");
+    assert_eq!(required_guards, 3);
+
+    let admin_user_id: String = sqlx::query_scalar(
+        "SELECT id::text FROM public.users WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("recovery review fixture should provision the single active Admin");
+
+    let duplicate_admin = sqlx::query(
+        "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at, password_hash) \
+         VALUES ('admin', 'active', 'second-admin@example.test', 'email', clock_timestamp(), clock_timestamp(), 'test-only-hash')",
+    )
+    .execute(pool)
+    .await;
+    assert!(
+        duplicate_admin.is_err(),
+        "database must reject a second Admin account"
+    );
+
+    sqlx::query(
+        "INSERT INTO public.admin_totp_credentials (user_id, secret_ciphertext, secret_nonce, encryption_key_version) \
+         VALUES ($1::uuid, $2, $3, 'v1')",
+    )
+    .bind(&admin_user_id)
+    .bind(vec![0xA5_u8; 32])
+    .bind(vec![0x5A_u8; 12])
+    .execute(pool)
+    .await
+    .expect("encrypted TOTP credential should be attachable to the single active Admin");
+
+    sqlx::query(
+        "UPDATE public.admin_totp_credentials \
+            SET enabled_at = clock_timestamp(), last_accepted_step = 100 \
+          WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await
+    .expect("TOTP enrollment should be activatable after verification");
+
+    sqlx::query(
+        "UPDATE public.admin_totp_credentials SET last_accepted_step = 101 WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await
+    .expect("TOTP replay counter should advance");
+
+    let replay = sqlx::query(
+        "UPDATE public.admin_totp_credentials SET last_accepted_step = 100 WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await;
+    assert!(
+        replay.is_err(),
+        "TOTP replay counter must never move backwards"
+    );
+
+    let secret_replacement = sqlx::query(
+        "UPDATE public.admin_totp_credentials SET secret_ciphertext = $2 WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .bind(vec![0xB6_u8; 32])
+    .execute(pool)
+    .await;
+    assert!(
+        secret_replacement.is_err(),
+        "enabled TOTP secret cannot be replaced by a direct update"
+    );
+
+    let credential_delete =
+        sqlx::query("DELETE FROM public.admin_totp_credentials WHERE user_id = $1::uuid")
+            .bind(&admin_user_id)
+            .execute(pool)
+            .await;
+    assert!(
+        credential_delete.is_err(),
+        "Admin TOTP credential cannot be deleted directly"
+    );
+}
+
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
     let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL").expect(
         "CI must provide a disposable target-database DBA connection for privilege bootstrap tests",
@@ -2559,7 +2690,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
-                   'account_recovery_case_signals', 'account_recovery_review_decisions', \
+                   'account_recovery_case_signals', 'account_recovery_review_decisions', 'admin_totp_credentials', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \

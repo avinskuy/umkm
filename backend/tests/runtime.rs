@@ -1034,16 +1034,26 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .expect("DBA should inspect recorded prior-session signal");
     assert_eq!(matched_signal_count, 1);
 
-    let admin_email = format!("recovery-review-admin-{email}");
-    let reviewer_id: String = sqlx::query_scalar(
-        "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at, password_hash) \
-         VALUES ('admin', 'active', $1, 'email', clock_timestamp(), clock_timestamp(), '$argon2id$test-review-hash') \
-         RETURNING id::text",
+    let existing_admin_id: Option<String> = sqlx::query_scalar(
+        "SELECT id::text FROM public.users WHERE primary_role = 'admin' AND account_status = 'active'",
     )
-    .bind(&admin_email)
-    .fetch_one(&admin_pool)
+    .fetch_optional(&admin_pool)
     .await
-    .expect("an active Admin reviewer should be provisioned for the test");
+    .expect("existing Admin account should be queryable");
+    let reviewer_id = if let Some(admin_id) = existing_admin_id {
+        admin_id
+    } else {
+        let admin_email = format!("recovery-review-admin-{email}");
+        sqlx::query_scalar(
+            "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at, password_hash) \
+             VALUES ('admin', 'active', $1, 'email', clock_timestamp(), clock_timestamp(), '$argon2id$test-review-hash') \
+             RETURNING id::text",
+        )
+        .bind(&admin_email)
+        .fetch_one(&admin_pool)
+        .await
+        .expect("a single active Admin reviewer should be provisioned for the test")
+    };
 
     let reviewer_session_token = "b".repeat(64);
     let reviewer_session_hash = hash_session_token(&reviewer_session_token);
