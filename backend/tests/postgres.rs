@@ -2683,7 +2683,7 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
             .expect("service TOTP secret should be encrypted");
     let service_key_version = key_version_label(service_encrypted.key_version)
         .expect("service TOTP key version should be valid");
-    sqlx::query(
+    let reset_prepared: bool = sqlx::query_scalar(
         "SELECT public.reset_admin_totp_enrollment( \
             $1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid \
         )",
@@ -2693,18 +2693,20 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
     .bind(service_encrypted.nonce.to_vec())
     .bind(service_key_version)
     .bind("00000000-0000-4000-8000-000000000002")
-    .execute(pool)
+    .fetch_one(pool)
     .await
     .expect("operator should prepare a fresh TOTP secret for end-to-end service coverage");
-    sqlx::query(
+    assert!(reset_prepared);
+    let reactivated: bool = sqlx::query_scalar(
         "SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)",
     )
     .bind(&admin_id)
     .bind(current_totp_step - 1)
     .bind("00000000-0000-4000-8000-000000000002")
-    .execute(pool)
+    .fetch_one(pool)
     .await
     .expect("operator should activate the fresh TOTP secret before service login");
+    assert!(reactivated);
 
     let invalid_password = service
         .begin_login(
