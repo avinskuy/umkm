@@ -133,7 +133,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 DECLARE
     v_prepared_user_id UUID;
 BEGIN
@@ -319,7 +319,7 @@ COMMENT ON FUNCTION public.reset_admin_totp_enrollment(UUID, BYTEA, BYTEA, TEXT,
 
     RETURN TRUE;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.prepare_admin_totp_enrollment(UUID, BYTEA, BYTEA, TEXT, UUID) FROM PUBLIC;
 
