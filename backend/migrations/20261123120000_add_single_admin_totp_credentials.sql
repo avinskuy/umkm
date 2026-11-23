@@ -73,14 +73,22 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    IF OLD.enabled_at IS NOT NULL AND NEW.enabled_at IS DISTINCT FROM OLD.enabled_at THEN
-        RAISE EXCEPTION 'enabled Admin TOTP enrollment cannot be reset through a direct update'
+    IF OLD.enabled_at IS NOT NULL AND (
+        NEW.enabled_at IS DISTINCT FROM OLD.enabled_at
+        OR NEW.secret_ciphertext IS DISTINCT FROM OLD.secret_ciphertext
+        OR NEW.secret_nonce IS DISTINCT FROM OLD.secret_nonce
+        OR NEW.encryption_key_version IS DISTINCT FROM OLD.encryption_key_version
+    ) THEN
+        RAISE EXCEPTION 'enabled Admin TOTP secret and enrollment cannot be replaced directly'
             USING ERRCODE = '23514';
     END IF;
 
     IF OLD.last_accepted_step IS NOT NULL
-       AND NEW.last_accepted_step < OLD.last_accepted_step THEN
-        RAISE EXCEPTION 'Admin TOTP replay counter cannot move backwards'
+       AND (
+           NEW.last_accepted_step IS NULL
+           OR NEW.last_accepted_step < OLD.last_accepted_step
+       ) THEN
+        RAISE EXCEPTION 'Admin TOTP replay counter cannot move backwards or be cleared'
             USING ERRCODE = '23514';
     END IF;
 
