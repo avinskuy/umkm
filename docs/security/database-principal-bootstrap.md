@@ -2,7 +2,7 @@
 
 - **Status:** baseline implementasi untuk database khusus USahapintar
 - **Tanggal:** 22 November 2026
-- **Cakupan:** PostgreSQL 16, SQLx, Identity Core migrations 0001–0005
+- **Cakupan:** PostgreSQL 16, SQLx, Identity Core migrations 0001–0018
 - **Penerapan produksi:** belum dilakukan
 
 ## 1. Tujuan dan batas aman
@@ -33,7 +33,7 @@ Jangan memakai satu credential untuk aplikasi, migrasi, backup, monitoring, dan 
 2. Jalankan `001_create_principals.sql` sebagai DBA pada database target. Skrip ini idempotent untuk role/privilege yang dikelolanya.
 3. Tetapkan password setiap LOGIN role dari secret manager atau melalui sesi `psql` interaktif `\password role_name`. Untuk autentikasi production, utamakan SCRAM-SHA-256 atau sertifikat sesuai kebijakan jaringan.
 4. Jalankan seluruh SQLx migrations sebagai `usahapintar_migrator`, bukan superuser/DBA. Dengan demikian tabel dan fungsi dimiliki migrator yang tidak memiliki hak superuser.
-5. Setelah Identity Core 0001–0005 terpasang, jalankan `002_identity_core_grants.sql` sebagai DBA. Skrip menolak melanjutkan bila `create_client_user`, `users`, atau `identity_audit_events` bukan milik migrator non-superuser.
+5. Setelah seluruh migration Identity Core terpasang, jalankan `002_identity_core_grants.sql` sebagai DBA. Skrip menolak melanjutkan bila `create_client_user`, `users`, atau `identity_audit_events` bukan milik migrator non-superuser.
 6. Verifikasi koneksi dan privilege memakai tes PostgreSQL pada CI atau database disposable sebelum perubahan lingkungan bersama.
 
 Untuk database yang sudah dimigrasikan oleh superuser/owner lain, jangan langsung memberikan EXECUTE pada fungsi `SECURITY DEFINER`. Skrip 002 sengaja gagal tertutup. Lakukan rencana transfer ownership yang ditinjau dan diuji secara terpisah; jangan melakukan `REASSIGN OWNED` secara membabi buta.
@@ -46,7 +46,7 @@ Aplikasi mendapat:
 - `INSERT` pada `identity_audit_events`.
 - `EXECUTE` pada validator metadata audit yang dipakai constraint.
 
-Aplikasi **tidak** mendapat SELECT/INSERT/UPDATE/DELETE/TRUNCATE langsung pada tabel akun, identitas provider, verifikasi, sesi, kontak pemulihan, kasus recovery, token reset, atau audit. Aplikasi juga tidak mendapat CREATE pada schema, akses fungsi trigger, atau hak baca audit. Akses domain lain harus ditambahkan melalui grant eksplisit per use case setelah kontrak runtime dan tes otorisasi tersedia.
+Aplikasi **tidak** mendapat SELECT/INSERT/UPDATE/DELETE/TRUNCATE langsung pada tabel akun, identitas provider, verifikasi, sesi, kontak pemulihan, kasus recovery, token reset, kredensial TOTP Admin, atau audit. Aplikasi juga tidak mendapat CREATE pada schema, akses fungsi trigger, atau hak baca audit. Akses domain lain harus ditambahkan melalui grant eksplisit per use case setelah kontrak runtime dan tes otorisasi tersedia.
 
 Fungsi `create_client_user` adalah SECURITY DEFINER dan hanya aman diberikan kepada aplikasi jika owner-nya `usahapintar_migrator` yang bukan superuser/BYPASSRLS/CREATEDB/CREATEROLE serta memiliki tabel terkait. Jangan pernah menjalankan migration production dengan superuser.
 
@@ -73,4 +73,4 @@ Tes harus membuktikan aplikasi dapat memanggil fungsi pembuatan akun dan menulis
 
 ## 8. Belum termasuk
 
-Skrip provisioning ini tidak menjalankan aplikasi atau mengubah konfigurasi HTTP runtime. Integrasi pool PostgreSQL pada HTTP startup sudah tersedia, tetapi hanya dapat digunakan setelah principal dan connection string disiapkan sesuai prosedur. Provisioning ini juga tidak mengaktifkan endpoint autentikasi, login/session runtime, OTP provider, Admin console, backup scheduler, monitoring exporter, rotasi password otomatis, RLS policy domain, migration production, atau deployment. Hak baca audit untuk Admin dan grant CRUD domain harus ditinjau secara terpisah.
+Skrip provisioning ini tidak menjalankan aplikasi atau mengubah konfigurasi HTTP runtime. Integrasi pool PostgreSQL pada HTTP startup sudah tersedia, tetapi hanya dapat digunakan setelah principal dan connection string disiapkan sesuai prosedur. Provisioning ini juga tidak mengaktifkan endpoint autentikasi, login/session runtime, OTP provider, login Admin/TOTP, Admin console, backup scheduler, monitoring exporter, rotasi password otomatis, RLS policy domain, migration production, atau deployment. Hak baca audit untuk Admin dan grant CRUD domain harus ditinjau secara terpisah.
