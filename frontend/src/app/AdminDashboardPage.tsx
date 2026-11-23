@@ -84,11 +84,10 @@ export function AdminDashboardPage() {
       <main className={styles.loadingPage}>
         <p className={styles.eyebrow}>USAHAPINTAR · ADMIN</p>
         <h1>Sesi belum tersedia</h1>
-        <p className={styles.error} role="alert">{notice}</p>
-        <button
-          type="button"
-          onClick={() => setRetryCount((value) => value + 1)}
-        >
+        <p className={styles.error} role="alert">
+          {notice}
+        </p>
+        <button type="button" onClick={() => setRetryCount((value) => value + 1)}>
           Coba lagi
         </button>
         <button
@@ -106,7 +105,9 @@ export function AdminDashboardPage() {
     <main className={styles.page}>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="USahapintar beranda">
-          <span className={styles.brandMark} aria-hidden="true">U</span>
+          <span className={styles.brandMark} aria-hidden="true">
+            U
+          </span>
           <span>USahapintar</span>
           <span className={styles.adminLabel}>ADMIN</span>
         </a>
@@ -115,26 +116,18 @@ export function AdminDashboardPage() {
         </button>
       </header>
 
-      <section
-        className={styles.content}
-        aria-labelledby="admin-dashboard-title"
-      >
+      <section className={styles.content} aria-labelledby="admin-dashboard-title">
         <p className={styles.eyebrow}>ADMINISTRATOR WORKSPACE</p>
         <h1 id="admin-dashboard-title">Dashboard Admin</h1>
         <p className={styles.description}>
-          Sesi administrator terverifikasi. Area operasional akan diaktifkan
-          secara bertahap setelah modul dan kontrol aksesnya selesai diaudit.
+          Sesi administrator terverifikasi. Area operasional akan diaktifkan secara
+          bertahap setelah modul dan kontrol aksesnya selesai diaudit.
         </p>
 
-        <section
-          className={styles.sessionCard}
-          aria-label="Informasi sesi Admin"
-        >
+        <section className={styles.sessionCard} aria-label="Informasi sesi Admin">
           <div>
             <span className={styles.fieldLabel}>Status sesi</span>
-            <strong className={styles.sessionStatus}>
-              Aktif dan terverifikasi
-            </strong>
+            <strong className={styles.sessionStatus}>Aktif dan terverifikasi</strong>
           </div>
           <div>
             <span className={styles.fieldLabel}>Peran</span>
@@ -147,10 +140,14 @@ export function AdminDashboardPage() {
         </section>
 
         <div className={styles.notice} role="status">
-          Fondasi autentikasi Admin sudah aktif. Fitur pengelolaan belum tersedia
-          pada tahap ini.
+          Fondasi autentikasi Admin sudah aktif. Fitur pengelolaan belum tersedia pada
+          tahap ini.
         </div>
-        {notice && <p className={styles.error} role="alert">{notice}</p>}
+        {notice && (
+          <p className={styles.error} role="alert">
+            {notice}
+          </p>
+        )}
       </section>
     </main>
   );
