@@ -3,7 +3,8 @@ pub mod database;
 pub mod identity;
 
 use crate::identity::http::{
-    authentication_router, recovery_router, AuthenticationApiState, RecoveryApiState,
+    admin_authentication_router, authentication_router, recovery_router,
+    AdminAuthenticationApiState, AuthenticationApiState, RecoveryApiState,
 };
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
@@ -58,6 +59,15 @@ pub fn app(pool: PgPool) -> Router {
 /// Build the public API with password authentication routes mounted.
 pub fn app_with_authentication(pool: PgPool, authentication: AuthenticationApiState) -> Router {
     app(pool).merge(authentication_router(authentication))
+}
+
+/// Build the public API with Owner/Investor and isolated Admin authentication routes.
+pub fn app_with_authentication_and_admin(
+    pool: PgPool,
+    authentication: AuthenticationApiState,
+    admin_authentication: AdminAuthenticationApiState,
+) -> Router {
+    app_with_authentication(pool, authentication).merge(admin_authentication_router(admin_authentication))
 }
 
 /// Build the public API with password authentication and account recovery routes mounted.
