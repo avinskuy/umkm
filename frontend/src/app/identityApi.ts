@@ -37,7 +37,10 @@ async function requestIdentityApi(
       },
     });
   } catch {
-    throw new IdentityApiError(0, "Koneksi belum tersedia. Periksa jaringan lalu coba lagi.");
+    throw new IdentityApiError(
+      0,
+      "Koneksi belum tersedia. Periksa jaringan lalu coba lagi.",
+    );
   }
 
   let payload: ApiPayload = {};
