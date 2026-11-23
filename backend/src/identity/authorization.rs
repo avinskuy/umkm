@@ -507,6 +507,7 @@ mod tests {
     #[test]
     fn admin_access_requires_matching_purpose_and_backend_confirmed_scope() {
         let mut item = resource("owner-1", ResourceVisibility::Private);
+        item.resource_type = "recovery_case".into();
         item.admin_scope_granted = true;
         assert_eq!(
             evaluate(&ctx(
