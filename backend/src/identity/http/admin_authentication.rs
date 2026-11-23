@@ -698,15 +698,9 @@ mod tests {
             .expect("lazy test pool should be valid");
         let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
             .expect("test rate-limit key should be valid");
-        let owner_state = crate::identity::http::AuthenticationApiState::new(
-            pool.clone(),
-            rate_limit_key,
-        );
-        let app = crate::app_with_authentication_and_admin(
-            pool,
-            owner_state,
-            test_state(),
-        );
+        let owner_state =
+            crate::identity::http::AuthenticationApiState::new(pool.clone(), rate_limit_key);
+        let app = crate::app_with_authentication_and_admin(pool, owner_state, test_state());
 
         let owner_cookie_on_admin_route = app
             .clone()
@@ -722,7 +716,10 @@ mod tests {
             )
             .await
             .expect("Admin route should reject an Owner session cookie");
-        assert_eq!(owner_cookie_on_admin_route.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            owner_cookie_on_admin_route.status(),
+            StatusCode::UNAUTHORIZED
+        );
         assert!(owner_cookie_on_admin_route
             .headers()
             .get_all(header::SET_COOKIE)
@@ -744,7 +741,10 @@ mod tests {
             )
             .await
             .expect("Owner route should reject an Admin session cookie");
-        assert_eq!(admin_cookie_on_owner_route.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            admin_cookie_on_owner_route.status(),
+            StatusCode::UNAUTHORIZED
+        );
         assert!(admin_cookie_on_owner_route
             .headers()
             .get_all(header::SET_COOKIE)
