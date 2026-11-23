@@ -5,8 +5,7 @@
 //! database runtime and must remain atomic.
 
 use ring::{
-    constant_time,
-    hmac,
+    constant_time, hmac,
     rand::{SecureRandom, SystemRandom},
 };
 use zeroize::Zeroizing;
@@ -95,11 +94,8 @@ pub fn matching_step(
         }
 
         let expected = code_for_step(secret, step)?;
-        if constant_time::verify_slices_are_equal(
-            expected.as_bytes(),
-            candidate_code.as_bytes(),
-        )
-        .is_ok()
+        if constant_time::verify_slices_are_equal(expected.as_bytes(), candidate_code.as_bytes())
+            .is_ok()
         {
             matched_step = Some(matched_step.map_or(step, |matched: u64| matched.max(step)));
         }
@@ -128,16 +124,31 @@ mod tests {
         let current = code_for_step(RFC_TEST_SECRET, 1).unwrap();
         let next = code_for_step(RFC_TEST_SECRET, 2).unwrap();
 
-        assert_eq!(matching_step(RFC_TEST_SECRET, &previous, 59, None).unwrap(), Some(0));
-        assert_eq!(matching_step(RFC_TEST_SECRET, &current, 59, None).unwrap(), Some(1));
-        assert_eq!(matching_step(RFC_TEST_SECRET, &next, 59, None).unwrap(), Some(2));
+        assert_eq!(
+            matching_step(RFC_TEST_SECRET, &previous, 59, None).unwrap(),
+            Some(0)
+        );
+        assert_eq!(
+            matching_step(RFC_TEST_SECRET, &current, 59, None).unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            matching_step(RFC_TEST_SECRET, &next, 59, None).unwrap(),
+            Some(2)
+        );
     }
 
     #[test]
     fn rejects_replayed_or_older_time_steps() {
         let code = code_for_step(RFC_TEST_SECRET, 1).unwrap();
-        assert_eq!(matching_step(RFC_TEST_SECRET, &code, 59, Some(1)).unwrap(), None);
-        assert_eq!(matching_step(RFC_TEST_SECRET, &code, 59, Some(2)).unwrap(), None);
+        assert_eq!(
+            matching_step(RFC_TEST_SECRET, &code, 59, Some(1)).unwrap(),
+            None
+        );
+        assert_eq!(
+            matching_step(RFC_TEST_SECRET, &code, 59, Some(2)).unwrap(),
+            None
+        );
     }
 
     #[test]
@@ -150,10 +161,7 @@ mod tests {
             matching_step(RFC_TEST_SECRET, "12a456", 59, None),
             Err(TotpError::InvalidCode)
         );
-        assert_eq!(
-            code_for_step(b"short", 1),
-            Err(TotpError::InvalidSecret)
-        );
+        assert_eq!(code_for_step(b"short", 1), Err(TotpError::InvalidSecret));
     }
 
     #[test]
