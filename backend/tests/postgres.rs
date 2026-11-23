@@ -2809,6 +2809,21 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         "application should execute only the explicit Admin authentication functions"
     );
 
+    let operator_function_access: (bool, bool) = sqlx::query_as(
+        "SELECT has_function_privilege(current_user, \
+                    'public.activate_admin_totp_enrollment(uuid,bigint,uuid)', 'EXECUTE'), \
+                has_function_privilege(current_user, \
+                    'public.reset_admin_totp_enrollment(uuid,bytea,bytea,text,text,uuid)', 'EXECUTE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("operator-only TOTP procedure privileges should be queryable");
+    assert_eq!(
+        operator_function_access,
+        (false, false),
+        "application principal must not execute operator-only TOTP recovery procedures"
+    );
+
     let created_user_id: String =
         sqlx::query_scalar("SELECT public.create_client_user_with_profile_and_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)::text")
             .bind("Pemilik Bootstrap")
