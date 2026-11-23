@@ -11,8 +11,8 @@ use super::{
 };
 
 mod admin_authentication;
-pub mod authorization;
 mod authentication;
+pub mod authorization;
 mod handlers;
 mod password_reset;
 mod recovery;
