@@ -10,16 +10,14 @@ use zeroize::Zeroizing;
 
 use super::{
     append_audit_event,
-    AuditActorType, AuditEvent, AuditOutcome,
     authentication::{
         hash_session_token, ip_rate_limit_subject, normalize_identifier, random_session_token,
         session_token_hash, AuthenticationRateLimitKey,
     },
-    crypto::{
-        decrypt_admin_totp_secret, parse_key_version, EncryptedPayload, KeyProvider,
-    },
+    crypto::{decrypt_admin_totp_secret, parse_key_version, EncryptedPayload, KeyProvider},
     password::{hash_password, verify_password},
     totp::matching_step,
+    AuditActorType, AuditEvent, AuditOutcome,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,13 +133,12 @@ impl<'a> AdminAuthenticationService<'a> {
             .rate_limit_key
             .fingerprint(b"usahapintar:admin-login-ip:v1", &ip_subject);
 
-        let allowed: bool =
-            sqlx::query_scalar("SELECT public.reserve_admin_login_attempt($1, $2)")
-                .bind(identifier_hash.to_vec())
-                .bind(ip_hash.to_vec())
-                .fetch_one(self.pool)
-                .await
-                .map_err(|_| AdminAuthenticationError::Database)?;
+        let allowed: bool = sqlx::query_scalar("SELECT public.reserve_admin_login_attempt($1, $2)")
+            .bind(identifier_hash.to_vec())
+            .bind(ip_hash.to_vec())
+            .fetch_one(self.pool)
+            .await
+            .map_err(|_| AdminAuthenticationError::Database)?;
         if !allowed {
             return Err(AdminAuthenticationError::RateLimited);
         }
@@ -171,13 +168,13 @@ impl<'a> AdminAuthenticationService<'a> {
         .map_err(|_| AdminAuthenticationError::Internal)?;
 
         let Some(user_id) = verified else {
-            self.append_failed_login_audit("invalid_credentials").await?;
+            self.append_failed_login_audit("invalid_credentials")
+                .await?;
             return Err(AdminAuthenticationError::InvalidCredentials);
         };
 
-        let challenge_token = Zeroizing::new(
-            random_session_token().map_err(|_| AdminAuthenticationError::Internal)?,
-        );
+        let challenge_token =
+            Zeroizing::new(random_session_token().map_err(|_| AdminAuthenticationError::Internal)?);
         let challenge_hash = hash_session_token(challenge_token.as_str());
         let (_, expires_at_unix): (String, i64) = sqlx::query_as(
             "SELECT challenge_id::text, expires_at_unix \
@@ -201,13 +198,10 @@ impl<'a> AdminAuthenticationService<'a> {
         challenge_token: &str,
         totp_code: &str,
     ) -> Result<AdminLoginSession, AdminAuthenticationError> {
-        let challenge_hash =
-            session_token_hash(challenge_token).map_err(|_| AdminAuthenticationError::InvalidChallenge)?;
+        let challenge_hash = session_token_hash(challenge_token)
+            .map_err(|_| AdminAuthenticationError::InvalidChallenge)?;
 
-        let credential = sqlx::query_as::<
-            _,
-            (String, Vec<u8>, Vec<u8>, String, Option<i64>),
-        >(
+        let credential = sqlx::query_as::<_, (String, Vec<u8>, Vec<u8>, String, Option<i64>)>(
             "SELECT user_id::text, secret_ciphertext, secret_nonce, \
                     encryption_key_version, last_accepted_step \
                FROM public.get_admin_login_totp_credentials($1)",
@@ -219,8 +213,8 @@ impl<'a> AdminAuthenticationService<'a> {
         .ok_or(AdminAuthenticationError::InvalidChallenge)?;
 
         let (user_id, ciphertext, nonce, key_version_label, last_step) = credential;
-        let key_version =
-            parse_key_version(&key_version_label).map_err(|_| AdminAuthenticationError::Internal)?;
+        let key_version = parse_key_version(&key_version_label)
+            .map_err(|_| AdminAuthenticationError::Internal)?;
         let nonce: [u8; 12] = nonce
             .try_into()
             .map_err(|_| AdminAuthenticationError::Internal)?;
@@ -247,25 +241,21 @@ impl<'a> AdminAuthenticationService<'a> {
         let matched_step = match matching_step(&secret, totp_code, now, last_step) {
             Ok(Some(step)) => step,
             Ok(None) | Err(_) => {
-                let _: bool = sqlx::query_scalar(
-                    "SELECT public.record_admin_login_challenge_failure($1)",
-                )
-                .bind(challenge_hash.to_vec())
-                .fetch_one(self.pool)
-                .await
-                .map_err(|_| AdminAuthenticationError::Database)?;
+                let _: bool =
+                    sqlx::query_scalar("SELECT public.record_admin_login_challenge_failure($1)")
+                        .bind(challenge_hash.to_vec())
+                        .fetch_one(self.pool)
+                        .await
+                        .map_err(|_| AdminAuthenticationError::Database)?;
                 self.append_failed_login_audit("invalid_totp").await?;
                 return Err(AdminAuthenticationError::InvalidChallenge);
             }
         };
 
-        let session_token = Zeroizing::new(
-            random_session_token().map_err(|_| AdminAuthenticationError::Internal)?,
-        );
+        let session_token =
+            Zeroizing::new(random_session_token().map_err(|_| AdminAuthenticationError::Internal)?);
         let session_hash = hash_session_token(session_token.as_str());
-        let _: String = sqlx::query_scalar(
-            "SELECT public.complete_admin_login($1, $2, $3)::text",
-        )
+        let _: String = sqlx::query_scalar("SELECT public.complete_admin_login($1, $2, $3)::text")
         .bind(challenge_hash.to_vec())
         .bind(i64::try_from(matched_step).map_err(|_| AdminAuthenticationError::Internal)?)
         .bind(session_hash.to_vec())
