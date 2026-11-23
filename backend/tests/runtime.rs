@@ -1519,20 +1519,41 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
     .await
     .expect("current TOTP step should be available");
 
-    let reset: bool = sqlx::query_scalar(
-        "SELECT public.reset_admin_totp_enrollment( \
-            $1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid \
-        )",
+    let credential_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM public.admin_totp_credentials WHERE user_id = $1::uuid)",
     )
     .bind(&admin_id)
-    .bind(&encrypted.ciphertext)
-    .bind(encrypted.nonce.to_vec())
-    .bind(&key_version)
-    .bind(OPERATOR_ID)
     .fetch_one(&admin_pool)
     .await
-    .expect("operator should prepare the Admin TOTP credential");
-    assert!(reset);
+    .expect("Admin TOTP credential state should be queryable");
+    let prepared: bool = if credential_exists {
+        sqlx::query_scalar(
+            "SELECT public.reset_admin_totp_enrollment( \
+                $1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid \
+            )",
+        )
+        .bind(&admin_id)
+        .bind(&encrypted.ciphertext)
+        .bind(encrypted.nonce.to_vec())
+        .bind(&key_version)
+        .bind(OPERATOR_ID)
+        .fetch_one(&admin_pool)
+        .await
+        .expect("operator should reset the Admin TOTP credential")
+    } else {
+        sqlx::query_scalar(
+            "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, $4, $5::uuid)",
+        )
+        .bind(&admin_id)
+        .bind(&encrypted.ciphertext)
+        .bind(encrypted.nonce.to_vec())
+        .bind(&key_version)
+        .bind(OPERATOR_ID)
+        .fetch_one(&admin_pool)
+        .await
+        .expect("operator should prepare the initial Admin TOTP credential")
+    };
+    assert!(prepared);
 
     let activated: bool = sqlx::query_scalar(
         "SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)",
