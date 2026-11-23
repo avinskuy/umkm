@@ -179,6 +179,7 @@ async fn registration_http_router_creates_and_verifies_an_account_without_being_
                 KeyPurpose::DataEncryption => 0x11,
                 KeyPurpose::ContactFingerprint => 0x22,
                 KeyPurpose::OtpVerification => 0x33,
+                KeyPurpose::AdminTotpSecret => 0x44,
             };
             Ok(SecretKey::from_bytes([marker; 32]))
         }
@@ -640,6 +641,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
                 KeyPurpose::DataEncryption => 0x11,
                 KeyPurpose::ContactFingerprint => 0x22,
                 KeyPurpose::OtpVerification => 0x33,
+                KeyPurpose::AdminTotpSecret => 0x44,
             };
             Ok(SecretKey::from_bytes([marker; 32]))
         }

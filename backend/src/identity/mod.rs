@@ -5,6 +5,7 @@
 //! append-only. Router HTTP registrasi tersedia sebagai komponen terinjeksi, tetapi
 //! sengaja belum dipasang pada aplikasi runtime.
 
+pub mod admin_authentication;
 mod audit;
 pub mod authentication;
 pub mod crypto;
@@ -17,6 +18,10 @@ mod registration;
 pub mod totp;
 pub mod verification;
 
+pub use admin_authentication::{
+    AdminAuthenticatedSession, AdminAuthenticationError, AdminAuthenticationService,
+    AdminLoginChallenge, AdminLoginSession,
+};
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
 pub use authentication::{
     AuthenticatedSession, AuthenticationConfigError, AuthenticationError,

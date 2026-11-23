@@ -4,9 +4,14 @@ use sqlx::{postgres::PgPoolOptions, raw_sql, PgPool};
 use usahapintar_api::{
     database::{connect, migrations::run, DatabaseConfig},
     identity::{
-        crypto::{CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey, VersionedKey},
-        ClientRegistration, ClientRole, ContactChannel, DispatchStatus, OtpDeliveryMessage,
-        OtpDeliveryProvider, VerificationService,
+        crypto::{
+            encrypt_admin_totp_secret, key_version_label, CryptoError, KeyProvider, KeyPurpose,
+            KeyVersion, SecretKey, VersionedKey,
+        },
+        password::hash_password,
+        AdminAuthenticationService, AuthenticationRateLimitKey, ClientRegistration, ClientRole,
+        ContactChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
+        VerificationService,
     },
 };
 
@@ -26,6 +31,7 @@ impl KeyProvider for VerificationTestKeys {
             KeyPurpose::DataEncryption => 0x11,
             KeyPurpose::ContactFingerprint => 0x22,
             KeyPurpose::OtpVerification => 0x33,
+            KeyPurpose::AdminTotpSecret => 0x44,
         };
         Ok(SecretKey::from_bytes([marker; 32]))
     }
@@ -88,6 +94,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_single_admin_totp_schema(&pool).await;
     assert_admin_totp_operator_workflows(&pool).await;
     assert_admin_authentication_database_runtime(&pool).await;
+    assert_admin_authentication_service(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -2559,12 +2566,19 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     );
 
     let operator_id = "00000000-0000-4000-8000-000000000002";
+    let initial_totp_secret = [0x5A_u8; 20];
+    let initial_encrypted =
+        encrypt_admin_totp_secret(&VerificationTestKeys, &admin_user_id, &initial_totp_secret)
+            .expect("initial Admin TOTP secret should be encrypted");
+    let initial_key_version = key_version_label(initial_encrypted.key_version)
+        .expect("initial Admin TOTP key version should be valid");
     let prepared: bool = sqlx::query_scalar(
-        "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, 'v1', $4::uuid)",
+        "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, $4, $5::uuid)",
     )
     .bind(&admin_user_id)
-    .bind(vec![0xA5_u8; 36])
-    .bind(vec![0x5A_u8; 12])
+    .bind(&initial_encrypted.ciphertext)
+    .bind(initial_encrypted.nonce.to_vec())
+    .bind(initial_key_version)
     .bind(operator_id)
     .fetch_one(pool)
     .await
@@ -2634,6 +2648,144 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
         credential_delete.is_err(),
         "Admin TOTP credential cannot be deleted directly"
     );
+}
+
+async fn assert_admin_authentication_service(pool: &PgPool) {
+    let (admin_id, admin_email): (String, String) = sqlx::query_as(
+        "SELECT id::text, email_normalized FROM public.users \
+          WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("active Admin fixture should be available for service integration");
+
+    let password_hash = hash_password(b"Admin-Service-Test-Password-2026!")
+        .expect("Admin integration password should be hashed");
+    sqlx::query("UPDATE public.users SET password_hash = $2 WHERE id = $1::uuid")
+        .bind(&admin_id)
+        .bind(password_hash)
+        .execute(pool)
+        .await
+        .expect("Admin integration password should be stored through test fixture setup");
+
+    let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"cd".repeat(32))
+        .expect("test Admin rate-limit key should be valid");
+    let service = AdminAuthenticationService::new(pool, &rate_limit_key, &VerificationTestKeys);
+
+    let current_totp_step: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint")
+            .fetch_one(pool)
+            .await
+            .expect("current TOTP step should be available for service integration");
+    let service_totp_secret = [0x6B_u8; 20];
+    let service_encrypted =
+        encrypt_admin_totp_secret(&VerificationTestKeys, &admin_id, &service_totp_secret)
+            .expect("service TOTP secret should be encrypted");
+    let service_key_version = key_version_label(service_encrypted.key_version)
+        .expect("service TOTP key version should be valid");
+    let reset_prepared: bool = sqlx::query_scalar(
+        "SELECT public.reset_admin_totp_enrollment( \
+            $1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid \
+        )",
+    )
+    .bind(&admin_id)
+    .bind(&service_encrypted.ciphertext)
+    .bind(service_encrypted.nonce.to_vec())
+    .bind(service_key_version)
+    .bind("00000000-0000-4000-8000-000000000002")
+    .fetch_one(pool)
+    .await
+    .expect("operator should prepare a fresh TOTP secret for end-to-end service coverage");
+    assert!(reset_prepared);
+    // Assert operator activation before exercising the Admin login service.
+    let reactivated: bool =
+        sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)")
+            .bind(&admin_id)
+            .bind(current_totp_step - 1)
+            .bind("00000000-0000-4000-8000-000000000002")
+            .fetch_one(pool)
+            .await
+            .expect("operator should activate the fresh TOTP secret before service login");
+    assert!(reactivated);
+
+    let invalid_password = service
+        .begin_login(
+            &admin_email,
+            "Wrong-Admin-Password-2026!",
+            "192.0.2.44".parse().expect("test IP should be valid"),
+        )
+        .await;
+    assert!(matches!(
+        invalid_password,
+        Err(usahapintar_api::identity::AdminAuthenticationError::InvalidCredentials)
+    ));
+
+    let challenge = service
+        .begin_login(
+            &admin_email,
+            "Admin-Service-Test-Password-2026!",
+            "192.0.2.44".parse().expect("test IP should be valid"),
+        )
+        .await
+        .expect("valid Admin password should issue a TOTP challenge");
+    assert!(challenge.expires_at_unix > 0);
+
+    let valid_totp_code = usahapintar_api::identity::totp::code_for_step(
+        &service_totp_secret,
+        current_totp_step as u64,
+    )
+    .expect("valid TOTP code should be generated for the current time-step");
+    let session = service
+        .complete_login(challenge.token.as_str(), &valid_totp_code)
+        .await
+        .expect("valid TOTP should atomically create an isolated Admin session");
+    assert_eq!(session.user_id, admin_id);
+
+    let authenticated = service
+        .validate_session(session.token.as_str())
+        .await
+        .expect("new Admin session should validate");
+    assert_eq!(authenticated.user_id, admin_id);
+    assert!(service
+        .logout(session.token.as_str())
+        .await
+        .expect("Admin logout should revoke the isolated session"));
+    assert!(matches!(
+        service.validate_session(session.token.as_str()).await,
+        Err(usahapintar_api::identity::AdminAuthenticationError::InvalidSession)
+    ));
+
+    let failed_totp_challenge = service
+        .begin_login(
+            &admin_email,
+            "Admin-Service-Test-Password-2026!",
+            "192.0.2.44".parse().expect("test IP should be valid"),
+        )
+        .await
+        .expect("correct password should issue a second TOTP challenge");
+    let invalid_totp_code = usahapintar_api::identity::totp::code_for_step(
+        &service_totp_secret,
+        current_totp_step as u64 + 5,
+    )
+    .expect("out-of-window TOTP code should be generated");
+    let invalid_totp = service
+        .complete_login(failed_totp_challenge.token.as_str(), &invalid_totp_code)
+        .await;
+    assert!(matches!(
+        invalid_totp,
+        Err(usahapintar_api::identity::AdminAuthenticationError::InvalidChallenge)
+    ));
+
+    let failed_audit_events: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+          WHERE actor_type = 'system' AND subject_user_id IS NULL \
+            AND action_code = 'identity.admin.login.failed' \
+            AND outcome = 'failure'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("failed Admin login audit events should be inspectable");
+    assert_eq!(failed_audit_events, 2);
 }
 
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
@@ -3391,12 +3543,19 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
         .await
         .expect("operator workflow fixture should create an active Admin session");
 
+    let reset_totp_secret = [0x6B_u8; 20];
+    let reset_encrypted =
+        encrypt_admin_totp_secret(&VerificationTestKeys, &admin_id, &reset_totp_secret)
+            .expect("replacement Admin TOTP secret should be encrypted");
+    let reset_key_version = key_version_label(reset_encrypted.key_version)
+        .expect("replacement Admin TOTP key version should be valid");
     let reset: bool = sqlx::query_scalar(
-        "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, 'v2', 'authenticator_lost', $4::uuid)",
+        "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid)",
     )
     .bind(&admin_id)
-    .bind(vec![0xB6_u8; 36])
-    .bind(vec![0x6B_u8; 12])
+    .bind(&reset_encrypted.ciphertext)
+    .bind(reset_encrypted.nonce.to_vec())
+    .bind(&reset_key_version)
     .bind(operator_id)
     .fetch_one(pool)
     .await
@@ -3409,12 +3568,15 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
            FROM public.admin_totp_credentials WHERE user_id = $1::uuid",
     )
     .bind(&admin_id)
-    .bind(vec![0xB6_u8; 36])
-    .bind(vec![0x6B_u8; 12])
+    .bind(&reset_encrypted.ciphertext)
+    .bind(reset_encrypted.nonce.to_vec())
     .fetch_one(pool)
     .await
     .expect("reset TOTP credential should be inspectable by migrator");
-    assert_eq!(credential_state, (true, true, true, true, "v2".to_owned()));
+    assert_eq!(
+        credential_state,
+        (true, true, true, true, reset_key_version.clone())
+    );
 
     let challenge_consumed: bool = sqlx::query_scalar(
         "SELECT consumed_at IS NOT NULL FROM public.admin_login_challenges WHERE challenge_hash = $1",
@@ -3585,7 +3747,7 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert_eq!(challenge_credential.0, admin_id);
     assert_eq!(challenge_credential.1.len(), 36);
     assert_eq!(challenge_credential.2.len(), 12);
-    assert_eq!(challenge_credential.3, "v2");
+    assert_eq!(challenge_credential.3, "v1");
     assert_eq!(challenge_credential.4, Some(101));
 
     let session_hash = vec![0x52_u8; 32];
