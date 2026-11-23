@@ -157,7 +157,12 @@ pub fn encrypt(
     plaintext: &[u8],
     associated_data: &[u8],
 ) -> Result<EncryptedPayload, CryptoError> {
-    encrypt_for_purpose(provider, KeyPurpose::DataEncryption, plaintext, associated_data)
+    encrypt_for_purpose(
+        provider,
+        KeyPurpose::DataEncryption,
+        plaintext,
+        associated_data,
+    )
 }
 
 /// Enkripsi untuk tujuan key tertentu tanpa mengubah domain key antar-purpose.
@@ -202,7 +207,12 @@ pub fn decrypt(
     payload: &EncryptedPayload,
     associated_data: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, CryptoError> {
-    decrypt_for_purpose(provider, KeyPurpose::DataEncryption, payload, associated_data)
+    decrypt_for_purpose(
+        provider,
+        KeyPurpose::DataEncryption,
+        payload,
+        associated_data,
+    )
 }
 
 fn decrypt_for_purpose(
@@ -282,11 +292,9 @@ fn admin_totp_associated_data(
 
 fn is_canonical_uuid(value: &str) -> bool {
     value.len() == 36
-        && value.bytes().enumerate().all(|(index, byte)| {
-            match index {
-                8 | 13 | 18 | 23 => byte == b'-',
-                _ => byte.is_ascii_hexdigit(),
-            }
+        && value.bytes().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_hexdigit(),
         })
 }
 
@@ -390,8 +398,7 @@ impl AdminTotpKeyring {
         );
         let active_version = parse_key_version(active_label.as_str())?;
         let encoded_keys = Zeroizing::new(
-            std::env::var("ADMIN_TOTP_ENCRYPTION_KEYS")
-                .map_err(|_| CryptoError::KeyUnavailable)?,
+            std::env::var("ADMIN_TOTP_ENCRYPTION_KEYS").map_err(|_| CryptoError::KeyUnavailable)?,
         );
 
         let mut keys = HashMap::new();
@@ -399,7 +406,10 @@ impl AdminTotpKeyring {
             let (label, encoded_key) = entry.split_once(':').ok_or(CryptoError::InvalidInput)?;
             let version = parse_key_version(label)?;
             let key_bytes = decode_hex_key(encoded_key)?;
-            if keys.insert(version, SecretKey::from_bytes(key_bytes)).is_some() {
+            if keys
+                .insert(version, SecretKey::from_bytes(key_bytes))
+                .is_some()
+            {
                 return Err(CryptoError::InvalidInput);
             }
         }
@@ -408,7 +418,10 @@ impl AdminTotpKeyring {
             return Err(CryptoError::KeyUnavailable);
         }
 
-        Ok(Self { active_version, keys })
+        Ok(Self {
+            active_version,
+            keys,
+        })
     }
 
     pub fn from_hex_entries(
@@ -425,7 +438,10 @@ impl AdminTotpKeyring {
                 return Err(CryptoError::InvalidInput);
             }
             let key_bytes = decode_hex_key(encoded_key)?;
-            if keys.insert(*version, SecretKey::from_bytes(key_bytes)).is_some() {
+            if keys
+                .insert(*version, SecretKey::from_bytes(key_bytes))
+                .is_some()
+            {
                 return Err(CryptoError::InvalidInput);
             }
         }
@@ -443,7 +459,10 @@ impl KeyProvider for AdminTotpKeyring {
         if purpose != KeyPurpose::AdminTotpSecret {
             return Err(CryptoError::KeyUnavailable);
         }
-        let key = self.keys.get(&self.active_version).ok_or(CryptoError::KeyUnavailable)?;
+        let key = self
+            .keys
+            .get(&self.active_version)
+            .ok_or(CryptoError::KeyUnavailable)?;
         Ok(VersionedKey::new(
             self.active_version,
             SecretKey::from_bytes(*key.expose()),
@@ -754,8 +773,14 @@ mod tests {
         let provider = AdminTotpKeyring::from_hex_entries(
             KeyVersion(2),
             &[
-                (KeyVersion(1), "1111111111111111111111111111111111111111111111111111111111111111"),
-                (KeyVersion(2), "2222222222222222222222222222222222222222222222222222222222222222"),
+                (
+                    KeyVersion(1),
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                ),
+                (
+                    KeyVersion(2),
+                    "2222222222222222222222222222222222222222222222222222222222222222",
+                ),
             ],
         )
         .expect("valid Admin keyring should load");
@@ -801,7 +826,10 @@ mod tests {
         assert_eq!(
             AdminTotpKeyring::from_hex_entries(
                 KeyVersion(3),
-                &[(KeyVersion(2), "2222222222222222222222222222222222222222222222222222222222222222")]
+                &[(
+                    KeyVersion(2),
+                    "2222222222222222222222222222222222222222222222222222222222222222",
+                )]
             )
             .err()
             .expect("missing active key must be rejected"),
@@ -811,8 +839,14 @@ mod tests {
             AdminTotpKeyring::from_hex_entries(
                 KeyVersion(2),
                 &[
-                    (KeyVersion(2), "2222222222222222222222222222222222222222222222222222222222222222"),
-                    (KeyVersion(2), "3333333333333333333333333333333333333333333333333333333333333333")
+                    (
+                        KeyVersion(2),
+                        "2222222222222222222222222222222222222222222222222222222222222222",
+                    ),
+                    (
+                        KeyVersion(2),
+                        "3333333333333333333333333333333333333333333333333333333333333333",
+                    )
                 ]
             )
             .err()
