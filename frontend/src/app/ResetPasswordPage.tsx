@@ -14,6 +14,7 @@ export function ResetPasswordPage() {
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const [completed, setCompleted] = useState(false);
+  const submitDisabled = pending || !password || !confirmation;
 
   useEffect(() => {
     const fragment = new URLSearchParams(window.location.hash.slice(1));
@@ -54,12 +55,16 @@ export function ResetPasswordPage() {
           confirm_password: confirmation,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as ApiMessage | null;
+      let payload: ApiMessage | null = null;
+      try {
+        payload = (await response.json()) as ApiMessage;
+      } catch {
+        payload = null;
+      }
 
       if (!response.ok) {
         setNotice(
-          payload?.error ??
-            "Reset password belum dapat diproses. Periksa tautan atau coba lagi nanti.",
+          payload?.error ?? "Reset password gagal. Periksa tautan atau coba lagi.",
         );
         return;
       }
@@ -68,9 +73,7 @@ export function ResetPasswordPage() {
       setPassword("");
       setConfirmation("");
       setCompleted(true);
-      setNotice(
-        payload?.message ?? "Password berhasil diperbarui. Silakan masuk kembali.",
-      );
+      setNotice(payload?.message ?? "Password diperbarui. Silakan masuk kembali.");
     } catch {
       setNotice("Koneksi belum tersedia. Periksa jaringan lalu coba lagi.");
     } finally {
@@ -100,8 +103,8 @@ export function ResetPasswordPage() {
         <p className={styles.eyebrow}>KEAMANAN AKUN</p>
         <h1 id="reset-title">Buat password baru</h1>
         <p className={styles.description}>
-          Gunakan password baru untuk mengamankan akun. Setelah berhasil, semua sesi
-          sebelumnya akan berakhir dan kamu perlu masuk kembali.
+          Gunakan password baru untuk mengamankan akun. Setelah berhasil,
+          semua sesi sebelumnya akan berakhir dan kamu perlu masuk kembali.
         </p>
 
         {completed ? (
@@ -110,8 +113,8 @@ export function ResetPasswordPage() {
           </div>
         ) : !token ? (
           <div className={styles.notice} role="alert">
-            Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan pemulihan baru
-            melalui alur resmi USahapintar.
+            Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan
+            pemulihan baru melalui alur resmi USahapintar.
           </div>
         ) : (
           <form className={styles.form} onSubmit={submit}>
@@ -140,8 +143,8 @@ export function ResetPasswordPage() {
             />
 
             <p className={styles.hint}>
-              Password harus memenuhi kebijakan keamanan akun. Jangan gunakan password
-              yang pernah dipakai pada layanan lain.
+              Password harus memenuhi kebijakan keamanan akun. Jangan gunakan
+              password yang pernah dipakai pada layanan lain.
             </p>
 
             {notice && (
@@ -150,10 +153,7 @@ export function ResetPasswordPage() {
               </p>
             )}
 
-            <button
-              type="submit"
-              disabled={pending || !password || !confirmation}
-            >
+            <button type="submit" disabled={submitDisabled}>
               {pending ? "Menyimpan..." : "Simpan password baru"}
             </button>
           </form>
