@@ -52,11 +52,17 @@ CREATE TABLE public.admin_sessions (
     revocation_reason TEXT,
     CONSTRAINT admin_sessions_token_hash_check CHECK (octet_length(token_hash) = 32),
     CONSTRAINT admin_sessions_expiry_check CHECK (expires_at > created_at),
+    CONSTRAINT admin_sessions_activity_check
+        CHECK (last_seen_at >= created_at),
     CONSTRAINT admin_sessions_revocation_check
         CHECK (
             (revoked_at IS NULL AND revocation_reason IS NULL)
             OR
-            (revoked_at IS NOT NULL AND revocation_reason IN ('logout', 'account_status_changed', 'security_event', 'operator_action'))
+            (
+                revoked_at IS NOT NULL
+                AND revocation_reason IS NOT NULL
+                AND revocation_reason IN ('logout', 'account_status_changed', 'security_event', 'operator_action')
+            )
         )
 );
 
