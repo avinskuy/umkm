@@ -86,6 +86,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
     assert_single_admin_totp_schema(&pool).await;
+    assert_admin_authentication_database_runtime(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -2691,6 +2692,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
                    'account_recovery_case_signals', 'account_recovery_review_decisions', 'admin_totp_credentials', \
+                   'admin_login_rate_limits', 'admin_login_challenges', 'admin_sessions', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
@@ -3305,4 +3307,223 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         selected_case,
         ("under_review".to_owned(), started.user_id.clone())
     );
+}
+
+
+async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
+    let (admin_id, admin_email): (String, String) = sqlx::query_as(
+        "SELECT id::text, email_normalized FROM public.users \
+          WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("single active Admin fixture should exist");
+
+    let found_admin: Option<(String, String)> = sqlx::query_as(
+        "SELECT user_id::text, password_hash \
+           FROM public.find_active_admin_password_login($1)",
+    )
+    .bind(&admin_email)
+    .fetch_optional(pool)
+    .await
+    .expect("Admin password lookup should be callable");
+    assert_eq!(
+        found_admin.map(|(user_id, hash)| (user_id, hash)),
+        Some((admin_id.clone(), "test-only-hash".to_owned()))
+    );
+
+    let credential_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.get_admin_totp_credentials($1::uuid)",
+    )
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("active enrolled Admin TOTP credential should be available through its function");
+    assert_eq!(credential_count, 1);
+
+    let identifier_hash = vec![0x31_u8; 32];
+    let ip_hash = vec![0x32_u8; 32];
+    for attempt in 1..=5 {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_admin_login_attempt($1, $2)",
+        )
+        .bind(&identifier_hash)
+        .bind(&ip_hash)
+        .fetch_one(pool)
+        .await
+        .expect("Admin login attempt should be reserved");
+        assert!(allowed, "the first five identifier attempts should be allowed");
+        assert_eq!(attempt, attempt);
+    }
+    let blocked: bool = sqlx::query_scalar(
+        "SELECT public.reserve_admin_login_attempt($1, $2)",
+    )
+    .bind(&identifier_hash)
+    .bind(&ip_hash)
+    .fetch_one(pool)
+    .await
+    .expect("Admin rate limit should return a decision");
+    assert!(!blocked, "the sixth identifier attempt must be blocked");
+
+    let failed_challenge_hash = vec![0x41_u8; 32];
+    sqlx::query(
+        "SELECT challenge_id FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&failed_challenge_hash)
+    .execute(pool)
+    .await
+    .expect("active Admin should receive a short-lived login challenge");
+    for attempt in 1..=5 {
+        let still_valid: bool = sqlx::query_scalar(
+            "SELECT public.record_admin_login_challenge_failure($1)",
+        )
+        .bind(&failed_challenge_hash)
+        .fetch_one(pool)
+        .await
+        .expect("challenge failure should be recorded");
+        assert_eq!(still_valid, attempt < 5);
+    }
+    assert!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT public.complete_admin_login($1, 102, $2)::text",
+        )
+        .bind(&failed_challenge_hash)
+        .bind(vec![0x51_u8; 32])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "a challenge must be unusable after five failed TOTP attempts"
+    );
+
+    let challenge_hash = vec![0x42_u8; 32];
+    let (challenge_id, expires_at): (String, i64) = sqlx::query_as(
+        "SELECT challenge_id::text, expires_at_unix \
+           FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("fresh Admin challenge should be created");
+    assert!(!challenge_id.is_empty());
+    assert!(expires_at > 0);
+
+    let session_hash = vec![0x52_u8; 32];
+    let session_id: String = sqlx::query_scalar(
+        "SELECT public.complete_admin_login($1, 102, $2)::text",
+    )
+    .bind(&challenge_hash)
+    .bind(&session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("valid TOTP step should atomically consume challenge and create Admin session");
+    assert!(!session_id.is_empty());
+
+    let session_owner: Option<(String, String)> = sqlx::query_as(
+        "SELECT session_id::text, user_id::text \
+           FROM public.get_active_admin_session($1)",
+    )
+    .bind(&session_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("dedicated Admin session should be retrievable");
+    assert_eq!(session_owner, Some((session_id.clone(), admin_id.clone())));
+
+    assert!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT public.complete_admin_login($1, 102, $2)::text",
+        )
+        .bind(&challenge_hash)
+        .bind(vec![0x53_u8; 32])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "a consumed challenge and TOTP step must not be reusable"
+    );
+
+    let replay_challenge_hash = vec![0x43_u8; 32];
+    sqlx::query(
+        "SELECT challenge_id FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&replay_challenge_hash)
+    .execute(pool)
+    .await
+    .expect("new challenge should be available after the prior challenge is consumed");
+    assert!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT public.complete_admin_login($1, 102, $2)::text",
+        )
+        .bind(&replay_challenge_hash)
+        .bind(vec![0x54_u8; 32])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "the same TOTP time-step must be rejected across distinct challenges"
+    );
+
+    let concurrent_challenge_hash = vec![0x44_u8; 32];
+    sqlx::query(
+        "SELECT challenge_id FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&concurrent_challenge_hash)
+    .execute(pool)
+    .await
+    .expect("concurrency challenge should be created");
+    let first = sqlx::query_scalar::<_, String>(
+        "SELECT public.complete_admin_login($1, 103, $2)::text",
+    )
+    .bind(&concurrent_challenge_hash)
+    .bind(vec![0x61_u8; 32])
+    .fetch_one(pool);
+    let second = sqlx::query_scalar::<_, String>(
+        "SELECT public.complete_admin_login($1, 103, $2)::text",
+    )
+    .bind(&concurrent_challenge_hash)
+    .bind(vec![0x62_u8; 32])
+    .fetch_one(pool);
+    let (first_result, second_result) = tokio::join!(first, second);
+    assert_ne!(
+        first_result.is_ok(),
+        second_result.is_ok(),
+        "concurrent completion must issue exactly one Admin session"
+    );
+
+    let revoked: bool = sqlx::query_scalar("SELECT public.revoke_admin_session($1)")
+        .bind(&session_hash)
+        .fetch_one(pool)
+        .await
+        .expect("Admin logout should revoke the dedicated session");
+    assert!(revoked);
+    let inactive_session: Option<String> = sqlx::query_scalar(
+        "SELECT session_id::text FROM public.get_active_admin_session($1)",
+    )
+    .bind(&session_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("revoked Admin session should no longer validate");
+    assert!(inactive_session.is_none());
+
+    let admin_audit_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+          WHERE actor_type = 'admin' AND actor_id = $1::uuid \
+            AND action_code = 'identity.admin.login.succeeded' \
+            AND outcome = 'success'",
+    )
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("successful Admin login audit event should be recorded");
+    assert!(admin_audit_count >= 2);
+
+    let dedicated_session_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.admin_sessions WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("dedicated Admin session table should be inspectable by migrator");
+    assert!(dedicated_session_count >= 2);
 }
