@@ -2690,7 +2690,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
-                   'account_recovery_case_signals', 'account_recovery_review_decisions', \\\n                   'admin_totp_credentials', \\
+                   'account_recovery_case_signals', 'account_recovery_review_decisions', 'admin_totp_credentials', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
