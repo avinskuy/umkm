@@ -2500,7 +2500,9 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .expect("single-Admin uniqueness index should exist");
     assert!(is_unique, "Admin account index must be unique");
     assert!(
-        predicate.as_deref().is_some_and(|value| value.contains("admin")),
+        predicate
+            .as_deref()
+            .is_some_and(|value| value.contains("admin")),
         "Admin uniqueness index must apply only to Admin accounts"
     );
 
@@ -2589,7 +2591,10 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .bind(&admin_user_id)
     .execute(pool)
     .await;
-    assert!(replay.is_err(), "TOTP replay counter must never move backwards");
+    assert!(
+        replay.is_err(),
+        "TOTP replay counter must never move backwards"
+    );
 
     let secret_replacement = sqlx::query(
         "UPDATE public.admin_totp_credentials SET secret_ciphertext = $2 WHERE user_id = $1::uuid",
@@ -2603,12 +2608,11 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
         "enabled TOTP secret cannot be replaced by a direct update"
     );
 
-    let credential_delete = sqlx::query(
-        "DELETE FROM public.admin_totp_credentials WHERE user_id = $1::uuid",
-    )
-    .bind(&admin_user_id)
-    .execute(pool)
-    .await;
+    let credential_delete =
+        sqlx::query("DELETE FROM public.admin_totp_credentials WHERE user_id = $1::uuid")
+            .bind(&admin_user_id)
+            .execute(pool)
+            .await;
     assert!(
         credential_delete.is_err(),
         "Admin TOTP credential cannot be deleted directly"
