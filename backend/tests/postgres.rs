@@ -3596,6 +3596,28 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         "the same TOTP time-step must be rejected across distinct challenges"
     );
 
+    let future_challenge_hash = vec![0x45_u8; 32];
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&future_challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("fresh challenge should be created for time-window validation");
+    assert!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT public.complete_admin_login($1, $2, $3)::text",
+        )
+        .bind(&future_challenge_hash)
+        .bind(current_totp_step + 2)
+        .bind(vec![0x55_u8; 32])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "TOTP steps outside the accepted clock-drift window must be rejected"
+    );
+
     let concurrent_challenge_hash = vec![0x44_u8; 32];
     let _: String = sqlx::query_scalar(
         "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
