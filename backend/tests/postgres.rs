@@ -2785,7 +2785,7 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("failed Admin login audit events should be inspectable");
-    assert!(failed_audit_events >= 2);
+    assert_eq!(failed_audit_events, 2);
 }
 
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
