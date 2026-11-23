@@ -2,7 +2,8 @@ import { ResetPasswordPage } from "./ResetPasswordPage";
 import styles from "./App.module.css";
 
 export function App() {
-  if (window.location.pathname.replace(/\\/$/, "").endsWith("/reset-password")) {
+  const path = window.location.pathname;
+  if (path.endsWith("/reset-password") || path.endsWith("/reset-password/")) {
     return <ResetPasswordPage />;
   }
 
