@@ -82,7 +82,9 @@ export function AdminLoginPage() {
         </p>
 
         <div className={styles.stepIndicator} aria-label="Tahap autentikasi">
-          <span className={phase === "password" ? styles.activeStep : styles.completeStep}>
+          <span
+            className={phase === "password" ? styles.activeStep : styles.completeStep}
+          >
             1 <span>Password</span>
           </span>
           <span className={styles.stepLine} aria-hidden="true" />
