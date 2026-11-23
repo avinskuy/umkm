@@ -436,6 +436,7 @@ BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
         'public.find_active_admin_password_login(text)',
         'public.get_admin_totp_credentials(uuid)',
+        'public.get_admin_login_totp_credentials(bytea)',
         'public.reserve_admin_login_attempt(bytea,bytea)',
         'public.clear_admin_login_identifier_limit(bytea)',
         'public.create_admin_login_challenge(uuid,bytea)',
@@ -487,6 +488,8 @@ REVOKE ALL ON TABLE public.admin_sessions FROM usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.find_active_admin_password_login(TEXT)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.get_admin_totp_credentials(UUID)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.get_admin_login_totp_credentials(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.reserve_admin_login_attempt(BYTEA, BYTEA)
     TO usahapintar_app;
