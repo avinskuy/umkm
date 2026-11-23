@@ -2805,7 +2805,6 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         "SELECT count(*)::bigint \
            FROM pg_catalog.unnest(ARRAY[ \
                'public.find_active_admin_password_login(text)'::regprocedure, \
-               'public.get_admin_totp_credentials(uuid)'::regprocedure, \
                'public.get_admin_login_totp_credentials(bytea)'::regprocedure, \
                'public.reserve_admin_login_attempt(bytea,bytea)'::regprocedure, \
                'public.create_admin_login_challenge(uuid,bytea)'::regprocedure, \
@@ -2820,7 +2819,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .await
     .expect("Admin authentication function grants should be inspectable");
     assert_eq!(
-        admin_function_grants, 9,
+        admin_function_grants, 8,
         "application should execute only the explicit Admin authentication functions"
     );
 
@@ -3754,12 +3753,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert!(deactivated_challenge);
 
     let deactivated_totp_count: i64 = sqlx::query_scalar(
-        "SELECT count(*)::bigint FROM public.get_admin_totp_credentials($1::uuid)",
+        "SELECT count(*)::bigint FROM public.get_admin_login_totp_credentials($1)",
     )
-    .bind(&admin_id)
+    .bind(vec![0x48_u8; 32])
     .fetch_one(pool)
     .await
-    .expect("inactive Admin must not retrieve TOTP credentials");
+    .expect("inactive Admin must not retrieve TOTP credentials without an active challenge");
     assert_eq!(deactivated_totp_count, 0);
 
     assert!(
