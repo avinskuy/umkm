@@ -445,6 +445,91 @@ mod tests {
         headers
     }
 
+    fn test_state() -> AdminAuthenticationApiState {
+        use crate::identity::crypto::{AdminTotpKeyring, KeyVersion};
+
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy test pool should be valid");
+        let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
+            .expect("test rate-limit key should be valid");
+        let keyring = AdminTotpKeyring::from_hex_entries(
+            KeyVersion(1),
+            &[(
+                KeyVersion(1),
+                "1111111111111111111111111111111111111111111111111111111111111111",
+            )],
+        )
+        .expect("test Admin keyring should be valid");
+        AdminAuthenticationApiState::new(pool, rate_limit_key, Arc::new(keyring))
+    }
+
+    #[tokio::test]
+    async fn admin_login_rejects_cross_site_and_missing_origin_before_database_access() {
+        use axum::body::Body;
+        use tower::ServiceExt;
+
+        let router = admin_authentication_router(test_state());
+        let peer: SocketAddr = "127.0.0.1:3000".parse().unwrap();
+        let cross_site = axum::http::Request::builder()
+            .method("POST")
+            .uri("/api/v1/identity/admin/login")
+            .header(header::HOST, "app.example.test")
+            .header(header::ORIGIN, "https://evil.example.test")
+            .header("sec-fetch-site", "cross-site")
+            .header(header::CONTENT_TYPE, "application/json")
+            .extension(ConnectInfo(peer))
+            .body(Body::from("{}"))
+            .unwrap();
+        let response = router
+            .clone()
+            .oneshot(cross_site)
+            .await
+            .expect("router should answer cross-site login");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let missing_origin = axum::http::Request::builder()
+            .method("POST")
+            .uri("/api/v1/identity/admin/login")
+            .header(header::HOST, "app.example.test")
+            .header(header::CONTENT_TYPE, "application/json")
+            .extension(ConnectInfo(peer))
+            .body(Body::from("{}"))
+            .unwrap();
+        let response = router
+            .oneshot(missing_origin)
+            .await
+            .expect("router should answer login without Origin");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn admin_me_requires_its_own_session_cookie() {
+        use axum::body::Body;
+        use tower::ServiceExt;
+
+        let response = admin_authentication_router(test_state())
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/api/v1/identity/admin/me")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("router should answer unauthenticated Admin session request");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let cookies: Vec<_> = response
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|value| value.to_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(cookies.len(), 1);
+        assert!(cookies[0].starts_with(&format!("{ADMIN_SESSION_COOKIE}=")));
+        assert!(cookies[0].contains("SameSite=Strict"));
+    }
+
     #[test]
     fn admin_cookies_are_separate_host_only_secure_and_strict() {
         let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
