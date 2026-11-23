@@ -75,6 +75,53 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION public.revoke_admin_authentication_when_inactive()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $
+BEGIN
+    IF OLD.primary_role = 'admin'
+       AND OLD.account_status = 'active'
+       AND NEW.account_status <> 'active' THEN
+        UPDATE public.admin_login_challenges
+           SET consumed_at = clock_timestamp()
+         WHERE user_id = NEW.id
+           AND consumed_at IS NULL;
+
+        UPDATE public.admin_sessions
+           SET revoked_at = clock_timestamp(),
+               revocation_reason = 'account_status_changed'
+         WHERE user_id = NEW.id
+           AND revoked_at IS NULL;
+
+        INSERT INTO public.identity_audit_events (
+            actor_type, subject_user_id, action_code, outcome, reason_code, metadata
+        )
+        VALUES (
+            'system', NEW.id, 'identity.admin.access.revoked',
+            'success', 'account_status_changed',
+            pg_catalog.jsonb_build_object(
+                'purpose', 'admin_login',
+                'role', 'admin',
+                'policy_code', 'inactive_admin_account'
+            )
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER users_30_revoke_admin_authentication_when_inactive
+    AFTER UPDATE OF account_status ON public.users
+    FOR EACH ROW
+    WHEN (OLD.primary_role = 'admin' AND OLD.account_status IS DISTINCT FROM NEW.account_status)
+    EXECUTE FUNCTION public.revoke_admin_authentication_when_inactive();
+
+REVOKE ALL ON FUNCTION public.revoke_admin_authentication_when_inactive() FROM PUBLIC;
+
 CREATE FUNCTION public.activate_admin_totp_enrollment(
     p_user_id UUID,
     p_verified_step BIGINT,
