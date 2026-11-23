@@ -2806,6 +2806,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
            FROM pg_catalog.unnest(ARRAY[ \
                'public.find_active_admin_password_login(text)'::regprocedure, \
                'public.get_admin_totp_credentials(uuid)'::regprocedure, \
+               'public.get_admin_login_totp_credentials(bytea)'::regprocedure, \
                'public.reserve_admin_login_attempt(bytea,bytea)'::regprocedure, \
                'public.clear_admin_login_identifier_limit(bytea)'::regprocedure, \
                'public.create_admin_login_challenge(uuid,bytea)'::regprocedure, \
@@ -2820,7 +2821,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .await
     .expect("Admin authentication function grants should be inspectable");
     assert_eq!(
-        admin_function_grants, 9,
+        admin_function_grants, 10,
         "application should execute only the explicit Admin authentication functions"
     );
 
@@ -3577,6 +3578,22 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .expect("fresh Admin challenge should be created");
     assert!(!challenge_id.is_empty());
     assert!(expires_at > 0);
+
+    let challenge_credential: (String, Vec<u8>, Vec<u8>, String, Option<i64>) =
+        sqlx::query_as(
+            "SELECT user_id::text, secret_ciphertext, secret_nonce, \
+                    encryption_key_version, last_accepted_step \
+               FROM public.get_admin_login_totp_credentials($1)",
+        )
+        .bind(&challenge_hash)
+        .fetch_one(pool)
+        .await
+        .expect("valid Admin challenge should resolve only its active TOTP credential");
+    assert_eq!(challenge_credential.0, admin_id);
+    assert_eq!(challenge_credential.1.len(), 36);
+    assert_eq!(challenge_credential.2.len(), 12);
+    assert_eq!(challenge_credential.3, "v1");
+    assert_eq!(challenge_credential.4, Some(101));
 
     let session_hash = vec![0x52_u8; 32];
     let session_id: String =
