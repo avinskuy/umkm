@@ -1427,7 +1427,6 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     pool.close().await;
 }
 
-
 #[tokio::test]
 #[ignore = "requires disposable PostgreSQL application and DBA principals"]
 async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
