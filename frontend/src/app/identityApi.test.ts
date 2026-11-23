@@ -81,6 +81,20 @@ describe("Admin identity API", () => {
     await expect(getCurrentAdmin()).rejects.toMatchObject({ status: 502 });
   });
 
+  it("rejects an empty Admin user identifier", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ user_id: " ", role: "admin" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(getCurrentAdmin()).rejects.toMatchObject({ status: 502 });
+  });
+
   it("handles a 204 logout response without parsing JSON", async () => {
     const response = new Response(null, { status: 204 });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
