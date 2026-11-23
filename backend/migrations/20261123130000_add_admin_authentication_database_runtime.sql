@@ -119,6 +119,45 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION public.get_admin_login_totp_credentials(p_challenge_hash BYTEA)
+RETURNS TABLE (
+    challenge_id UUID,
+    user_id UUID,
+    secret_ciphertext BYTEA,
+    secret_nonce BYTEA,
+    encryption_key_version TEXT,
+    last_accepted_step BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF p_challenge_hash IS NULL OR octet_length(p_challenge_hash) <> 32 THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT challenge.id, challenge.user_id, credential.secret_ciphertext,
+           credential.secret_nonce, credential.encryption_key_version,
+           credential.last_accepted_step
+      FROM public.admin_login_challenges AS challenge
+      JOIN public.admin_totp_credentials AS credential
+        ON credential.user_id = challenge.user_id
+      JOIN public.users AS account
+        ON account.id = challenge.user_id
+     WHERE challenge.challenge_hash = p_challenge_hash
+       AND challenge.consumed_at IS NULL
+       AND challenge.expires_at > clock_timestamp()
+       AND challenge.attempt_count < 5
+       AND credential.enabled_at IS NOT NULL
+       AND account.primary_role = 'admin'
+       AND account.account_status = 'active';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_admin_login_totp_credentials(BYTEA) FROM PUBLIC;
+
 CREATE FUNCTION public.reserve_admin_login_attempt(p_identifier_hash BYTEA, p_ip_hash BYTEA)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
