@@ -2570,14 +2570,13 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .expect("encrypted TOTP credential should be attachable to the single active Admin");
 
     let operator_id = "00000000-0000-4000-8000-000000000001";
-    let enrollment_activated: bool = sqlx::query_scalar(
-        "SELECT public.activate_admin_totp_enrollment($1::uuid, 100, $2::uuid)",
-    )
-    .bind(&admin_user_id)
-    .bind(operator_id)
-    .fetch_one(pool)
-    .await
-    .expect("operator should activate TOTP only after enrollment verification");
+    let enrollment_activated: bool =
+        sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, 100, $2::uuid)")
+            .bind(&admin_user_id)
+            .bind(operator_id)
+            .fetch_one(pool)
+            .await
+            .expect("operator should activate TOTP only after enrollment verification");
     assert!(enrollment_activated);
 
     sqlx::query(
@@ -3368,14 +3367,12 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
     .expect("enabled Admin should be able to create a challenge before recovery");
 
     let active_session_hash = vec![0x72_u8; 32];
-    sqlx::query(
-        "INSERT INTO public.admin_sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
-    )
-    .bind(&admin_id)
-    .bind(&active_session_hash)
-    .execute(pool)
-    .await
-    .expect("operator workflow fixture should create an active Admin session");
+    sqlx::query("INSERT INTO public.admin_sessions (user_id, token_hash) VALUES ($1::uuid, $2)")
+        .bind(&admin_id)
+        .bind(&active_session_hash)
+        .execute(pool)
+        .await
+        .expect("operator workflow fixture should create an active Admin session");
 
     let reset: bool = sqlx::query_scalar(
         "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, 'v2', 'authenticator_lost', $4::uuid)",
@@ -3420,14 +3417,13 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
     .expect("operator reset should revoke active Admin sessions");
     assert_eq!(session_revocation.as_deref(), Some("operator_action"));
 
-    let reenrolled: bool = sqlx::query_scalar(
-        "SELECT public.activate_admin_totp_enrollment($1::uuid, 101, $2::uuid)",
-    )
-    .bind(&admin_id)
-    .bind(operator_id)
-    .fetch_one(pool)
-    .await
-    .expect("operator should activate the replacement authenticator after verification");
+    let reenrolled: bool =
+        sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, 101, $2::uuid)")
+            .bind(&admin_id)
+            .bind(operator_id)
+            .fetch_one(pool)
+            .await
+            .expect("operator should activate the replacement authenticator after verification");
     assert!(reenrolled);
 
     let audit_count: i64 = sqlx::query_scalar(
@@ -3492,11 +3488,11 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         );
     }
     let blocked: bool = sqlx::query_scalar("SELECT public.reserve_admin_login_attempt($1, $2)")
-    .bind(&identifier_hash)
-    .bind(&ip_hash)
-    .fetch_one(pool)
-    .await
-    .expect("Admin rate limit should return a decision");
+        .bind(&identifier_hash)
+        .bind(&ip_hash)
+        .fetch_one(pool)
+        .await
+        .expect("Admin rate limit should return a decision");
     assert!(!blocked, "the sixth identifier attempt must be blocked");
 
     let failed_challenge_hash = vec![0x41_u8; 32];
@@ -3518,12 +3514,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         assert_eq!(still_valid, attempt < 5);
     }
     assert!(
-        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
-        .bind(&failed_challenge_hash)
-        .bind(vec![0x51_u8; 32])
-        .fetch_one(pool)
-        .await
-        .is_err(),
+            sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
+                .bind(&failed_challenge_hash)
+                .bind(vec![0x51_u8; 32])
+                .fetch_one(pool)
+                .await
+                .is_err(),
         "a challenge must be unusable after five failed TOTP attempts"
     );
 
@@ -3543,11 +3539,11 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     let session_hash = vec![0x52_u8; 32];
     let session_id: String =
         sqlx::query_scalar("SELECT public.complete_admin_login($1, 102, $2)::text")
-    .bind(&challenge_hash)
-    .bind(&session_hash)
-    .fetch_one(pool)
-    .await
-    .expect("valid TOTP step should atomically consume challenge and create Admin session");
+            .bind(&challenge_hash)
+            .bind(&session_hash)
+            .fetch_one(pool)
+            .await
+            .expect("valid TOTP step should atomically consume challenge and create Admin session");
     assert!(!session_id.is_empty());
 
     let session_owner: Option<(String, String)> = sqlx::query_as(
@@ -3561,14 +3557,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert_eq!(session_owner, Some((session_id.clone(), admin_id.clone())));
 
     assert!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT public.complete_admin_login($1, 102, $2)::text",
-        )
-        .bind(&challenge_hash)
-        .bind(vec![0x53_u8; 32])
-        .fetch_one(pool)
-        .await
-        .is_err(),
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
+            .bind(&challenge_hash)
+            .bind(vec![0x53_u8; 32])
+            .fetch_one(pool)
+            .await
+            .is_err(),
         "a consumed challenge and TOTP step must not be reusable"
     );
 
@@ -3582,14 +3576,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("new challenge should be available after the prior challenge is consumed");
     assert!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT public.complete_admin_login($1, 102, $2)::text",
-        )
-        .bind(&replay_challenge_hash)
-        .bind(vec![0x54_u8; 32])
-        .fetch_one(pool)
-        .await
-        .is_err(),
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
+            .bind(&replay_challenge_hash)
+            .bind(vec![0x54_u8; 32])
+            .fetch_one(pool)
+            .await
+            .is_err(),
         "the same TOTP time-step must be rejected across distinct challenges"
     );
 
@@ -3602,16 +3594,16 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("concurrency challenge should be created");
-    let first = sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 103, $2)::text",)
-    .bind(&concurrent_challenge_hash)
-    .bind(vec![0x61_u8; 32])
-    .fetch_one(pool);
-    let second = sqlx::query_scalar::<_, String>(
-        "SELECT public.complete_admin_login($1, 103, $2)::text",
-    )
-    .bind(&concurrent_challenge_hash)
-    .bind(vec![0x62_u8; 32])
-    .fetch_one(pool);
+    let first =
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 103, $2)::text")
+            .bind(&concurrent_challenge_hash)
+            .bind(vec![0x61_u8; 32])
+            .fetch_one(pool);
+    let second =
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 103, $2)::text")
+            .bind(&concurrent_challenge_hash)
+            .bind(vec![0x62_u8; 32])
+            .fetch_one(pool);
     let (first_result, second_result) = tokio::join!(first, second);
     assert_ne!(
         first_result.is_ok(),
@@ -3627,10 +3619,10 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert!(revoked);
     let inactive_session: Option<String> =
         sqlx::query_scalar("SELECT session_id::text FROM public.get_active_admin_session($1)")
-    .bind(&session_hash)
-    .fetch_optional(pool)
-    .await
-    .expect("revoked Admin session should no longer validate");
+            .bind(&session_hash)
+            .fetch_optional(pool)
+            .await
+            .expect("revoked Admin session should no longer validate");
     assert!(inactive_session.is_none());
 
     let admin_audit_count: i64 = sqlx::query_scalar(
