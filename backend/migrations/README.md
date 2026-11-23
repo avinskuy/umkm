@@ -23,7 +23,7 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 | 0015 | `20261122240000_add_account_recovery_account_candidates.sql` | Daftar kandidat akun setelah OTP diverifikasi dan pencocokan kontak pemulihan. |
 | 0016 | `20261123100000_add_account_recovery_review_and_session_signals.sql` | Sinyal sesi aktif sebelumnya, keputusan review Admin append-only, dan audit event review. |
 | 0017 | `20261123110000_add_password_reset_runtime.sql` | Penerbitan dan pencabutan token reset, konsumsi satu kali, penggantian hash password atomik, pencabutan seluruh sesi, penyelesaian kasus, dan audit event. |
-| 0018 | `20261123120000_add_single_admin_totp_credentials.sql` | Membatasi akun Admin menjadi satu dan menyediakan penyimpanan kredensial TOTP terenkripsi dengan perlindungan replay-counter dan perubahan langsung. |
+| 0018 | `20261123120000_add_single_admin_totp_credentials.sql` | Membatasi akun Admin menjadi satu dan menyediakan penyimpanan kredensial TOTP terenkripsi dengan perlindungan replay-counter dan perubahan langsung. |\n| 0019 | `20261123130000_add_admin_authentication_database_runtime.sql` | Challenge login Admin sekali pakai, rate limit terpisah, sesi Admin terisolasi, konsumsi TOTP atomik, dan audit login berhasil. |
 
 ## Batas runtime
 
@@ -36,7 +36,7 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 
 ## Status integrasi
 
-Migration 0001–0018 tersedia pada repository. Migration 0018 hanya menyediakan fondasi skema akun Admin tunggal dan kredensial TOTP terenkripsi; login Admin, enrollment, verifikasi TOTP, provisioning internal, serta dashboard Admin belum tersedia. Pengujian PostgreSQL CI mencakup invariant token reset, privilege function, serta operasi reset dan pencabutan sesi. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan account recovery.
+Migration 0001–0019 tersedia pada repository. Migration 0018 menyediakan fondasi akun Admin tunggal dan kredensial TOTP terenkripsi. Migration 0019 menyediakan operasi database terkontrol untuk lookup kredensial Admin, rate limit, challenge login, konsumsi time-step TOTP secara atomik, sesi Admin terpisah, dan audit login berhasil. Runtime kriptografi Admin, enrollment dan reset TOTP terkontrol, layanan autentikasi, endpoint HTTP, provisioning internal, serta dashboard Admin belum tersedia. Pengujian PostgreSQL CI mencakup invariant token reset, privilege function, serta operasi reset dan pencabutan sesi. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan account recovery.
 
 Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal. Password reset memiliki service penerbitan token setelah approval dan endpoint konsumsi token pada recovery router. Token berlaku 15 menit, disimpan sebagai hash, hanya dapat digunakan sekali, dan kegagalan pengiriman mencabut token. Konsumsi token memperbarui hash password, mencabut seluruh sesi aktif, menyelesaikan kasus recovery, dan menulis audit event dalam satu operasi PostgreSQL. Orkestrasi penerbitan token dari keputusan review Admin, endpoint review Admin, notifikasi keamanan pasca-reset, dan UI frontend reset password belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
 
