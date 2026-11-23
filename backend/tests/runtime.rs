@@ -1568,15 +1568,11 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
 
     let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
         .expect("test rate-limit key should be valid");
-    let owner_authentication =
-        AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+    let owner_authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
     let admin_authentication =
         AdminAuthenticationApiState::new(pool.clone(), rate_limit_key, keyring);
-    let app = app_with_authentication_and_admin(
-        pool.clone(),
-        owner_authentication,
-        admin_authentication,
-    );
+    let app =
+        app_with_authentication_and_admin(pool.clone(), owner_authentication, admin_authentication);
 
     let make_request = |method: Method,
                         uri: &'static str,
@@ -1594,7 +1590,9 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
             builder = builder.header(header::COOKIE, cookie);
         }
         let mut request = builder
-            .body(Body::from(body.map(|value| value.to_string()).unwrap_or_default()))
+            .body(Body::from(
+                body.map(|value| value.to_string()).unwrap_or_default(),
+            ))
             .expect("Admin HTTP request should be valid");
         request.extensions_mut().insert(ConnectInfo(
             "127.0.0.1:40000"
@@ -1619,7 +1617,10 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
         .expect("Admin password login route should respond");
     assert_eq!(password_response.status(), axum::http::StatusCode::ACCEPTED);
     assert_eq!(
-        password_response.headers().get(header::CACHE_CONTROL).unwrap(),
+        password_response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
         "no-store"
     );
     let challenge_cookie = password_response
@@ -1772,7 +1773,11 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
             .headers()
             .get_all(header::SET_COOKIE)
             .iter()
-            .filter(|value| value.to_str().is_ok_and(|cookie| cookie.contains("Max-Age=0")))
+            .filter(|value| {
+                value
+                    .to_str()
+                    .is_ok_and(|cookie| cookie.contains("Max-Age=0"))
+            })
             .count(),
         2,
         "logout should clear both Admin cookies"
@@ -1787,10 +1792,7 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
         ))
         .await
         .expect("Admin route should reject a logged-out session");
-    assert_eq!(
-        after_logout.status(),
-        axum::http::StatusCode::UNAUTHORIZED
-    );
+    assert_eq!(after_logout.status(), axum::http::StatusCode::UNAUTHORIZED);
 
     admin_pool.close().await;
     pool.close().await;
