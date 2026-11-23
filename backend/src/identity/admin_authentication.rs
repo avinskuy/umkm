@@ -311,3 +311,81 @@ impl<'a> AdminAuthenticationService<'a> {
             .map_err(|_| AdminAuthenticationError::Database)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::identity::crypto::{CryptoError, KeyPurpose, KeyVersion, SecretKey, VersionedKey};
+    use sqlx::postgres::PgPoolOptions;
+
+    struct TestAdminKeys;
+
+    impl KeyProvider for TestAdminKeys {
+        fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+            self.key(purpose, KeyVersion(1))
+                .map(|key| VersionedKey::new(KeyVersion(1), key))
+        }
+
+        fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+            if version != KeyVersion(1) || purpose != KeyPurpose::AdminTotpSecret {
+                return Err(CryptoError::KeyUnavailable);
+            }
+            Ok(SecretKey::from_bytes([0x44; 32]))
+        }
+    }
+
+    fn service<'a>(
+        pool: &'a PgPool,
+        rate_limit_key: &'a AuthenticationRateLimitKey,
+        key_provider: &'a dyn KeyProvider,
+    ) -> AdminAuthenticationService<'a> {
+        AdminAuthenticationService::new(pool, rate_limit_key, key_provider)
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_password_login_input_before_database_access() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy pool configuration should be valid");
+        let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32)).unwrap();
+        let keys = TestAdminKeys;
+        let service = service(&pool, &rate_limit_key, &keys);
+
+        assert!(matches!(
+            service
+                .begin_login("", "password", "127.0.0.1".parse().unwrap())
+                .await,
+            Err(AdminAuthenticationError::InvalidInput)
+        ));
+        assert!(matches!(
+            service
+                .begin_login("admin@example.test", "", "127.0.0.1".parse().unwrap())
+                .await,
+            Err(AdminAuthenticationError::InvalidInput)
+        ));
+    }
+
+    #[tokio::test]
+    async fn rejects_malformed_challenge_and_session_tokens_before_database_access() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy pool configuration should be valid");
+        let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32)).unwrap();
+        let keys = TestAdminKeys;
+        let service = service(&pool, &rate_limit_key, &keys);
+
+        assert!(matches!(
+            service.complete_login("invalid", "123456").await,
+            Err(AdminAuthenticationError::InvalidChallenge)
+        ));
+        assert!(matches!(
+            service.validate_session("invalid").await,
+            Err(AdminAuthenticationError::InvalidSession)
+        ));
+        assert!(matches!(
+            service.logout("invalid").await,
+            Err(AdminAuthenticationError::InvalidSession)
+        ));
+    }
+}
