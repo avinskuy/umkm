@@ -3331,7 +3331,6 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     );
 }
 
-
 async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     let (admin_id, admin_email): (String, String) = sqlx::query_as(
         "SELECT id::text, email_normalized FROM public.users \
@@ -3368,19 +3367,18 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     let identifier_hash = vec![0x31_u8; 32];
     let ip_hash = vec![0x32_u8; 32];
     for _ in 1..=5 {
-        let allowed: bool = sqlx::query_scalar(
-            "SELECT public.reserve_admin_login_attempt($1, $2)",
-        )
-        .bind(&identifier_hash)
-        .bind(&ip_hash)
-        .fetch_one(pool)
-        .await
-        .expect("Admin login attempt should be reserved");
-        assert!(allowed, "the first five identifier attempts should be allowed");
+        let allowed: bool = sqlx::query_scalar("SELECT public.reserve_admin_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("Admin login attempt should be reserved");
+        assert!(
+            allowed,
+            "the first five identifier attempts should be allowed"
+        );
     }
-    let blocked: bool = sqlx::query_scalar(
-        "SELECT public.reserve_admin_login_attempt($1, $2)",
-    )
+    let blocked: bool = sqlx::query_scalar("SELECT public.reserve_admin_login_attempt($1, $2)")
     .bind(&identifier_hash)
     .bind(&ip_hash)
     .fetch_one(pool)
@@ -3398,19 +3396,16 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("active Admin should receive a short-lived login challenge");
     for attempt in 1..=5 {
-        let still_valid: bool = sqlx::query_scalar(
-            "SELECT public.record_admin_login_challenge_failure($1)",
-        )
-        .bind(&failed_challenge_hash)
-        .fetch_one(pool)
-        .await
-        .expect("challenge failure should be recorded");
+        let still_valid: bool =
+            sqlx::query_scalar("SELECT public.record_admin_login_challenge_failure($1)")
+                .bind(&failed_challenge_hash)
+                .fetch_one(pool)
+                .await
+                .expect("challenge failure should be recorded");
         assert_eq!(still_valid, attempt < 5);
     }
     assert!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT public.complete_admin_login($1, 102, $2)::text",
-        )
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
         .bind(&failed_challenge_hash)
         .bind(vec![0x51_u8; 32])
         .fetch_one(pool)
@@ -3433,9 +3428,8 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert!(expires_at > 0);
 
     let session_hash = vec![0x52_u8; 32];
-    let session_id: String = sqlx::query_scalar(
-        "SELECT public.complete_admin_login($1, 102, $2)::text",
-    )
+    let session_id: String =
+        sqlx::query_scalar("SELECT public.complete_admin_login($1, 102, $2)::text")
     .bind(&challenge_hash)
     .bind(&session_hash)
     .fetch_one(pool)
@@ -3495,9 +3489,7 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("concurrency challenge should be created");
-    let first = sqlx::query_scalar::<_, String>(
-        "SELECT public.complete_admin_login($1, 103, $2)::text",
-    )
+    let first = sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 103, $2)::text",)
     .bind(&concurrent_challenge_hash)
     .bind(vec![0x61_u8; 32])
     .fetch_one(pool);
@@ -3520,9 +3512,8 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         .await
         .expect("Admin logout should revoke the dedicated session");
     assert!(revoked);
-    let inactive_session: Option<String> = sqlx::query_scalar(
-        "SELECT session_id::text FROM public.get_active_admin_session($1)",
-    )
+    let inactive_session: Option<String> =
+        sqlx::query_scalar("SELECT session_id::text FROM public.get_active_admin_session($1)")
     .bind(&session_hash)
     .fetch_optional(pool)
     .await
