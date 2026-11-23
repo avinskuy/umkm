@@ -164,7 +164,9 @@ fn is_same_origin_request(headers: &HeaderMap) -> bool {
         return false;
     };
     if authority.is_empty()
-        || authority.bytes().any(|byte| matches!(byte, b'/' | b'?' | b'#' | b'@'))
+        || authority
+            .bytes()
+            .any(|byte| matches!(byte, b'/' | b'?' | b'#' | b'@'))
         || authority.parse::<axum::http::uri::Authority>().is_err()
         || !same_authority(authority, host, scheme)
     {
@@ -672,20 +674,16 @@ mod tests {
             );
         }
 
-        let mut duplicate_origin = headers_with_origin(
-            "https://app.example.test",
-            "app.example.test",
-        );
+        let mut duplicate_origin =
+            headers_with_origin("https://app.example.test", "app.example.test");
         duplicate_origin.append(
             header::ORIGIN,
             HeaderValue::from_static("https://evil.example.test"),
         );
         assert!(!is_same_origin_request(&duplicate_origin));
 
-        let mut duplicate_host = headers_with_origin(
-            "https://app.example.test",
-            "app.example.test",
-        );
+        let mut duplicate_host =
+            headers_with_origin("https://app.example.test", "app.example.test");
         duplicate_host.append(header::HOST, HeaderValue::from_static("evil.example.test"));
         assert!(!is_same_origin_request(&duplicate_host));
     }
