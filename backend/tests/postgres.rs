@@ -3404,12 +3404,19 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
         .await
         .expect("operator workflow fixture should create an active Admin session");
 
+    let reset_totp_secret = [0x6B_u8; 20];
+    let reset_encrypted =
+        encrypt_admin_totp_secret(&VerificationTestKeys, &admin_id, &reset_totp_secret)
+            .expect("replacement Admin TOTP secret should be encrypted");
+    let reset_key_version = key_version_label(reset_encrypted.key_version)
+        .expect("replacement Admin TOTP key version should be valid");
     let reset: bool = sqlx::query_scalar(
-        "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, 'v2', 'authenticator_lost', $4::uuid)",
+        "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid)",
     )
     .bind(&admin_id)
-    .bind(vec![0xB6_u8; 36])
-    .bind(vec![0x6B_u8; 12])
+    .bind(&reset_encrypted.ciphertext)
+    .bind(reset_encrypted.nonce.to_vec())
+    .bind(&reset_key_version)
     .bind(operator_id)
     .fetch_one(pool)
     .await
@@ -3422,12 +3429,15 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
            FROM public.admin_totp_credentials WHERE user_id = $1::uuid",
     )
     .bind(&admin_id)
-    .bind(vec![0xB6_u8; 36])
-    .bind(vec![0x6B_u8; 12])
+    .bind(&reset_encrypted.ciphertext)
+    .bind(reset_encrypted.nonce.to_vec())
     .fetch_one(pool)
     .await
     .expect("reset TOTP credential should be inspectable by migrator");
-    assert_eq!(credential_state, (true, true, true, true, "v2".to_owned()));
+    assert_eq!(
+        credential_state,
+        (true, true, true, true, reset_key_version.clone())
+    );
 
     let challenge_consumed: bool = sqlx::query_scalar(
         "SELECT consumed_at IS NOT NULL FROM public.admin_login_challenges WHERE challenge_hash = $1",
