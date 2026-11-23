@@ -1435,9 +1435,7 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
     use usahapintar_api::{
         app_with_authentication_and_admin,
         identity::{
-            crypto::{
-                encrypt_admin_totp_secret, key_version_label, AdminTotpKeyring, KeyVersion,
-            },
+            crypto::{encrypt_admin_totp_secret, key_version_label, AdminTotpKeyring, KeyVersion},
             http::{AdminAuthenticationApiState, AuthenticationApiState},
             password::hash_password,
             totp::code_for_step,
