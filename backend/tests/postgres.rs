@@ -3484,13 +3484,23 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         "Admin lookup should return the active Admin credential only"
     );
 
-    let credential_count: i64 = sqlx::query_scalar(
-        "SELECT count(*)::bigint FROM public.get_admin_totp_credentials($1::uuid)",
+    let credential_challenge_hash = vec![0x3A_u8; 32];
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
     )
     .bind(&admin_id)
+    .bind(&credential_challenge_hash)
     .fetch_one(pool)
     .await
-    .expect("active enrolled Admin TOTP credential should be available through its function");
+    .expect("active enrolled Admin should receive a challenge for scoped credential lookup");
+
+    let credential_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.get_admin_login_totp_credentials($1)",
+    )
+    .bind(&credential_challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active challenge should resolve only its Admin TOTP credential");
     assert_eq!(credential_count, 1);
 
     let identifier_hash = vec![0x31_u8; 32];
