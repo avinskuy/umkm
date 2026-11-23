@@ -95,7 +95,7 @@ export function AdminLoginPage() {
 
         {phase === "password" ? (
           <form className={styles.form} onSubmit={submitPassword} aria-busy={pending}>
-            <label htmlFor="admin-identifier">Email atau nomor terdaftar</label>
+            <label htmlFor="admin-identifier">Email Admin</label>
             <input
               id="admin-identifier"
               name="identifier"
