@@ -1,6 +1,11 @@
+import { ResetPasswordPage } from "./ResetPasswordPage";
 import styles from "./App.module.css";
 
 export function App() {
+  if (window.location.pathname.replace(/\\/$/, "").endsWith("/reset-password")) {
+    return <ResetPasswordPage />;
+  }
+
   return (
     <main className={styles.shell}>
       <div className={styles.brandMark} aria-hidden="true">
