@@ -1,4 +1,4 @@
-use std::{net::{IpAddr, SocketAddr}, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{net::SocketAddr, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
 
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Extension, Json, Request, State},
@@ -258,7 +258,11 @@ async fn begin_login(
             no_store(&mut response);
             response
         }
-        Err(error_value) => authentication_error(error_value),
+        Err(error_value) => {
+            let mut response = authentication_error(error_value);
+            clear_admin_challenge_cookie(&mut response);
+            response
+        }
     }
 }
 
