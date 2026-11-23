@@ -80,7 +80,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
     IF OLD.primary_role = 'admin'
        AND OLD.account_status = 'active'
@@ -112,7 +112,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER users_30_revoke_admin_authentication_when_inactive
     AFTER UPDATE OF account_status ON public.users
