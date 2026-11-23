@@ -435,15 +435,15 @@ DECLARE
 BEGIN
     FOREACH v_signature IN ARRAY ARRAY[
         'public.find_active_admin_password_login(text)',
-        'public.get_admin_totp_credentials(uuid)',
+        'public.get_admin_login_totp_credentials(bytea)',
         'public.reserve_admin_login_attempt(bytea,bytea)',
-        'public.clear_admin_login_identifier_limit(bytea)',
         'public.create_admin_login_challenge(uuid,bytea)',
         'public.record_admin_login_challenge_failure(bytea)',
         'public.complete_admin_login(bytea,bigint,bytea)',
         'public.get_active_admin_session(bytea)',
         'public.revoke_admin_session(bytea)',
         'public.revoke_admin_authentication_when_inactive()',
+        'public.prepare_admin_totp_enrollment(uuid,bytea,bytea,text,uuid)',
         'public.activate_admin_totp_enrollment(uuid,bigint,uuid)',
         'public.reset_admin_totp_enrollment(uuid,bytea,bytea,text,text,uuid)'
     ] LOOP
@@ -485,11 +485,9 @@ REVOKE ALL ON TABLE public.admin_sessions FROM usahapintar_app;
 
 GRANT EXECUTE ON FUNCTION public.find_active_admin_password_login(TEXT)
     TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.get_admin_totp_credentials(UUID)
+GRANT EXECUTE ON FUNCTION public.get_admin_login_totp_credentials(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.reserve_admin_login_attempt(BYTEA, BYTEA)
-    TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.clear_admin_login_identifier_limit(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.create_admin_login_challenge(UUID, BYTEA)
     TO usahapintar_app;

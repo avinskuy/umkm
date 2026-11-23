@@ -92,8 +92,9 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION public.get_admin_totp_credentials(p_user_id UUID)
+CREATE FUNCTION public.get_admin_login_totp_credentials(p_challenge_hash BYTEA)
 RETURNS TABLE (
+    user_id UUID,
     secret_ciphertext BYTEA,
     secret_nonce BYTEA,
     encryption_key_version TEXT,
@@ -104,20 +105,30 @@ SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
 BEGIN
-    IF p_user_id IS NULL THEN
+    IF p_challenge_hash IS NULL OR octet_length(p_challenge_hash) <> 32 THEN
         RETURN;
     END IF;
 
     RETURN QUERY
-    SELECT c.secret_ciphertext, c.secret_nonce, c.encryption_key_version, c.last_accepted_step
-      FROM public.admin_totp_credentials AS c
-      JOIN public.users AS u ON u.id = c.user_id
-     WHERE c.user_id = p_user_id
-       AND c.enabled_at IS NOT NULL
-       AND u.primary_role = 'admin'
-       AND u.account_status = 'active';
+    SELECT challenge.user_id, credential.secret_ciphertext,
+           credential.secret_nonce, credential.encryption_key_version,
+           credential.last_accepted_step
+      FROM public.admin_login_challenges AS challenge
+      JOIN public.admin_totp_credentials AS credential
+        ON credential.user_id = challenge.user_id
+      JOIN public.users AS account
+        ON account.id = challenge.user_id
+     WHERE challenge.challenge_hash = p_challenge_hash
+       AND challenge.consumed_at IS NULL
+       AND challenge.expires_at > clock_timestamp()
+       AND challenge.attempt_count < 5
+       AND credential.enabled_at IS NOT NULL
+       AND account.primary_role = 'admin'
+       AND account.account_status = 'active';
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.get_admin_login_totp_credentials(BYTEA) FROM PUBLIC;
 
 CREATE FUNCTION public.reserve_admin_login_attempt(p_identifier_hash BYTEA, p_ip_hash BYTEA)
 RETURNS BOOLEAN
@@ -197,24 +208,6 @@ BEGIN
        AND (v_identifier_block IS NULL OR v_identifier_block <= v_now)
        AND v_ip_count <= 20
        AND (v_ip_block IS NULL OR v_ip_block <= v_now);
-END;
-$$;
-
-CREATE FUNCTION public.clear_admin_login_identifier_limit(p_identifier_hash BYTEA)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog
-AS $$
-BEGIN
-    IF p_identifier_hash IS NULL OR octet_length(p_identifier_hash) <> 32 THEN
-        RAISE EXCEPTION 'Admin login identifier fingerprint is invalid'
-            USING ERRCODE = '22023';
-    END IF;
-
-    DELETE FROM public.admin_login_rate_limits
-     WHERE scope = 'identifier'
-       AND key_hash = p_identifier_hash;
 END;
 $$;
 
@@ -435,9 +428,7 @@ REVOKE ALL ON TABLE public.admin_login_rate_limits FROM PUBLIC;
 REVOKE ALL ON TABLE public.admin_login_challenges FROM PUBLIC;
 REVOKE ALL ON TABLE public.admin_sessions FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.find_active_admin_password_login(TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_admin_totp_credentials(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.reserve_admin_login_attempt(BYTEA, BYTEA) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.clear_admin_login_identifier_limit(BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_admin_login_challenge(UUID, BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_admin_login_challenge_failure(BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.complete_admin_login(BYTEA, BIGINT, BYTEA) FROM PUBLIC;

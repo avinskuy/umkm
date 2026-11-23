@@ -122,6 +122,68 @@ CREATE TRIGGER users_30_revoke_admin_authentication_when_inactive
 
 REVOKE ALL ON FUNCTION public.revoke_admin_authentication_when_inactive() FROM PUBLIC;
 
+CREATE FUNCTION public.prepare_admin_totp_enrollment(
+    p_user_id UUID,
+    p_secret_ciphertext BYTEA,
+    p_secret_nonce BYTEA,
+    p_encryption_key_version TEXT,
+    p_operator_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+    v_prepared_user_id UUID;
+BEGIN
+    IF p_user_id IS NULL
+       OR p_secret_ciphertext IS NULL
+       OR octet_length(p_secret_ciphertext) <> 36
+       OR p_secret_nonce IS NULL
+       OR octet_length(p_secret_nonce) <> 12
+       OR p_encryption_key_version IS NULL
+       OR p_encryption_key_version !~ '^v[1-9][0-9]{0,9}$'
+       OR p_operator_id IS NULL THEN
+        RAISE EXCEPTION 'Admin TOTP enrollment preparation input is invalid'
+            USING ERRCODE = '22023';
+    END IF;
+
+    INSERT INTO public.admin_totp_credentials (
+        user_id, secret_ciphertext, secret_nonce, encryption_key_version
+    )
+    SELECT u.id, p_secret_ciphertext, p_secret_nonce, p_encryption_key_version
+      FROM public.users AS u
+     WHERE u.id = p_user_id
+       AND u.primary_role = 'admin'
+       AND u.account_status = 'active'
+    ON CONFLICT (user_id) DO NOTHING
+    RETURNING user_id INTO v_prepared_user_id;
+
+    IF v_prepared_user_id IS NULL THEN
+        RAISE EXCEPTION 'active Admin is unavailable or TOTP enrollment already exists'
+            USING ERRCODE = 'P0002';
+    END IF;
+
+    INSERT INTO public.identity_audit_events (
+        actor_type, actor_id, subject_user_id, action_code, outcome, reason_code, metadata
+    )
+    VALUES (
+        'operator', p_operator_id, p_user_id, 'identity.admin.totp.enrollment.prepared',
+        'success', 'operator_initial_enrollment',
+        pg_catalog.jsonb_build_object(
+            'purpose', 'admin_totp',
+            'role', 'admin',
+            'policy_code', 'operator_prepared_enrollment'
+        )
+    );
+
+    RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.prepare_admin_totp_enrollment(UUID, BYTEA, BYTEA, TEXT, UUID) FROM PUBLIC;
+
 CREATE FUNCTION public.activate_admin_totp_enrollment(
     p_user_id UUID,
     p_verified_step BIGINT,
@@ -193,7 +255,7 @@ DECLARE
 BEGIN
     IF p_user_id IS NULL
        OR p_secret_ciphertext IS NULL
-       OR octet_length(p_secret_ciphertext) < 32
+       OR octet_length(p_secret_ciphertext) <> 36
        OR p_secret_nonce IS NULL
        OR octet_length(p_secret_nonce) <> 12
        OR p_encryption_key_version IS NULL
