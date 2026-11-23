@@ -4,9 +4,12 @@ use sqlx::{postgres::PgPoolOptions, raw_sql, PgPool};
 use usahapintar_api::{
     database::{connect, migrations::run, DatabaseConfig},
     identity::{
-        crypto::{CryptoError, KeyProvider, KeyPurpose, KeyVersion, SecretKey, VersionedKey},
-        ClientRegistration, ClientRole, ContactChannel, DispatchStatus, OtpDeliveryMessage,
-        OtpDeliveryProvider, VerificationService,
+        crypto::{
+            encrypt_admin_totp_secret, key_version_label, CryptoError, KeyProvider, KeyPurpose,
+            KeyVersion, SecretKey, VersionedKey,
+        },
+        AdminAuthenticationService, AuthenticationRateLimitKey, ClientRegistration, ClientRole,
+        ContactChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider, VerificationService,
     },
 };
 
@@ -26,6 +29,7 @@ impl KeyProvider for VerificationTestKeys {
             KeyPurpose::DataEncryption => 0x11,
             KeyPurpose::ContactFingerprint => 0x22,
             KeyPurpose::OtpVerification => 0x33,
+            KeyPurpose::AdminTotpSecret => 0x44,
         };
         Ok(SecretKey::from_bytes([marker; 32]))
     }
@@ -2559,12 +2563,19 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     );
 
     let operator_id = "00000000-0000-4000-8000-000000000001";
+    let initial_totp_secret = [0x5A_u8; 20];
+    let initial_encrypted =
+        encrypt_admin_totp_secret(&VerificationTestKeys, &admin_user_id, &initial_totp_secret)
+            .expect("initial Admin TOTP secret should be encrypted");
+    let initial_key_version = key_version_label(initial_encrypted.key_version)
+        .expect("initial Admin TOTP key version should be valid");
     let prepared: bool = sqlx::query_scalar(
-        "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, 'v1', $4::uuid)",
+        "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, $4, $5::uuid)",
     )
     .bind(&admin_user_id)
-    .bind(vec![0xA5_u8; 36])
-    .bind(vec![0x5A_u8; 12])
+    .bind(&initial_encrypted.ciphertext)
+    .bind(initial_encrypted.nonce.to_vec())
+    .bind(initial_key_version)
     .bind(operator_id)
     .fetch_one(pool)
     .await
