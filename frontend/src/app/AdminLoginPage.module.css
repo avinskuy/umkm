@@ -1,0 +1,206 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem 1rem;
+  background:
+    radial-gradient(circle at 12% 8%, var(--color-pale-sage), transparent 30rem),
+    var(--color-background);
+}
+
+.panel {
+  width: min(100%, 31rem);
+  border: 1px solid var(--color-border);
+  border-radius: 1.25rem;
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  background: var(--color-surface);
+  box-shadow: 0 1.25rem 3.5rem rgb(41 51 45 / 8%);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--color-forest);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.brandMark {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: var(--color-forest);
+  color: white;
+  font-size: 1.25rem;
+}
+
+.eyebrow {
+  margin-top: 2rem;
+  color: var(--color-sage-dark);
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+}
+
+.panel h1 {
+  margin-top: 0.65rem;
+  color: var(--color-text);
+  font-size: clamp(1.8rem, 6vw, 2.35rem);
+  letter-spacing: -0.045em;
+}
+
+.description,
+.stepDescription {
+  margin-top: 0.8rem;
+  color: var(--color-muted);
+  line-height: 1.65;
+}
+
+.stepIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1.8rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.activeStep,
+.completeStep,
+.pendingStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.activeStep {
+  color: var(--color-forest);
+}
+
+.completeStep {
+  color: var(--color-sage-dark);
+}
+
+.pendingStep {
+  color: var(--color-muted);
+}
+
+.activeStep::first-letter,
+.completeStep::first-letter,
+.pendingStep::first-letter {
+  font-weight: 800;
+}
+
+.stepLine {
+  height: 1px;
+  flex: 1;
+  background: var(--color-border);
+}
+
+.form {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.7rem;
+}
+
+.form label {
+  margin-top: 0.45rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.form input {
+  width: 100%;
+  min-height: 2.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.form input:disabled {
+  opacity: 0.7;
+}
+
+.form input[name="code"] {
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+
+.form button {
+  min-height: 3rem;
+  margin-top: 0.65rem;
+  border: 0;
+  border-radius: 0.7rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-forest);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form .secondaryButton {
+  margin-top: 0;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-forest);
+}
+
+.notice,
+.success {
+  margin-top: 0.65rem;
+  border-radius: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.notice {
+  border: 1px solid #e5c9a5;
+  background: #fff9ef;
+  color: #704b1c;
+}
+
+.success {
+  border: 1px solid var(--color-border);
+  background: var(--color-pale-sage);
+  color: var(--color-forest);
+}
+
+.securityNote {
+  margin-top: 1.7rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.backLink {
+  display: inline-block;
+  margin-top: 1.3rem;
+  color: var(--color-forest);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+@media (max-width: 420px) {
+  .stepIndicator {
+    gap: 0.4rem;
+    font-size: 0.72rem;
+  }
+}
