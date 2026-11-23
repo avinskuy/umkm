@@ -1,10 +1,14 @@
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use usahapintar_api::{
-    app_with_authentication,
+    app_with_authentication_and_admin,
     config::server_address,
     database::{connect, DatabaseConfig},
-    identity::{http::AuthenticationApiState, AuthenticationRateLimitKey},
+    identity::{
+        crypto::AdminTotpKeyring,
+        http::{AdminAuthenticationApiState, AuthenticationApiState},
+        AuthenticationRateLimitKey,
+    },
 };
 
 #[tokio::main]
@@ -29,7 +33,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })?);
     let rate_limit_key = AuthenticationRateLimitKey::from_hex(rate_limit_key.as_str())?;
-    let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key);
+    let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+
+    let admin_totp_keyring = Arc::new(AdminTotpKeyring::from_env().map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "ADMIN_TOTP_ENCRYPTION_KEY_ACTIVE_VERSION and ADMIN_TOTP_ENCRYPTION_KEYS are required and must be valid",
+        )
+    })?);
+    let admin_authentication =
+        AdminAuthenticationApiState::new(pool.clone(), rate_limit_key, admin_totp_keyring);
 
     let host = env::var("HOST").ok();
     let port = env::var("PORT").ok();
@@ -42,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     axum::serve(
         listener,
-        app_with_authentication(pool, authentication)
+        app_with_authentication_and_admin(pool, authentication, admin_authentication)
             .into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await?;

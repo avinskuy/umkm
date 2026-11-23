@@ -1426,3 +1426,368 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     admin_pool.close().await;
     pool.close().await;
 }
+
+#[tokio::test]
+#[ignore = "requires disposable PostgreSQL application and DBA principals"]
+async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
+    use serde_json::json;
+    use sqlx::postgres::PgPoolOptions;
+    use usahapintar_api::{
+        app_with_authentication_and_admin,
+        identity::{
+            crypto::{encrypt_admin_totp_secret, key_version_label, AdminTotpKeyring, KeyVersion},
+            http::{AdminAuthenticationApiState, AuthenticationApiState},
+            password::hash_password,
+            totp::code_for_step,
+            AuthenticationRateLimitKey,
+        },
+    };
+
+    const OPERATOR_ID: &str = "00000000-0000-4000-8000-000000000002";
+    const ADMIN_PASSWORD: &str = "Admin-HTTP-Integration-Password-2026!";
+
+    let pool = application_pool().await;
+    let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL")
+        .expect("CI must provide the disposable DBA connection");
+    let admin_pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&admin_url)
+        .await
+        .expect("disposable DBA connection should succeed");
+
+    let existing_admin: Option<(String, String)> = sqlx::query_as(
+        "SELECT id::text, email_normalized FROM public.users \
+          WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_optional(&admin_pool)
+    .await
+    .expect("active Admin fixture should be queryable");
+    let (admin_id, admin_email) = if let Some(existing) = existing_admin {
+        existing
+    } else {
+        let email = format!(
+            "admin-http-{}-{}@example.test",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock should be after epoch")
+                .as_nanos()
+        );
+        let user_id: String = sqlx::query_scalar(
+            "INSERT INTO public.users ( \
+                 primary_role, account_status, email_normalized, initial_contact_channel, \
+                 email_verified_at, initial_contact_verified_at, password_hash \
+             ) VALUES ( \
+                 'admin', 'active', $1, 'email', clock_timestamp(), clock_timestamp(), $2 \
+             ) RETURNING id::text",
+        )
+        .bind(&email)
+        .bind(hash_password(ADMIN_PASSWORD.as_bytes()).expect("Admin password should hash"))
+        .fetch_one(&admin_pool)
+        .await
+        .expect("a single active Admin fixture should be provisioned");
+        (user_id, email)
+    };
+
+    let password_hash =
+        hash_password(ADMIN_PASSWORD.as_bytes()).expect("Admin password should hash");
+    sqlx::query("UPDATE public.users SET password_hash = $2 WHERE id = $1::uuid")
+        .bind(&admin_id)
+        .bind(password_hash)
+        .execute(&admin_pool)
+        .await
+        .expect("Admin test password should be installed");
+
+    let key_hex = "44".repeat(32);
+    let keyring = Arc::new(
+        AdminTotpKeyring::from_hex_entries(KeyVersion(1), &[(KeyVersion(1), key_hex.as_str())])
+            .expect("test Admin keyring should be valid"),
+    );
+    let totp_secret = [0x6B_u8; 20];
+    let encrypted = encrypt_admin_totp_secret(keyring.as_ref(), &admin_id, &totp_secret)
+        .expect("Admin TOTP secret should be encrypted");
+    let key_version =
+        key_version_label(encrypted.key_version).expect("Admin key version label should be valid");
+    let current_step: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint")
+            .fetch_one(&admin_pool)
+            .await
+            .expect("current TOTP step should be available");
+
+    let credential_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM public.admin_totp_credentials WHERE user_id = $1::uuid)",
+    )
+    .bind(&admin_id)
+    .fetch_one(&admin_pool)
+    .await
+    .expect("Admin TOTP credential state should be queryable");
+    let prepared: bool = if credential_exists {
+        sqlx::query_scalar(
+            "SELECT public.reset_admin_totp_enrollment( \
+                $1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid \
+            )",
+        )
+        .bind(&admin_id)
+        .bind(&encrypted.ciphertext)
+        .bind(encrypted.nonce.to_vec())
+        .bind(&key_version)
+        .bind(OPERATOR_ID)
+        .fetch_one(&admin_pool)
+        .await
+        .expect("operator should reset the Admin TOTP credential")
+    } else {
+        sqlx::query_scalar(
+            "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, $4, $5::uuid)",
+        )
+        .bind(&admin_id)
+        .bind(&encrypted.ciphertext)
+        .bind(encrypted.nonce.to_vec())
+        .bind(&key_version)
+        .bind(OPERATOR_ID)
+        .fetch_one(&admin_pool)
+        .await
+        .expect("operator should prepare the initial Admin TOTP credential")
+    };
+    assert!(prepared);
+
+    let activated: bool =
+        sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)")
+            .bind(&admin_id)
+            .bind(current_step - 1)
+            .bind(OPERATOR_ID)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("operator should activate the Admin TOTP credential");
+    assert!(activated);
+
+    let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
+        .expect("test rate-limit key should be valid");
+    let owner_authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+    let admin_authentication =
+        AdminAuthenticationApiState::new(pool.clone(), rate_limit_key, keyring);
+    let app =
+        app_with_authentication_and_admin(pool.clone(), owner_authentication, admin_authentication);
+
+    let make_request = |method: Method,
+                        uri: &'static str,
+                        body: Option<serde_json::Value>,
+                        cookie: Option<String>| {
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header(header::HOST, "app.example.test")
+            .header(header::ORIGIN, "https://app.example.test");
+        if body.is_some() {
+            builder = builder.header(header::CONTENT_TYPE, "application/json");
+        }
+        if let Some(cookie) = cookie {
+            builder = builder.header(header::COOKIE, cookie);
+        }
+        let mut request = builder
+            .body(Body::from(
+                body.map(|value| value.to_string()).unwrap_or_default(),
+            ))
+            .expect("Admin HTTP request should be valid");
+        request.extensions_mut().insert(ConnectInfo(
+            "127.0.0.1:40000"
+                .parse::<SocketAddr>()
+                .expect("test socket address should be valid"),
+        ));
+        request
+    };
+
+    let password_response = app
+        .clone()
+        .oneshot(make_request(
+            Method::POST,
+            "/api/v1/identity/admin/login",
+            Some(json!({
+                "identifier": admin_email,
+                "password": ADMIN_PASSWORD
+            })),
+            None,
+        ))
+        .await
+        .expect("Admin password login route should respond");
+    assert_eq!(password_response.status(), axum::http::StatusCode::ACCEPTED);
+    assert_eq!(
+        password_response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
+        "no-store"
+    );
+    let challenge_cookie = password_response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .find_map(|value| {
+            let cookie = value.to_str().ok()?;
+            cookie
+                .starts_with("__Host-usahapintar_admin_challenge=")
+                .then(|| cookie.split(';').next().unwrap_or_default().to_owned())
+        })
+        .expect("password login should issue the HttpOnly Admin challenge cookie");
+    let challenge_header = password_response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .find(|value| {
+            value
+                .to_str()
+                .is_ok_and(|cookie| cookie.starts_with("__Host-usahapintar_admin_challenge="))
+        })
+        .expect("Admin challenge Set-Cookie header should exist")
+        .to_str()
+        .expect("Admin challenge cookie header should be valid");
+    assert!(challenge_header.contains("HttpOnly"));
+    assert!(challenge_header.contains("Secure"));
+    assert!(challenge_header.contains("SameSite=Strict"));
+    assert!(!challenge_header.to_ascii_lowercase().contains("domain="));
+
+    let password_body = password_response
+        .into_body()
+        .collect()
+        .await
+        .expect("password login response body should be readable")
+        .to_bytes();
+    let password_payload: serde_json::Value =
+        serde_json::from_slice(&password_body).expect("password login response should be JSON");
+    assert!(password_payload.get("token").is_none());
+    assert!(password_payload.get("challenge_token").is_none());
+
+    let totp_code = code_for_step(&totp_secret, current_step as u64)
+        .expect("current Admin TOTP code should be generated");
+    let totp_response = app
+        .clone()
+        .oneshot(make_request(
+            Method::POST,
+            "/api/v1/identity/admin/login/totp",
+            Some(json!({ "code": totp_code })),
+            Some(challenge_cookie),
+        ))
+        .await
+        .expect("Admin TOTP completion route should respond");
+    assert_eq!(totp_response.status(), axum::http::StatusCode::OK);
+    assert_eq!(
+        totp_response.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+    let session_cookie = totp_response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .find_map(|value| {
+            let cookie = value.to_str().ok()?;
+            cookie
+                .starts_with("__Host-usahapintar_admin_session=")
+                .then(|| cookie.split(';').next().unwrap_or_default().to_owned())
+        })
+        .expect("successful TOTP should issue the isolated Admin session cookie");
+    let session_header = totp_response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .find(|value| {
+            value
+                .to_str()
+                .is_ok_and(|cookie| cookie.starts_with("__Host-usahapintar_admin_session="))
+        })
+        .expect("Admin session Set-Cookie header should exist")
+        .to_str()
+        .expect("Admin session cookie header should be valid");
+    assert!(session_header.contains("Path=/"));
+    assert!(session_header.contains("Max-Age=28800"));
+    assert!(session_header.contains("HttpOnly"));
+    assert!(session_header.contains("Secure"));
+    assert!(session_header.contains("SameSite=Strict"));
+    assert!(!session_header.to_ascii_lowercase().contains("domain="));
+
+    let totp_body = totp_response
+        .into_body()
+        .collect()
+        .await
+        .expect("TOTP response body should be readable")
+        .to_bytes();
+    let totp_payload: serde_json::Value =
+        serde_json::from_slice(&totp_body).expect("TOTP response should be JSON");
+    assert!(totp_payload.get("token").is_none());
+    assert!(totp_payload.get("session_token").is_none());
+
+    let current_admin = app
+        .clone()
+        .oneshot(make_request(
+            Method::GET,
+            "/api/v1/identity/admin/me",
+            None,
+            Some(session_cookie.clone()),
+        ))
+        .await
+        .expect("Admin current-session route should respond");
+    assert_eq!(current_admin.status(), axum::http::StatusCode::OK);
+    let current_admin_body = current_admin
+        .into_body()
+        .collect()
+        .await
+        .expect("Admin session response should be readable")
+        .to_bytes();
+    let current_admin_payload: serde_json::Value =
+        serde_json::from_slice(&current_admin_body).expect("Admin session response should be JSON");
+    assert_eq!(current_admin_payload["user_id"], admin_id);
+    assert_eq!(current_admin_payload["role"], "admin");
+
+    let owner_route_with_admin_cookie = app
+        .clone()
+        .oneshot(make_request(
+            Method::GET,
+            "/api/v1/identity/me",
+            None,
+            Some(session_cookie.clone()),
+        ))
+        .await
+        .expect("Owner session route should reject an Admin cookie");
+    assert_eq!(
+        owner_route_with_admin_cookie.status(),
+        axum::http::StatusCode::UNAUTHORIZED
+    );
+
+    let logout = app
+        .clone()
+        .oneshot(make_request(
+            Method::POST,
+            "/api/v1/identity/admin/logout",
+            None,
+            Some(session_cookie.clone()),
+        ))
+        .await
+        .expect("Admin logout route should respond");
+    assert_eq!(logout.status(), axum::http::StatusCode::NO_CONTENT);
+    assert_eq!(
+        logout
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .filter(|value| {
+                value
+                    .to_str()
+                    .is_ok_and(|cookie| cookie.contains("Max-Age=0"))
+            })
+            .count(),
+        2,
+        "logout should clear both Admin cookies"
+    );
+
+    let after_logout = app
+        .oneshot(make_request(
+            Method::GET,
+            "/api/v1/identity/admin/me",
+            None,
+            Some(session_cookie),
+        ))
+        .await
+        .expect("Admin route should reject a logged-out session");
+    assert_eq!(after_logout.status(), axum::http::StatusCode::UNAUTHORIZED);
+
+    admin_pool.close().await;
+    pool.close().await;
+}
