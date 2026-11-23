@@ -690,6 +690,72 @@ mod tests {
         assert!(!is_same_origin_request(&duplicate_host));
     }
 
+    #[tokio::test]
+    async fn admin_and_owner_inactive_session_routes_do_not_accept_each_others_cookies() {
+        use axum::body::Body;
+        use tower::ServiceExt;
+
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy test pool should be valid");
+        let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
+            .expect("test rate-limit key should be valid");
+        let owner_state = crate::identity::http::AuthenticationApiState::new(
+            pool.clone(),
+            rate_limit_key,
+        );
+        let app = crate::app_with_authentication_and_admin(
+            pool,
+            owner_state,
+            test_state(),
+        );
+
+        let owner_cookie_on_admin_route = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/api/v1/identity/admin/me")
+                    .header(
+                        header::COOKIE,
+                        "__Host-usahapintar_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("Admin route should reject an Owner session cookie");
+        assert_eq!(owner_cookie_on_admin_route.status(), StatusCode::UNAUTHORIZED);
+        assert!(owner_cookie_on_admin_route
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|value| value
+                .to_str()
+                .is_ok_and(|cookie| cookie.starts_with(&format!("{ADMIN_SESSION_COOKIE}=")))));
+
+        let admin_cookie_on_owner_route = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/api/v1/identity/me")
+                    .header(
+                        header::COOKIE,
+                        "__Host-usahapintar_admin_session=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("Owner route should reject an Admin session cookie");
+        assert_eq!(admin_cookie_on_owner_route.status(), StatusCode::UNAUTHORIZED);
+        assert!(admin_cookie_on_owner_route
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|value| value
+                .to_str()
+                .is_ok_and(|cookie| cookie.starts_with("__Host-usahapintar_session="))));
+    }
+
     #[test]
     fn default_origin_ports_are_normalized_without_accepting_other_hosts() {
         assert!(is_same_origin_request(&headers_with_origin(
