@@ -423,3 +423,75 @@ GRANT EXECUTE ON FUNCTION public.revoke_password_reset_token(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.complete_password_reset(BYTEA, TEXT)
     TO usahapintar_app;
+
+
+-- Dedicated Admin authentication database operations.
+DO $admin_authentication_ownership_guard$
+DECLARE
+    v_signature TEXT;
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    FOREACH v_signature IN ARRAY ARRAY[
+        'public.find_active_admin_password_login(text)',
+        'public.get_admin_totp_credentials(uuid)',
+        'public.reserve_admin_login_attempt(bytea,bytea)',
+        'public.create_admin_login_challenge(uuid,bytea)',
+        'public.record_admin_login_challenge_failure(bytea)',
+        'public.complete_admin_login(bytea,bigint,bytea)',
+        'public.get_active_admin_session(bytea)',
+        'public.revoke_admin_session(bytea)'
+    ] LOOP
+        SELECT pg_catalog.pg_get_userbyid(p.proowner),
+               p.prosecdef,
+               COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+          INTO v_owner, v_is_security_definer, v_has_safe_search_path
+          FROM pg_catalog.pg_proc AS p
+         WHERE p.oid = pg_catalog.to_regprocedure(v_signature);
+
+        IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+           OR v_is_security_definer IS DISTINCT FROM TRUE
+           OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+            RAISE EXCEPTION
+                'Refusing Admin authentication grants: % must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path',
+                v_signature;
+        END IF;
+    END LOOP;
+
+    IF EXISTS (
+        SELECT 1
+          FROM pg_catalog.pg_class AS c
+         WHERE c.oid IN (
+             'public.admin_login_rate_limits'::pg_catalog.regclass,
+             'public.admin_login_challenges'::pg_catalog.regclass,
+             'public.admin_sessions'::pg_catalog.regclass
+         )
+           AND pg_catalog.pg_get_userbyid(c.relowner) <> 'usahapintar_migrator'
+    ) THEN
+        RAISE EXCEPTION
+            'Refusing Admin authentication grants: dedicated Admin tables must be owned by usahapintar_migrator';
+    END IF;
+END;
+$admin_authentication_ownership_guard$;
+
+REVOKE ALL ON TABLE public.admin_login_rate_limits FROM usahapintar_app;
+REVOKE ALL ON TABLE public.admin_login_challenges FROM usahapintar_app;
+REVOKE ALL ON TABLE public.admin_sessions FROM usahapintar_app;
+
+GRANT EXECUTE ON FUNCTION public.find_active_admin_password_login(TEXT)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.get_admin_totp_credentials(UUID)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.reserve_admin_login_attempt(BYTEA, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.create_admin_login_challenge(UUID, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.record_admin_login_challenge_failure(BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.complete_admin_login(BYTEA, BIGINT, BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.get_active_admin_session(BYTEA)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.revoke_admin_session(BYTEA)
+    TO usahapintar_app;
