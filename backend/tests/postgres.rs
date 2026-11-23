@@ -3521,13 +3521,13 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         assert_eq!(still_valid, attempt < 5);
     }
     assert!(
-            sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text",)
-                .bind(&failed_challenge_hash)
-                .bind(current_totp_step)
-                .bind(vec![0x51_u8; 32])
-                .fetch_one(pool)
-                .await
-                .is_err(),
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text",)
+            .bind(&failed_challenge_hash)
+            .bind(current_totp_step)
+            .bind(vec![0x51_u8; 32])
+            .fetch_one(pool)
+            .await
+            .is_err(),
         "a challenge must be unusable after five failed TOTP attempts"
     );
 
