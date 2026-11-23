@@ -10,33 +10,30 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Admin identity API", () => {
-  it(
-    "uses same-origin, no-store requests for the first login step",
-    async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response("{}", {
-          status: 202,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-      vi.stubGlobal("fetch", fetchMock);
+  it("uses same-origin, no-store requests for the first login step", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("{}", {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
-      await beginAdminLogin("admin@example.test", "demo-value");
+    await beginAdminLogin("admin@example.test", "demo-value");
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/v1/identity/admin/login",
-        expect.objectContaining({
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-          body: JSON.stringify({
-            identifier: "admin@example.test",
-            password: "demo-value",
-          }),
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/identity/admin/login",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({
+          identifier: "admin@example.test",
+          password: "demo-value",
         }),
-      );
-    },
-  );
+      }),
+    );
+  });
 
   it("sends the authenticator code to the TOTP endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
