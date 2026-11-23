@@ -1,4 +1,8 @@
-use std::{net::SocketAddr, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Extension, Json, Request, State},
@@ -14,9 +18,8 @@ use zeroize::Zeroizing;
 
 use super::authentication::resolved_client_ip;
 use crate::identity::{
-    AdminAuthenticatedSession, AdminAuthenticationError, AdminAuthenticationService,
-    AuthenticationRateLimitKey,
-    crypto::KeyProvider,
+    crypto::KeyProvider, AdminAuthenticatedSession, AdminAuthenticationError,
+    AdminAuthenticationService, AuthenticationRateLimitKey,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
@@ -113,9 +116,10 @@ fn authentication_error(error_value: AdminAuthenticationError) -> Response {
             StatusCode::TOO_MANY_REQUESTS,
             "Terlalu banyak percobaan. Coba lagi beberapa menit.",
         ),
-        AdminAuthenticationError::InvalidInput => {
-            error(StatusCode::BAD_REQUEST, "Permintaan autentikasi Admin tidak valid.")
-        }
+        AdminAuthenticationError::InvalidInput => error(
+            StatusCode::BAD_REQUEST,
+            "Permintaan autentikasi Admin tidak valid.",
+        ),
         AdminAuthenticationError::Database | AdminAuthenticationError::Internal => error(
             StatusCode::SERVICE_UNAVAILABLE,
             "Layanan autentikasi Admin sementara tidak tersedia.",
@@ -134,10 +138,16 @@ fn is_same_origin_request(headers: &HeaderMap) -> bool {
         return false;
     }
 
-    let Some(host) = headers.get(header::HOST).and_then(|value| value.to_str().ok()) else {
+    let Some(host) = headers
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+    else {
         return false;
     };
-    let Some(origin) = headers.get(header::ORIGIN).and_then(|value| value.to_str().ok()) else {
+    let Some(origin) = headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+    else {
         return false;
     };
     let Some((scheme, remainder)) = origin.split_once("://") else {
@@ -210,7 +220,10 @@ async fn begin_login(
     payload: Result<Json<LoginRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     if !is_same_origin_request(&headers) {
-        return error(StatusCode::FORBIDDEN, "Permintaan lintas situs tidak diizinkan.");
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan lintas situs tidak diizinkan.",
+        );
     }
 
     let Json(request) = match payload {
@@ -254,7 +267,9 @@ async fn begin_login(
                 }),
             )
                 .into_response();
-            response.headers_mut().insert(header::SET_COOKIE, cookie_value);
+            response
+                .headers_mut()
+                .insert(header::SET_COOKIE, cookie_value);
             no_store(&mut response);
             response
         }
@@ -272,11 +287,17 @@ async fn complete_login(
     payload: Result<Json<TotpRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     if !is_same_origin_request(&headers) {
-        return error(StatusCode::FORBIDDEN, "Permintaan lintas situs tidak diizinkan.");
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan lintas situs tidak diizinkan.",
+        );
     }
 
     let Some(challenge_token) = admin_challenge_cookie(&headers) else {
-        return error(StatusCode::UNAUTHORIZED, "Challenge Admin tidak valid atau kedaluwarsa.");
+        return error(
+            StatusCode::UNAUTHORIZED,
+            "Challenge Admin tidak valid atau kedaluwarsa.",
+        );
     };
     let Json(request) = match payload {
         Ok(payload) => payload,
@@ -342,9 +363,7 @@ async fn require_admin_session(
     }
 }
 
-async fn current_admin(
-    Extension(session): Extension<AdminAuthenticatedSession>,
-) -> Response {
+async fn current_admin(Extension(session): Extension<AdminAuthenticatedSession>) -> Response {
     response(
         StatusCode::OK,
         Json(CurrentAdminResponse {
@@ -354,12 +373,12 @@ async fn current_admin(
     )
 }
 
-async fn logout(
-    State(state): State<AdminAuthenticationApiState>,
-    headers: HeaderMap,
-) -> Response {
+async fn logout(State(state): State<AdminAuthenticationApiState>, headers: HeaderMap) -> Response {
     if !is_same_origin_request(&headers) {
-        return error(StatusCode::FORBIDDEN, "Permintaan lintas situs tidak diizinkan.");
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan lintas situs tidak diizinkan.",
+        );
     }
 
     if let Some(token) = admin_session_cookie(&headers) {
