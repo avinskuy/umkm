@@ -441,7 +441,9 @@ BEGIN
         'public.record_admin_login_challenge_failure(bytea)',
         'public.complete_admin_login(bytea,bigint,bytea)',
         'public.get_active_admin_session(bytea)',
-        'public.revoke_admin_session(bytea)'
+        'public.revoke_admin_session(bytea)',
+        'public.activate_admin_totp_enrollment(uuid,bigint,uuid)',
+        'public.reset_admin_totp_enrollment(uuid,bytea,bytea,text,text,uuid)'
     ] LOOP
         SELECT pg_catalog.pg_get_userbyid(p.proowner),
                p.prosecdef,
