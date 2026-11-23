@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use zeroize::Zeroizing;
 
 use super::{
+    append_audit_event,
+    AuditActorType, AuditEvent, AuditOutcome,
     authentication::{
         hash_session_token, ip_rate_limit_subject, normalize_identifier, random_session_token,
         session_token_hash, AuthenticationRateLimitKey,
@@ -83,6 +85,34 @@ impl<'a> AdminAuthenticationService<'a> {
         }
     }
 
+    async fn append_failed_login_audit(
+        &self,
+        reason_code: &'static str,
+    ) -> Result<(), AdminAuthenticationError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AdminAuthenticationError::Database)?;
+        let event = AuditEvent {
+            actor_type: AuditActorType::System,
+            actor_id: None,
+            subject_user_id: None,
+            action_code: "identity.admin.login.failed",
+            outcome: AuditOutcome::Failure,
+            reason_code: Some(reason_code),
+            request_id: None,
+            metadata: serde_json::json!({ "purpose": "admin_login" }),
+        };
+        append_audit_event(&mut transaction, &event)
+            .await
+            .map_err(|_| AdminAuthenticationError::Database)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AdminAuthenticationError::Database)
+    }
+
     /// Verify the Admin password and issue a short-lived opaque TOTP challenge.
     pub async fn begin_login(
         &self,
@@ -141,6 +171,7 @@ impl<'a> AdminAuthenticationService<'a> {
         .map_err(|_| AdminAuthenticationError::Internal)?;
 
         let Some(user_id) = verified else {
+            self.append_failed_login_audit("invalid_credentials").await?;
             return Err(AdminAuthenticationError::InvalidCredentials);
         };
 
@@ -223,6 +254,7 @@ impl<'a> AdminAuthenticationService<'a> {
                 .fetch_one(self.pool)
                 .await
                 .map_err(|_| AdminAuthenticationError::Database)?;
+                self.append_failed_login_audit("invalid_totp").await?;
                 return Err(AdminAuthenticationError::InvalidChallenge);
             }
         };
