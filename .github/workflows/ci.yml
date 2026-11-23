@@ -25,6 +25,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm install --global npm@10.8.2
       - run: npm ci
+      - name: Inspect Admin login component test formatting
+        run: |
+          npx prettier src/app/AdminLoginPage.test.tsx > /tmp/AdminLoginPage.test.formatted.tsx
+          diff -u src/app/AdminLoginPage.test.tsx /tmp/AdminLoginPage.test.formatted.tsx || true
       - run: npm ls --depth=0
       - run: npm audit --audit-level=moderate
       - run: npm run format:check
