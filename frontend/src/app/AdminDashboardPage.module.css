@@ -1,0 +1,179 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-background);
+}
+
+.topbar {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.8rem clamp(1rem, 4vw, 3rem);
+  background: var(--color-surface);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--color-forest);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.brandMark {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--color-forest);
+  color: white;
+  font-size: 1.15rem;
+}
+
+.adminLabel {
+  margin-left: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  color: var(--color-sage-dark);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.topbar button,
+.loadingPage button {
+  min-height: 2.6rem;
+  border: 0;
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--color-forest);
+  color: white;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topbar button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.content {
+  width: min(100% - 2rem, 68rem);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 7vw, 5rem) 0;
+}
+
+.eyebrow {
+  color: var(--color-sage-dark);
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+}
+
+.content h1,
+.loadingPage h1 {
+  margin-top: 0.7rem;
+  color: var(--color-text);
+  font-size: clamp(1.9rem, 5vw, 2.8rem);
+  letter-spacing: -0.05em;
+}
+
+.description {
+  max-width: 42rem;
+  margin-top: 0.8rem;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.sessionCard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.2rem;
+  margin-top: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--color-surface);
+  box-shadow: 0 1rem 2.5rem rgb(41 51 45 / 5%);
+}
+
+.sessionCard > div {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.sessionCard strong,
+.sessionCard code {
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.sessionStatus {
+  color: var(--color-forest) !important;
+}
+
+.notice {
+  margin-top: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.8rem;
+  padding: 1rem 1.1rem;
+  background: var(--color-pale-sage);
+  color: var(--color-forest);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.error {
+  margin-top: 1rem;
+  color: #8a3c24;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.loadingPage {
+  display: grid;
+  min-height: 100vh;
+  align-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.loadingPage > p:not(.eyebrow) {
+  color: var(--color-muted);
+}
+
+.loadingPage .secondaryButton {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-forest);
+}
+
+@media (max-width: 680px) {
+  .sessionCard {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: center;
+  }
+
+  .brand {
+    gap: 0.45rem;
+    font-size: 0.9rem;
+  }
+}

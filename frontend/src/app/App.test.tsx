@@ -1,13 +1,35 @@
 import { render } from "@testing-library/react";
 import { screen } from "@testing-library/dom";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 
 describe("App", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
   it("renders the USahapintar project identity", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "USahapintar" })).toBeInTheDocument();
     expect(screen.getByText(/business owners and investors/i)).toBeInTheDocument();
+  });
+
+  it("routes the Admin login path to the dedicated login page", () => {
+    window.history.replaceState(null, "", "/admin/login");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Admin sign in" })).toBeInTheDocument();
+  });
+
+  it("routes the Admin workspace path to the protected dashboard shell", () => {
+    window.history.replaceState(null, "", "/admin");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Memeriksa sesi administrator" }),
+    ).toBeInTheDocument();
   });
 });
