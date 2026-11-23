@@ -267,12 +267,12 @@ impl<'a> AdminAuthenticationService<'a> {
             Zeroizing::new(random_session_token().map_err(|_| AdminAuthenticationError::Internal)?);
         let session_hash = hash_session_token(session_token.as_str());
         let _: String = sqlx::query_scalar("SELECT public.complete_admin_login($1, $2, $3)::text")
-        .bind(challenge_hash.to_vec())
-        .bind(i64::try_from(matched_step).map_err(|_| AdminAuthenticationError::Internal)?)
-        .bind(session_hash.to_vec())
-        .fetch_one(self.pool)
-        .await
-        .map_err(map_admin_completion_error)?;
+            .bind(challenge_hash.to_vec())
+            .bind(i64::try_from(matched_step).map_err(|_| AdminAuthenticationError::Internal)?)
+            .bind(session_hash.to_vec())
+            .fetch_one(self.pool)
+            .await
+            .map_err(map_admin_completion_error)?;
 
         Ok(AdminLoginSession {
             user_id,
