@@ -2571,6 +2571,20 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .expect("operator should prepare the initial encrypted TOTP enrollment");
     assert!(prepared);
 
+    let duplicate_preparation = sqlx::query_scalar::<_, bool>(
+        "SELECT public.prepare_admin_totp_enrollment($1::uuid, $2, $3, 'v1', $4::uuid)",
+    )
+    .bind(&admin_user_id)
+    .bind(vec![0xA6_u8; 36])
+    .bind(vec![0x5B_u8; 12])
+    .bind(operator_id)
+    .fetch_one(pool)
+    .await;
+    assert!(
+        duplicate_preparation.is_err(),
+        "initial Admin TOTP enrollment must not overwrite an existing credential"
+    );
+
     let enrollment_activated: bool =
         sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, 100, $2::uuid)")
             .bind(&admin_user_id)
@@ -2603,7 +2617,7 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
         "UPDATE public.admin_totp_credentials SET secret_ciphertext = $2 WHERE user_id = $1::uuid",
     )
     .bind(&admin_user_id)
-    .bind(vec![0xB6_u8; 32])
+    .bind(vec![0xB6_u8; 36])
     .execute(pool)
     .await;
     assert!(
@@ -3382,7 +3396,7 @@ async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
         "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, 'v2', 'authenticator_lost', $4::uuid)",
     )
     .bind(&admin_id)
-    .bind(vec![0xB6_u8; 32])
+    .bind(vec![0xB6_u8; 36])
     .bind(vec![0x6B_u8; 12])
     .bind(operator_id)
     .fetch_one(pool)
