@@ -58,32 +58,44 @@ fn actor(request: &Request) -> Option<(String, AuthorizationRole, AuditActorType
             )
         })
 }
-async fn append_decision_audit(
-    state: &AuthorizationApiState,
-    actor_id: &str,
+struct AuthorizationAuditDecision<'a> {
+    actor_id: &'a str,
     actor_type: AuditActorType,
     action_code: &'static str,
     outcome: AuditOutcome,
     reason_code: &'static str,
     result_code: &'static str,
-    resource: Option<&AuthorizationResource>,
+    resource: Option<&'a AuthorizationResource>,
+}
+
+async fn append_decision_audit(
+    state: &AuthorizationApiState,
+    decision: AuthorizationAuditDecision<'_>,
 ) -> Result<(), sqlx::Error> {
     let mut transaction = state.pool.begin().await?;
-    let safe_type = resource
-        .map(|r| r.resource_type.as_str())
-        .filter(|v| !v.is_empty() && v.len() <= 64);
-    let safe_id = resource
-        .map(|r| r.resource_id.as_str())
-        .filter(|v| !v.is_empty() && v.len() <= 128);
+    let safe_type = decision
+        .resource
+        .map(|resource| resource.resource_type.as_str())
+        .filter(|value| !value.is_empty() && value.len() <= 64);
+    let safe_id = decision
+        .resource
+        .map(|resource| resource.resource_id.as_str())
+        .filter(|value| !value.is_empty() && value.len() <= 128);
     let event = AuditEvent {
-        actor_type,
-        actor_id: Some(actor_id),
+        actor_type: decision.actor_type,
+        actor_id: Some(decision.actor_id),
         subject_user_id: None,
-        action_code,
-        outcome,
-        reason_code: Some(reason_code),
+        action_code: decision.action_code,
+        outcome: decision.outcome,
+        reason_code: Some(decision.reason_code),
         request_id: None,
-        metadata: serde_json::json!({ "purpose": state.purpose.code(), "policy_code": state.permission.code(), "resource_type": safe_type, "resource_id": safe_id, "result_code": result_code }),
+        metadata: serde_json::json!({
+            "purpose": state.purpose.code(),
+            "policy_code": state.permission.code(),
+            "resource_type": safe_type,
+            "resource_id": safe_id,
+            "result_code": decision.result_code
+        }),
     };
     append_audit_event(&mut transaction, &event).await?;
     transaction.commit().await
@@ -111,13 +123,15 @@ pub async fn require_permission(
             if role == AuthorizationRole::Admin
                 && append_decision_audit(
                     &state,
-                    &actor_id,
-                    actor_type,
-                    "authorization.admin.access.granted",
-                    AuditOutcome::Success,
-                    "policy_allowed",
-                    "allowed",
-                    resource.as_ref(),
+                    AuthorizationAuditDecision {
+                        actor_id: &actor_id,
+                        actor_type,
+                        action_code: "authorization.admin.access.granted",
+                        outcome: AuditOutcome::Success,
+                        reason_code: "policy_allowed",
+                        result_code: "allowed",
+                        resource: resource.as_ref(),
+                    },
                 )
                 .await
                 .is_err()
@@ -132,23 +146,25 @@ pub async fn require_permission(
         AccessDecision::Deny(reason) => {
             if append_decision_audit(
                 &state,
-                &actor_id,
-                actor_type,
-                "authorization.permission.denied",
-                AuditOutcome::Denied,
-                "permission_denied",
-                match reason {
-                    DenialReason::RoleNotAllowed => "role_not_allowed",
-                    DenialReason::ResourceContextRequired => "resource_context_required",
-                    DenialReason::ResourceInactive => "resource_inactive",
-                    DenialReason::NotOwnerOrPublic => "not_owner_or_public",
-                    DenialReason::ConnectionRequired => "connection_required",
-                    DenialReason::ConsentRequired => "consent_required",
-                    DenialReason::ClassificationRestricted => "classification_restricted",
-                    DenialReason::AdminPurposeRequired => "admin_purpose_required",
-                    DenialReason::AdminScopeRequired => "admin_scope_required",
+                AuthorizationAuditDecision {
+                    actor_id: &actor_id,
+                    actor_type,
+                    action_code: "authorization.permission.denied",
+                    outcome: AuditOutcome::Denied,
+                    reason_code: "permission_denied",
+                    result_code: match reason {
+                        DenialReason::RoleNotAllowed => "role_not_allowed",
+                        DenialReason::ResourceContextRequired => "resource_context_required",
+                        DenialReason::ResourceInactive => "resource_inactive",
+                        DenialReason::NotOwnerOrPublic => "not_owner_or_public",
+                        DenialReason::ConnectionRequired => "connection_required",
+                        DenialReason::ConsentRequired => "consent_required",
+                        DenialReason::ClassificationRestricted => "classification_restricted",
+                        DenialReason::AdminPurposeRequired => "admin_purpose_required",
+                        DenialReason::AdminScopeRequired => "admin_scope_required",
+                    },
+                    resource: resource.as_ref(),
                 },
-                resource.as_ref(),
             )
             .await
             .is_err()

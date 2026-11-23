@@ -16,10 +16,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use zeroize::Zeroizing;
 
-use super::authentication::resolved_client_ip;
+use super::{
+    authentication::resolved_client_ip,
+    authorization::AuthorizationApiState,
+};
 use crate::identity::{
-    crypto::KeyProvider, AdminAuthenticatedSession, AdminAuthenticationError,
-    AdminAuthenticationService, AuthenticationRateLimitKey,
+    crypto::KeyProvider, AccessPurpose, AdminAuthenticatedSession, AdminAuthenticationError,
+    AdminAuthenticationService, AuthenticationRateLimitKey, Permission,
 };
 
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
@@ -46,6 +49,14 @@ impl AdminAuthenticationApiState {
             rate_limit_key,
             key_provider,
         }
+    }
+
+    fn authorization_state(&self) -> AuthorizationApiState {
+        AuthorizationApiState::new(
+            self.pool.clone(),
+            Permission::AdminDashboardRead,
+            AccessPurpose::SelfService,
+        )
     }
 
     fn service(&self) -> AdminAuthenticationService<'_> {
@@ -218,6 +229,10 @@ pub fn admin_authentication_router(state: AdminAuthenticationApiState) -> Router
 
     let protected_routes = Router::new()
         .route("/api/v1/identity/admin/me", get(current_admin))
+        .route_layer(middleware::from_fn_with_state(
+            state.authorization_state(),
+            super::authorization::require_permission,
+        ))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_admin_session,

@@ -27,6 +27,7 @@ pub enum Permission {
     DocumentRead,
     DocumentShare,
     ModerationReportCreate,
+    AdminDashboardRead,
     AdminRecoveryReview,
     AdminModerationManage,
     AdminAccountRestrict,
@@ -50,6 +51,7 @@ impl Permission {
             Self::DocumentRead => "document.read",
             Self::DocumentShare => "document.share",
             Self::ModerationReportCreate => "moderation.report.create",
+            Self::AdminDashboardRead => "admin.dashboard.read",
             Self::AdminRecoveryReview => "admin.recovery.review",
             Self::AdminModerationManage => "admin.moderation.manage",
             Self::AdminAccountRestrict => "admin.account.restrict",
@@ -64,6 +66,7 @@ impl Permission {
                 | Self::InvestorDiscoveryRead
                 | Self::ConnectionCreate
                 | Self::ModerationReportCreate
+                | Self::AdminDashboardRead
         )
     }
     const fn allowed_for(self, role: AuthorizationRole) -> bool {
@@ -83,6 +86,7 @@ impl Permission {
             Self::OpportunityRead | Self::InvestorDiscoveryRead => {
                 matches!(role, BusinessOwner | Investor)
             }
+            Self::AdminDashboardRead => matches!(role, Admin),
             Self::AdminRecoveryReview
             | Self::AdminModerationManage
             | Self::AdminAccountRestrict
@@ -117,6 +121,7 @@ pub const PERMISSION_CATALOG: &[Permission] = &[
     Permission::DocumentRead,
     Permission::DocumentShare,
     Permission::ModerationReportCreate,
+    Permission::AdminDashboardRead,
     Permission::AdminRecoveryReview,
     Permission::AdminModerationManage,
     Permission::AdminAccountRestrict,
@@ -343,6 +348,30 @@ mod tests {
             .iter()
             .any(|p| matches!(p.code(), "admin.role.change" | "account.permanent_delete")));
     }
+    #[test]
+    fn admin_dashboard_permission_is_limited_to_the_admin_role() {
+        assert_eq!(
+            evaluate(&ctx(
+                "admin-1",
+                AuthorizationRole::Admin,
+                Permission::AdminDashboardRead,
+                AccessPurpose::SelfService,
+                None
+            )),
+            AccessDecision::Allow
+        );
+        assert_eq!(
+            evaluate(&ctx(
+                "investor-1",
+                AuthorizationRole::Investor,
+                Permission::AdminDashboardRead,
+                AccessPurpose::SelfService,
+                None
+            )),
+            AccessDecision::Deny(DenialReason::RoleNotAllowed)
+        );
+    }
+
     #[test]
     fn role_function_mismatch_is_denied_bfla() {
         assert_eq!(

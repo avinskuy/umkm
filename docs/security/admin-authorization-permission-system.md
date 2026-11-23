@@ -15,7 +15,7 @@ USahapintar uses immutable RBAC grants for the canonical roles `business_owner`,
 
 ## Permission catalog
 
-The immutable catalog is defined in `backend/src/identity/authorization.rs`. It intentionally contains no role-change or permanent-delete capability. Protected routers apply `require_permission` with an `AuthorizationApiState` after the relevant session middleware and attach server-derived resource context for object-scoped permissions.
+The immutable catalog is defined in `backend/src/identity/authorization.rs`. The Admin identity endpoint is protected by the dedicated `admin.dashboard.read` permission after its isolated Admin session is validated. It intentionally contains no role-change or permanent-delete capability. Protected routers apply `require_permission` with an `AuthorizationApiState` after the relevant session middleware and attach server-derived resource context for object-scoped permissions.
 
 ## Audit
 
