@@ -29,7 +29,7 @@ describe("AdminLoginPage", () => {
   it("completes password and TOTP steps before navigating to the Admin workspace", async () => {
     render(<AdminLoginPage />);
 
-    fireEvent.change(screen.getByLabelText("Email atau nomor terdaftar"), {
+    fireEvent.change(screen.getByLabelText("Email Admin"), {
       target: { value: " admin@example.test " },
     });
     fireEvent.change(screen.getByLabelText("Password"), {
@@ -60,7 +60,7 @@ describe("AdminLoginPage", () => {
     );
     render(<AdminLoginPage />);
 
-    fireEvent.change(screen.getByLabelText("Email atau nomor terdaftar"), {
+    fireEvent.change(screen.getByLabelText("Email Admin"), {
       target: { value: "admin@example.test" },
     });
     fireEvent.change(screen.getByLabelText("Password"), {
