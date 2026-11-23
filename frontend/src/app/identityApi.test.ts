@@ -12,7 +12,9 @@ afterEach(() => {
 });
 
 describe("Admin identity API", () => {
-  it("starts password login with same-origin credentials and no-store caching", async () => {
+  it(
+    "starts password login with same-origin credentials and no-store caching",
+    async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ message: "challenge issued" }), {
         status: 202,
@@ -98,7 +100,9 @@ describe("Admin identity API", () => {
   });
 
   it("logs out without trying to parse a 204 response body", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(logoutAdmin()).resolves.toBeUndefined();
@@ -124,7 +128,9 @@ describe("Admin identity API", () => {
       ),
     );
 
-    await expect(beginAdminLogin("admin@example.test", "wrong-password")).rejects.toEqual(
+    await expect(
+      beginAdminLogin("admin@example.test", "wrong-password"),
+    ).rejects.toEqual(
       expect.objectContaining({
         name: "IdentityApiError",
         status: 401,
