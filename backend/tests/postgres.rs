@@ -3591,7 +3591,7 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert_eq!(challenge_credential.0, admin_id);
     assert_eq!(challenge_credential.1.len(), 36);
     assert_eq!(challenge_credential.2.len(), 12);
-    assert_eq!(challenge_credential.3, "v1");
+    assert_eq!(challenge_credential.3, "v2");
     assert_eq!(challenge_credential.4, Some(101));
 
     let session_hash = vec![0x52_u8; 32];
