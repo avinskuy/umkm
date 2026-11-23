@@ -5,7 +5,7 @@
 //! database runtime and must remain atomic.
 
 use ring::{
-    constant_time, hmac,
+    hmac,
     rand::{SecureRandom, SystemRandom},
 };
 use zeroize::Zeroizing;
@@ -52,7 +52,7 @@ pub fn code_for_step(secret: &[u8], step: u64) -> Result<String, TotpError> {
         return Err(TotpError::InvalidSecret);
     }
 
-    let key = hmac::Key::new(&hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, secret);
+    let key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, secret);
     let digest = hmac::sign(&key, &step.to_be_bytes());
     let bytes = digest.as_ref();
     let offset = usize::from(bytes[bytes.len() - 1] & 0x0f);
@@ -64,6 +64,19 @@ pub fn code_for_step(secret: &[u8], step: u64) -> Result<String, TotpError> {
     let code = binary % TOTP_MODULUS;
 
     Ok(format!("{code:06}"))
+}
+
+fn codes_match(secret: &[u8], expected: &str, candidate: &str) -> bool {
+    const DOMAIN: &[u8] = b"identity:totp-code-compare:v1:";
+
+    let key = hmac::Key::new(hmac::HMAC_SHA256, secret);
+    let mut expected_input = Zeroizing::new(DOMAIN.to_vec());
+    expected_input.extend_from_slice(expected.as_bytes());
+    let mut candidate_input = Zeroizing::new(DOMAIN.to_vec());
+    candidate_input.extend_from_slice(candidate.as_bytes());
+
+    let expected_tag = hmac::sign(&key, &expected_input);
+    hmac::verify(&key, &candidate_input, expected_tag.as_ref()).is_ok()
 }
 
 /// Return the matching time-step within a one-step clock-drift window.
@@ -94,9 +107,7 @@ pub fn matching_step(
         }
 
         let expected = code_for_step(secret, step)?;
-        if constant_time::verify_slices_are_equal(expected.as_bytes(), candidate_code.as_bytes())
-            .is_ok()
-        {
+        if codes_match(secret, &expected, candidate_code) {
             matched_step = Some(matched_step.map_or(step, |matched: u64| matched.max(step)));
         }
     }
