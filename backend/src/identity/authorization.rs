@@ -59,7 +59,27 @@ impl Permission {
             Self::AdminSecurityInvestigate => "admin.security.investigate",
         }
     }
-    pub const fn requires_resource(self) -> bool {
+    pub const fn expected_resource_type(self) -> Option<&'static str> {
+        match self {
+            Self::ProfileRead | Self::ProfileUpdate => Some("user_profile"),
+            Self::BusinessProfileRead | Self::BusinessProfileUpdate => Some("business_profile"),
+            Self::OpportunityRead | Self::OpportunityUpdate => Some("opportunity"),
+            Self::ConnectionRead => Some("connection"),
+            Self::DocumentRead | Self::DocumentShare => Some("document"),
+            Self::AdminRecoveryReview => Some("recovery_case"),
+            Self::AdminModerationManage => Some("moderation_case"),
+            Self::AdminAccountRestrict => Some("user_account"),
+            Self::AdminAuditRead => Some("audit_scope"),
+            Self::AdminSecurityInvestigate => Some("security_case"),
+            Self::OpportunityCreate
+            | Self::InvestorDiscoveryRead
+            | Self::ConnectionCreate
+            | Self::ModerationReportCreate
+            | Self::AdminDashboardRead => None,
+        }
+    }
+
+    pub const fn requires_resource(self) {
         !matches!(
             self,
             Self::OpportunityCreate
@@ -79,10 +99,10 @@ impl Permission {
             | Self::DocumentRead
             | Self::DocumentShare
             | Self::ModerationReportCreate => matches!(role, BusinessOwner | Investor),
-            Self::BusinessProfileRead
-            | Self::BusinessProfileUpdate
-            | Self::OpportunityCreate
-            | Self::OpportunityUpdate => matches!(role, BusinessOwner),
+            Self::BusinessProfileRead => matches!(role, BusinessOwner | Investor),
+            Self::BusinessProfileUpdate | Self::OpportunityCreate | Self::OpportunityUpdate => {
+                matches!(role, BusinessOwner)
+            },
             Self::OpportunityRead | Self::InvestorDiscoveryRead => {
                 matches!(role, BusinessOwner | Investor)
             }
@@ -195,6 +215,7 @@ pub struct AuthorizationResource {
 pub enum DenialReason {
     RoleNotAllowed,
     ResourceContextRequired,
+    ResourceTypeMismatch,
     ResourceInactive,
     NotOwnerOrPublic,
     ConnectionRequired,
@@ -208,6 +229,7 @@ impl fmt::Display for DenialReason {
         f.write_str(match self {
             Self::RoleNotAllowed => "role_not_allowed",
             Self::ResourceContextRequired => "resource_context_required",
+            Self::ResourceTypeMismatch => "resource_type_mismatch",
             Self::ResourceInactive => "resource_inactive",
             Self::NotOwnerOrPublic => "not_owner_or_public",
             Self::ConnectionRequired => "connection_required",
@@ -244,10 +266,16 @@ pub fn evaluate(context: &AuthorizationContext<'_>) -> AccessDecision {
         let Some(resource) = context.resource else {
             return AccessDecision::Deny(DenialReason::ResourceContextRequired);
         };
+        if permission.expected_resource_type() != Some(resource.resource_type.as_str()) {
+            return AccessDecision::Deny(DenialReason::ResourceTypeMismatch);
+        }
         if !resource.admin_scope_granted {
             return AccessDecision::Deny(DenialReason::AdminScopeRequired);
         }
-        if !resource.active {
+        if permission.expected_resource_type() != Some(resource.resource_type.as_str()) {
+        return AccessDecision::Deny(DenialReason::ResourceTypeMismatch);
+    }
+    if !resource.active {
             return AccessDecision::Deny(DenialReason::ResourceInactive);
         }
         if resource.classification == DataClassification::HighlyConfidential {
@@ -445,6 +473,22 @@ mod tests {
             AccessDecision::Allow
         );
     }
+    #[test]
+    fn mismatched_resource_type_fails_closed() {
+        let mut item = resource("owner-1", ResourceVisibility::Public);
+        item.resource_type = "opportunity".into();
+        assert_eq!(
+            evaluate(&ctx(
+                "owner-1",
+                AuthorizationRole::BusinessOwner,
+                Permission::DocumentRead,
+                AccessPurpose::SelfService,
+                Some(&item)
+            )),
+            AccessDecision::Deny(DenialReason::ResourceTypeMismatch)
+        );
+    }
+
     #[test]
     fn highly_confidential_data_is_never_exposed_to_application_roles() {
         let mut item = resource("owner-1", ResourceVisibility::Public);
