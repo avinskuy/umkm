@@ -121,7 +121,6 @@ $$;
 
 CREATE FUNCTION public.get_admin_login_totp_credentials(p_challenge_hash BYTEA)
 RETURNS TABLE (
-    challenge_id UUID,
     user_id UUID,
     secret_ciphertext BYTEA,
     secret_nonce BYTEA,
@@ -138,7 +137,7 @@ BEGIN
     END IF;
 
     RETURN QUERY
-    SELECT challenge.id, challenge.user_id, credential.secret_ciphertext,
+    SELECT challenge.user_id, credential.secret_ciphertext,
            credential.secret_nonce, credential.encryption_key_version,
            credential.last_accepted_step
       FROM public.admin_login_challenges AS challenge
