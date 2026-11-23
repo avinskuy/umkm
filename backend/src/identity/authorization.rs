@@ -79,7 +79,7 @@ impl Permission {
         }
     }
 
-    pub const fn requires_resource(self) {
+    pub const fn requires_resource(self) -> bool {
         !matches!(
             self,
             Self::OpportunityCreate
@@ -102,7 +102,7 @@ impl Permission {
             Self::BusinessProfileRead => matches!(role, BusinessOwner | Investor),
             Self::BusinessProfileUpdate | Self::OpportunityCreate | Self::OpportunityUpdate => {
                 matches!(role, BusinessOwner)
-            },
+            }
             Self::OpportunityRead | Self::InvestorDiscoveryRead => {
                 matches!(role, BusinessOwner | Investor)
             }
@@ -272,10 +272,7 @@ pub fn evaluate(context: &AuthorizationContext<'_>) -> AccessDecision {
         if !resource.admin_scope_granted {
             return AccessDecision::Deny(DenialReason::AdminScopeRequired);
         }
-        if permission.expected_resource_type() != Some(resource.resource_type.as_str()) {
-        return AccessDecision::Deny(DenialReason::ResourceTypeMismatch);
-    }
-    if !resource.active {
+        if !resource.active {
             return AccessDecision::Deny(DenialReason::ResourceInactive);
         }
         if resource.classification == DataClassification::HighlyConfidential {
@@ -289,6 +286,9 @@ pub fn evaluate(context: &AuthorizationContext<'_>) -> AccessDecision {
     let Some(resource) = context.resource else {
         return AccessDecision::Deny(DenialReason::ResourceContextRequired);
     };
+    if permission.expected_resource_type() != Some(resource.resource_type.as_str()) {
+        return AccessDecision::Deny(DenialReason::ResourceTypeMismatch);
+    }
     if !resource.active {
         return AccessDecision::Deny(DenialReason::ResourceInactive);
     }

@@ -155,7 +155,6 @@ pub async fn require_permission(
                     result_code: match reason {
                         DenialReason::RoleNotAllowed => "role_not_allowed",
                         DenialReason::ResourceContextRequired => "resource_context_required",
-                        DenialReason::ResourceTypeMismatch => "resource_type_mismatch",
                         DenialReason::ResourceInactive => "resource_inactive",
                         DenialReason::NotOwnerOrPublic => "not_owner_or_public",
                         DenialReason::ConnectionRequired => "connection_required",
