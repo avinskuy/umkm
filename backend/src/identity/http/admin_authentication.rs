@@ -16,10 +16,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use zeroize::Zeroizing;
 
-use super::{
-    authentication::resolved_client_ip,
-    authorization::AuthorizationApiState,
-};
+use super::{authentication::resolved_client_ip, authorization::AuthorizationApiState};
 use crate::identity::{
     crypto::KeyProvider, AccessPurpose, AdminAuthenticatedSession, AdminAuthenticationError,
     AdminAuthenticationService, AuthenticationRateLimitKey, Permission,

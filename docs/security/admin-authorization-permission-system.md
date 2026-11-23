@@ -7,7 +7,7 @@ USahapintar uses immutable RBAC grants for the canonical roles `business_owner`,
 ## Enforcement contract
 
 - Authentication middleware must run before permission middleware.
-- Resource repositories must attach `AuthorizationResource` only after loading the target from PostgreSQL and verifying its current state. Never construct it from request JSON, URL parameters, or client claims.
+- Resource repositories must attach `AuthorizationResource` only after loading the target from PostgreSQL and verifying its current state. Each permission is bound to an expected resource type; mismatched types are denied. Never construct it from request JSON, URL parameters, or client claims.
 - Missing resource context, inactive resources, unsupported roles, missing consent, or unavailable audit persistence fail closed.
 - Private confidential documents require both a valid connection and explicit sharing consent unless the requester is the owner.
 - Highly confidential data is not exposed through ordinary application permissions, including Admin operations.
