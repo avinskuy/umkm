@@ -2887,7 +2887,6 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                'public.get_admin_totp_credentials(uuid)'::regprocedure, \
                'public.get_admin_login_totp_credentials(bytea)'::regprocedure, \
                'public.reserve_admin_login_attempt(bytea,bytea)'::regprocedure, \
-               'public.clear_admin_login_identifier_limit(bytea)'::regprocedure, \
                'public.create_admin_login_challenge(uuid,bytea)'::regprocedure, \
                'public.record_admin_login_challenge_failure(bytea)'::regprocedure, \
                'public.complete_admin_login(bytea,bigint,bytea)'::regprocedure, \
@@ -2900,7 +2899,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .await
     .expect("Admin authentication function grants should be inspectable");
     assert_eq!(
-        admin_function_grants, 10,
+        admin_function_grants, 9,
         "application should execute only the explicit Admin authentication functions"
     );
 
