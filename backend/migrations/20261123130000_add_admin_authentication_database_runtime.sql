@@ -457,7 +457,6 @@ REVOKE ALL ON TABLE public.admin_sessions FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.find_active_admin_password_login(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_admin_totp_credentials(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.reserve_admin_login_attempt(BYTEA, BYTEA) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.clear_admin_login_identifier_limit(BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_admin_login_challenge(UUID, BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.record_admin_login_challenge_failure(BYTEA) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.complete_admin_login(BYTEA, BIGINT, BYTEA) FROM PUBLIC;
