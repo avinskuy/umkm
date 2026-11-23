@@ -250,8 +250,7 @@ async fn begin_login(
                 .expires_at_unix
                 .saturating_sub(now)
                 .clamp(1, ADMIN_CHALLENGE_MAX_AGE_SECONDS);
-            let cookie =
-                admin_challenge_cookie_header(challenge.token.as_str(), max_age);
+            let cookie = admin_challenge_cookie_header(challenge.token.as_str(), max_age);
             let Ok(cookie_value) = HeaderValue::from_str(cookie.as_str()) else {
                 return error(
                     StatusCode::SERVICE_UNAVAILABLE,
