@@ -85,6 +85,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_authentication_database_operations(&pool).await;
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
+    assert_single_admin_totp_schema(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -2488,6 +2489,54 @@ async fn assert_profile_and_policy_records(pool: &PgPool) {
     );
 }
 
+async fn assert_single_admin_totp_schema(pool: &PgPool) {
+    let (is_unique, predicate): (bool, Option<String>) = sqlx::query_as(
+        "SELECT i.indisunique, pg_catalog.pg_get_expr(i.indpred, i.indrelid) \
+           FROM pg_catalog.pg_index AS i \
+          WHERE i.indexrelid = 'public.users_single_admin_account_uidx'::regclass",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("single-Admin uniqueness index should exist");
+    assert!(is_unique, "Admin account index must be unique");
+    assert!(
+        predicate.as_deref().is_some_and(|value| value.contains("admin")),
+        "Admin uniqueness index must apply only to Admin accounts"
+    );
+
+    let required_columns: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+           FROM information_schema.columns \
+          WHERE table_schema = 'public' \
+            AND table_name = 'admin_totp_credentials' \
+            AND column_name = ANY(ARRAY[ \
+                'user_id', 'secret_ciphertext', 'secret_nonce', \
+                'encryption_key_version', 'enabled_at', 'last_accepted_step', \
+                'created_at', 'updated_at' \
+            ]::text[])",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("Admin TOTP credential columns should be inspectable");
+    assert_eq!(required_columns, 8);
+
+    let required_guards: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+           FROM pg_catalog.pg_trigger \
+          WHERE tgrelid = 'public.admin_totp_credentials'::regclass \
+            AND NOT tgisinternal \
+            AND tgname = ANY(ARRAY[ \
+                'admin_totp_credentials_10_guard', \
+                'admin_totp_credentials_20_no_delete', \
+                'admin_totp_credentials_30_no_truncate' \
+            ]::text[])",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("Admin TOTP credential guards should be inspectable");
+    assert_eq!(required_guards, 3);
+}
+
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
     let admin_url = std::env::var("CI_TARGET_ADMIN_DATABASE_URL").expect(
         "CI must provide a disposable target-database DBA connection for privilege bootstrap tests",
@@ -2559,7 +2608,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'verification_sessions', 'verification_challenges', \
                    'otp_verification_attempt_events', 'otp_delivery_events', 'sessions', \
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
-                   'account_recovery_case_signals', 'account_recovery_review_decisions', \
+                   'account_recovery_case_signals', 'account_recovery_review_decisions', \\\n                   'admin_totp_credentials', \\
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
