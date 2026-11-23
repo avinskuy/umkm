@@ -86,6 +86,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_account_recovery_schema_invariants(&pool).await;
     assert_identity_audit_event_invariants(&pool).await;
     assert_single_admin_totp_schema(&pool).await;
+    assert_admin_totp_operator_workflows(&pool).await;
     assert_admin_authentication_database_runtime(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
@@ -2568,15 +2569,16 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .await
     .expect("encrypted TOTP credential should be attachable to the single active Admin");
 
-    sqlx::query(
-        "UPDATE public.admin_totp_credentials \
-            SET enabled_at = clock_timestamp(), last_accepted_step = 100 \
-          WHERE user_id = $1::uuid",
+    let operator_id = "00000000-0000-4000-8000-000000000001";
+    let enrollment_activated: bool = sqlx::query_scalar(
+        "SELECT public.activate_admin_totp_enrollment($1::uuid, 100, $2::uuid)",
     )
     .bind(&admin_user_id)
-    .execute(pool)
+    .bind(operator_id)
+    .fetch_one(pool)
     .await
-    .expect("TOTP enrollment should be activatable after verification");
+    .expect("operator should activate TOTP only after enrollment verification");
+    assert!(enrollment_activated);
 
     sqlx::query(
         "UPDATE public.admin_totp_credentials SET last_accepted_step = 101 WHERE user_id = $1::uuid",
@@ -3329,6 +3331,102 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         selected_case,
         ("under_review".to_owned(), started.user_id.clone())
     );
+}
+
+async fn assert_admin_totp_operator_workflows(pool: &PgPool) {
+    let admin_id: String = sqlx::query_scalar(
+        "SELECT id::text FROM public.users WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("active Admin should exist for operator workflow tests");
+
+    let operator_id = "00000000-0000-4000-8000-000000000002";
+    let pending_challenge_hash = vec![0x71_u8; 32];
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&pending_challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("enabled Admin should be able to create a challenge before recovery");
+
+    let active_session_hash = vec![0x72_u8; 32];
+    sqlx::query(
+        "INSERT INTO public.admin_sessions (user_id, token_hash) VALUES ($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&active_session_hash)
+    .execute(pool)
+    .await
+    .expect("operator workflow fixture should create an active Admin session");
+
+    let reset: bool = sqlx::query_scalar(
+        "SELECT public.reset_admin_totp_enrollment($1::uuid, $2, $3, 'v2', 'authenticator_lost', $4::uuid)",
+    )
+    .bind(&admin_id)
+    .bind(vec![0xB6_u8; 32])
+    .bind(vec![0x6B_u8; 12])
+    .bind(operator_id)
+    .fetch_one(pool)
+    .await
+    .expect("operator should reset the TOTP credential through the controlled procedure");
+    assert!(reset);
+
+    let credential_state: (bool, bool, bool, bool, String) = sqlx::query_as(
+        "SELECT enabled_at IS NULL, last_accepted_step IS NULL, \
+                secret_ciphertext = $2, secret_nonce = $3, encryption_key_version \
+           FROM public.admin_totp_credentials WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_id)
+    .bind(vec![0xB6_u8; 32])
+    .bind(vec![0x6B_u8; 12])
+    .fetch_one(pool)
+    .await
+    .expect("reset TOTP credential should be inspectable by migrator");
+    assert_eq!(credential_state, (true, true, true, true, "v2".to_owned()));
+
+    let challenge_consumed: bool = sqlx::query_scalar(
+        "SELECT consumed_at IS NOT NULL FROM public.admin_login_challenges WHERE challenge_hash = $1",
+    )
+    .bind(&pending_challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("operator reset should consume pending Admin challenges");
+    assert!(challenge_consumed);
+
+    let session_revocation: Option<String> = sqlx::query_scalar(
+        "SELECT revocation_reason FROM public.admin_sessions WHERE token_hash = $1",
+    )
+    .bind(&active_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("operator reset should revoke active Admin sessions");
+    assert_eq!(session_revocation.as_deref(), Some("operator_action"));
+
+    let reenrolled: bool = sqlx::query_scalar(
+        "SELECT public.activate_admin_totp_enrollment($1::uuid, 101, $2::uuid)",
+    )
+    .bind(&admin_id)
+    .bind(operator_id)
+    .fetch_one(pool)
+    .await
+    .expect("operator should activate the replacement authenticator after verification");
+    assert!(reenrolled);
+
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+          WHERE actor_type = 'operator' AND actor_id = $1::uuid \
+            AND subject_user_id = $2::uuid \
+            AND action_code IN ('identity.admin.totp.enrolled', 'identity.admin.totp.reset')",
+    )
+    .bind(operator_id)
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("operator enrollment and reset audit events should be recorded");
+    assert_eq!(audit_count, 2);
 }
 
 async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
