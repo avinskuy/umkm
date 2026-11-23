@@ -9,6 +9,7 @@ AS $$
 DECLARE
     v_role TEXT;
     v_status TEXT;
+    v_operator_reset BOOLEAN;
 BEGIN
     IF TG_OP = 'INSERT' THEN
         SELECT primary_role, account_status
@@ -44,7 +45,10 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    IF current_user <> 'usahapintar_migrator'
+    v_operator_reset := current_user = 'usahapintar_migrator'
+        AND pg_catalog.current_setting('usahapintar.admin_totp_reset', TRUE) = 'on';
+
+    IF NOT v_operator_reset
        AND OLD.enabled_at IS NOT NULL
        AND (
            NEW.enabled_at IS DISTINCT FROM OLD.enabled_at
@@ -56,7 +60,7 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    IF current_user <> 'usahapintar_migrator'
+    IF NOT v_operator_reset
        AND OLD.last_accepted_step IS NOT NULL
        AND (
            NEW.last_accepted_step IS NULL
@@ -147,11 +151,14 @@ BEGIN
        OR octet_length(p_secret_nonce) <> 12
        OR p_encryption_key_version IS NULL
        OR p_encryption_key_version !~ '^v[1-9][0-9]{0,9}$'
+       OR p_reason_code IS NULL
        OR p_reason_code NOT IN ('authenticator_lost', 'suspected_compromise', 'operator_recovery')
        OR p_operator_id IS NULL THEN
         RAISE EXCEPTION 'Admin TOTP reset input is invalid'
             USING ERRCODE = '22023';
     END IF;
+
+    PERFORM pg_catalog.set_config('usahapintar.admin_totp_reset', 'on', TRUE);
 
     UPDATE public.admin_totp_credentials AS c
        SET secret_ciphertext = p_secret_ciphertext,
