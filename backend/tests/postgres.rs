@@ -2535,6 +2535,84 @@ async fn assert_single_admin_totp_schema(pool: &PgPool) {
     .await
     .expect("Admin TOTP credential guards should be inspectable");
     assert_eq!(required_guards, 3);
+
+    let admin_user_id: String = sqlx::query_scalar(
+        "SELECT id::text FROM public.users WHERE primary_role = 'admin' AND account_status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("recovery review fixture should provision the single active Admin");
+
+    let duplicate_admin = sqlx::query(
+        "INSERT INTO public.users (primary_role, account_status, email_normalized, initial_contact_channel, email_verified_at, initial_contact_verified_at, password_hash) \
+         VALUES ('admin', 'active', 'second-admin@example.test', 'email', clock_timestamp(), clock_timestamp(), 'test-only-hash')",
+    )
+    .execute(pool)
+    .await;
+    assert!(
+        duplicate_admin.is_err(),
+        "database must reject a second Admin account"
+    );
+
+    sqlx::query(
+        "INSERT INTO public.admin_totp_credentials (user_id, secret_ciphertext, secret_nonce, encryption_key_version) \
+         VALUES ($1::uuid, $2, $3, 'v1')",
+    )
+    .bind(&admin_user_id)
+    .bind(vec![0xA5_u8; 32])
+    .bind(vec![0x5A_u8; 12])
+    .execute(pool)
+    .await
+    .expect("encrypted TOTP credential should be attachable to the single active Admin");
+
+    sqlx::query(
+        "UPDATE public.admin_totp_credentials \
+            SET enabled_at = clock_timestamp(), last_accepted_step = 100 \
+          WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await
+    .expect("TOTP enrollment should be activatable after verification");
+
+    sqlx::query(
+        "UPDATE public.admin_totp_credentials SET last_accepted_step = 101 WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await
+    .expect("TOTP replay counter should advance");
+
+    let replay = sqlx::query(
+        "UPDATE public.admin_totp_credentials SET last_accepted_step = 100 WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await;
+    assert!(replay.is_err(), "TOTP replay counter must never move backwards");
+
+    let secret_replacement = sqlx::query(
+        "UPDATE public.admin_totp_credentials SET secret_ciphertext = $2 WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .bind(vec![0xB6_u8; 32])
+    .execute(pool)
+    .await;
+    assert!(
+        secret_replacement.is_err(),
+        "enabled TOTP secret cannot be replaced by a direct update"
+    );
+
+    let credential_delete = sqlx::query(
+        "DELETE FROM public.admin_totp_credentials WHERE user_id = $1::uuid",
+    )
+    .bind(&admin_user_id)
+    .execute(pool)
+    .await;
+    assert!(
+        credential_delete.is_err(),
+        "Admin TOTP credential cannot be deleted directly"
+    );
 }
 
 async fn assert_database_principal_bootstrap(pool: &PgPool) {
