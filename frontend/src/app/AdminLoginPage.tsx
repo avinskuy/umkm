@@ -164,8 +164,8 @@ export function AdminLoginPage() {
             aria-busy={pending}
           >
             <p className={styles.stepDescription}>
-              Buka aplikasi authenticator yang terdaftar dan masukkan kode enam digit.
-              Challenge hanya berlaku dalam waktu singkat.
+              Buka aplikasi authenticator yang terdaftar dan masukkan kode enam
+              digit. Challenge hanya berlaku dalam waktu singkat.
             </p>
 
             <label htmlFor="admin-totp-code">Kode authenticator</label>
@@ -208,7 +208,8 @@ export function AdminLoginPage() {
         )}
 
         <p className={styles.securityNote}>
-          Sesi Admin menggunakan cookie aman terpisah dan akan berakhir otomatis.
+          Sesi Admin menggunakan cookie aman terpisah dan akan berakhir
+          otomatis.
         </p>
         <a className={styles.backLink} href="/">
           Kembali ke beranda
