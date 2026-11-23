@@ -2792,6 +2792,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                'public.find_active_admin_password_login(text)'::regprocedure, \
                'public.get_admin_totp_credentials(uuid)'::regprocedure, \
                'public.reserve_admin_login_attempt(bytea,bytea)'::regprocedure, \
+               'public.clear_admin_login_identifier_limit(bytea)'::regprocedure, \
                'public.create_admin_login_challenge(uuid,bytea)'::regprocedure, \
                'public.record_admin_login_challenge_failure(bytea)'::regprocedure, \
                'public.complete_admin_login(bytea,bigint,bytea)'::regprocedure, \
@@ -2804,7 +2805,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     .await
     .expect("Admin authentication function grants should be inspectable");
     assert_eq!(
-        admin_function_grants, 8,
+        admin_function_grants, 9,
         "application should execute only the explicit Admin authentication functions"
     );
 
@@ -3494,6 +3495,20 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         .await
         .expect("Admin rate limit should return a decision");
     assert!(!blocked, "the sixth identifier attempt must be blocked");
+
+    sqlx::query("SELECT public.clear_admin_login_identifier_limit($1)")
+        .bind(&identifier_hash)
+        .execute(pool)
+        .await
+        .expect("successful Admin login should clear its identifier rate limit");
+    let allowed_after_clear: bool =
+        sqlx::query_scalar("SELECT public.reserve_admin_login_attempt($1, $2)")
+            .bind(&identifier_hash)
+            .bind(&ip_hash)
+            .fetch_one(pool)
+            .await
+            .expect("cleared Admin identifier should be allowed again");
+    assert!(allowed_after_clear);
 
     let current_totp_step: i64 =
         sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint")
