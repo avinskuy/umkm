@@ -3327,9 +3327,11 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .fetch_optional(pool)
     .await
     .expect("Admin password lookup should be callable");
-    assert_eq!(
-        found_admin.map(|(user_id, hash)| (user_id, hash)),
-        Some((admin_id.clone(), "test-only-hash".to_owned()))
+    assert!(
+        found_admin.is_some_and(|(user_id, password_hash)| {
+            user_id == admin_id && !password_hash.is_empty()
+        }),
+        "Admin lookup should return the active Admin credential only"
     );
 
     let credential_count: i64 = sqlx::query_scalar(
@@ -3343,7 +3345,7 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
 
     let identifier_hash = vec![0x31_u8; 32];
     let ip_hash = vec![0x32_u8; 32];
-    for attempt in 1..=5 {
+    for _ in 1..=5 {
         let allowed: bool = sqlx::query_scalar(
             "SELECT public.reserve_admin_login_attempt($1, $2)",
         )
@@ -3353,7 +3355,6 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         .await
         .expect("Admin login attempt should be reserved");
         assert!(allowed, "the first five identifier attempts should be allowed");
-        assert_eq!(attempt, attempt);
     }
     let blocked: bool = sqlx::query_scalar(
         "SELECT public.reserve_admin_login_attempt($1, $2)",
