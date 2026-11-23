@@ -801,6 +801,34 @@ mod tests {
             &decrypt_admin_totp_secret(&provider, admin_id, &encrypted).unwrap()[..],
             &secret
         );
+
+        let old_provider = AdminTotpKeyring::from_hex_entries(
+            KeyVersion(1),
+            &[
+                (
+                    KeyVersion(1),
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                ),
+                (
+                    KeyVersion(2),
+                    "2222222222222222222222222222222222222222222222222222222222222222",
+                ),
+            ],
+        )
+        .expect("previous Admin key should remain available during rotation");
+        let old_encrypted = encrypt_admin_totp_secret(&old_provider, admin_id, &secret).unwrap();
+        assert_eq!(old_encrypted.key_version, KeyVersion(1));
+        assert_eq!(
+            &decrypt_admin_totp_secret(&provider, admin_id, &old_encrypted).unwrap()[..],
+            &secret
+        );
+
+        let mut tampered_version = old_encrypted;
+        tampered_version.key_version = KeyVersion(2);
+        assert_eq!(
+            decrypt_admin_totp_secret(&provider, admin_id, &tampered_version).unwrap_err(),
+            CryptoError::AuthenticationFailed
+        );
     }
 
     #[test]
