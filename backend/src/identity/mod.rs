@@ -13,8 +13,8 @@ pub mod http;
 pub mod password;
 pub mod password_reset;
 pub mod recovery;
-pub mod totp;
 mod registration;
+pub mod totp;
 pub mod verification;
 
 pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
