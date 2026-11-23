@@ -3704,7 +3704,10 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("Admin session should be revoked after account deactivation");
-    assert_eq!(deactivation_reason.as_deref(), Some("account_status_changed"));
+    assert_eq!(
+        deactivation_reason.as_deref(),
+        Some("account_status_changed")
+    );
 
     let deactivated_challenge: bool = sqlx::query_scalar(
         "SELECT consumed_at IS NOT NULL FROM public.admin_login_challenges WHERE challenge_hash = $1",
@@ -3742,13 +3745,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         .await
         .expect("Admin account may be reactivated after deactivation");
 
-    let resumed_session: Option<String> = sqlx::query_scalar(
-        "SELECT session_id::text FROM public.get_active_admin_session($1)",
-    )
-    .bind(&active_admin_session_hash)
-    .fetch_optional(pool)
-    .await
-    .expect("revoked Admin session must remain invalid after account reactivation");
+    let resumed_session: Option<String> =
+        sqlx::query_scalar("SELECT session_id::text FROM public.get_active_admin_session($1)")
+            .bind(&active_admin_session_hash)
+            .fetch_optional(pool)
+            .await
+            .expect("revoked Admin session must remain invalid after account reactivation");
     assert!(
         resumed_session.is_none(),
         "reactivating the account must not revive a revoked Admin session"
