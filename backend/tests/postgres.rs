@@ -3495,6 +3495,13 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         .expect("Admin rate limit should return a decision");
     assert!(!blocked, "the sixth identifier attempt must be blocked");
 
+    let current_totp_step: i64 = sqlx::query_scalar(
+        "SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint",
+    )
+    .fetch_one(pool)
+    .await
+    .expect("current TOTP time-step should be available");
+
     let failed_challenge_hash = vec![0x41_u8; 32];
     let _: String = sqlx::query_scalar(
         "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
@@ -3514,8 +3521,9 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
         assert_eq!(still_valid, attempt < 5);
     }
     assert!(
-            sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
+            sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text",)
                 .bind(&failed_challenge_hash)
+                .bind(current_totp_step)
                 .bind(vec![0x51_u8; 32])
                 .fetch_one(pool)
                 .await
@@ -3538,8 +3546,9 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
 
     let session_hash = vec![0x52_u8; 32];
     let session_id: String =
-        sqlx::query_scalar("SELECT public.complete_admin_login($1, 102, $2)::text")
+        sqlx::query_scalar("SELECT public.complete_admin_login($1, $2, $3)::text")
             .bind(&challenge_hash)
+            .bind(current_totp_step)
             .bind(&session_hash)
             .fetch_one(pool)
             .await
@@ -3557,8 +3566,9 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert_eq!(session_owner, Some((session_id.clone(), admin_id.clone())));
 
     assert!(
-        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text",)
             .bind(&challenge_hash)
+            .bind(current_totp_step)
             .bind(vec![0x53_u8; 32])
             .fetch_one(pool)
             .await
@@ -3576,8 +3586,9 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("new challenge should be available after the prior challenge is consumed");
     assert!(
-        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 102, $2)::text",)
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text",)
             .bind(&replay_challenge_hash)
+            .bind(current_totp_step)
             .bind(vec![0x54_u8; 32])
             .fetch_one(pool)
             .await
@@ -3595,13 +3606,15 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("concurrency challenge should be created");
     let first =
-        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 103, $2)::text")
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text")
             .bind(&concurrent_challenge_hash)
+            .bind(current_totp_step + 1)
             .bind(vec![0x61_u8; 32])
             .fetch_one(pool);
     let second =
-        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, 103, $2)::text")
+        sqlx::query_scalar::<_, String>("SELECT public.complete_admin_login($1, $2, $3)::text")
             .bind(&concurrent_challenge_hash)
+            .bind(current_totp_step + 1)
             .bind(vec![0x62_u8; 32])
             .fetch_one(pool);
     let (first_result, second_result) = tokio::join!(first, second);
