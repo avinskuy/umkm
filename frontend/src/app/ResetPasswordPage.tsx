@@ -68,7 +68,9 @@ export function ResetPasswordPage() {
       setPassword("");
       setConfirmation("");
       setCompleted(true);
-      setNotice(payload?.message ?? "Password berhasil diperbarui. Silakan masuk kembali.");
+      setNotice(
+        payload?.message ?? "Password berhasil diperbarui. Silakan masuk kembali.",
+      );
     } catch {
       setNotice("Koneksi belum tersedia. Periksa jaringan lalu coba lagi.");
     } finally {
@@ -89,7 +91,9 @@ export function ResetPasswordPage() {
     <main className={styles.page}>
       <section className={styles.panel} aria-labelledby="reset-title">
         <a className={styles.brand} href="/" aria-label="USahapintar beranda">
-          <span className={styles.brandMark} aria-hidden="true">U</span>
+          <span className={styles.brandMark} aria-hidden="true">
+            U
+          </span>
           <span>USahapintar</span>
         </a>
 
@@ -140,9 +144,16 @@ export function ResetPasswordPage() {
               yang pernah dipakai pada layanan lain.
             </p>
 
-            {notice && <p className={styles.notice} role="alert">{notice}</p>}
+            {notice && (
+              <p className={styles.notice} role="alert">
+                {notice}
+              </p>
+            )}
 
-            <button type="submit" disabled={pending || !password || !confirmation}>
+            <button
+              type="submit"
+              disabled={pending || !password || !confirmation}
+            >
               {pending ? "Menyimpan..." : "Simpan password baru"}
             </button>
           </form>
