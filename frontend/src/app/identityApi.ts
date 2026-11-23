@@ -81,7 +81,11 @@ export async function completeAdminLogin(code: string): Promise<void> {
 
 export async function getCurrentAdmin(): Promise<AdminSession> {
   const payload = await requestIdentityApi("/api/v1/identity/admin/me");
-  if (typeof payload.user_id !== "string" || payload.role !== "admin") {
+  if (
+    typeof payload.user_id !== "string" ||
+    payload.user_id.trim().length === 0 ||
+    payload.role !== "admin"
+  ) {
     throw new IdentityApiError(502, "Respons sesi Admin tidak valid.");
   }
   return {
