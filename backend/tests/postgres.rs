@@ -3389,12 +3389,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert!(!blocked, "the sixth identifier attempt must be blocked");
 
     let failed_challenge_hash = vec![0x41_u8; 32];
-    sqlx::query(
-        "SELECT challenge_id FROM public.create_admin_login_challenge($1::uuid, $2)",
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
     )
     .bind(&admin_id)
     .bind(&failed_challenge_hash)
-    .execute(pool)
+    .fetch_one(pool)
     .await
     .expect("active Admin should receive a short-lived login challenge");
     for attempt in 1..=5 {
@@ -3466,12 +3466,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     );
 
     let replay_challenge_hash = vec![0x43_u8; 32];
-    sqlx::query(
-        "SELECT challenge_id FROM public.create_admin_login_challenge($1::uuid, $2)",
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
     )
     .bind(&admin_id)
     .bind(&replay_challenge_hash)
-    .execute(pool)
+    .fetch_one(pool)
     .await
     .expect("new challenge should be available after the prior challenge is consumed");
     assert!(
@@ -3487,12 +3487,12 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     );
 
     let concurrent_challenge_hash = vec![0x44_u8; 32];
-    sqlx::query(
-        "SELECT challenge_id FROM public.create_admin_login_challenge($1::uuid, $2)",
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
     )
     .bind(&admin_id)
     .bind(&concurrent_challenge_hash)
-    .execute(pool)
+    .fetch_one(pool)
     .await
     .expect("concurrency challenge should be created");
     let first = sqlx::query_scalar::<_, String>(
