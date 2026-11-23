@@ -2672,6 +2672,40 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
         .expect("test Admin rate-limit key should be valid");
     let service = AdminAuthenticationService::new(pool, &rate_limit_key, &VerificationTestKeys);
 
+    let current_totp_step: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint")
+            .fetch_one(pool)
+            .await
+            .expect("current TOTP step should be available for service integration");
+    let service_totp_secret = [0x6B_u8; 20];
+    let service_encrypted =
+        encrypt_admin_totp_secret(&VerificationTestKeys, &admin_id, &service_totp_secret)
+            .expect("service TOTP secret should be encrypted");
+    let service_key_version = key_version_label(service_encrypted.key_version)
+        .expect("service TOTP key version should be valid");
+    sqlx::query(
+        "SELECT public.reset_admin_totp_enrollment( \
+            $1::uuid, $2, $3, $4, 'authenticator_lost', $5::uuid \
+        )",
+    )
+    .bind(&admin_id)
+    .bind(&service_encrypted.ciphertext)
+    .bind(service_encrypted.nonce.to_vec())
+    .bind(service_key_version)
+    .bind("00000000-0000-4000-8000-000000000002")
+    .execute(pool)
+    .await
+    .expect("operator should prepare a fresh TOTP secret for end-to-end service coverage");
+    sqlx::query(
+        "SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)",
+    )
+    .bind(&admin_id)
+    .bind(current_totp_step - 1)
+    .bind("00000000-0000-4000-8000-000000000002")
+    .execute(pool)
+    .await
+    .expect("operator should activate the fresh TOTP secret before service login");
+
     let invalid_password = service
         .begin_login(
             &admin_email,
@@ -2694,8 +2728,48 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
         .expect("valid Admin password should issue a TOTP challenge");
     assert!(challenge.expires_at_unix > 0);
 
+    let valid_totp_code = usahapintar_api::identity::totp::code_for_step(
+        &service_totp_secret,
+        current_totp_step as u64,
+    )
+    .expect("valid TOTP code should be generated for the current time-step");
+    let session = service
+        .complete_login(challenge.token.as_str(), &valid_totp_code)
+        .await
+        .expect("valid TOTP should atomically create an isolated Admin session");
+    assert_eq!(session.user_id, admin_id);
+
+    let authenticated = service
+        .validate_session(session.token.as_str())
+        .await
+        .expect("new Admin session should validate");
+    assert_eq!(authenticated.user_id, admin_id);
+    assert!(
+        service
+            .logout(session.token.as_str())
+            .await
+            .expect("Admin logout should revoke the isolated session")
+    );
+    assert!(matches!(
+        service.validate_session(session.token.as_str()).await,
+        Err(usahapintar_api::identity::AdminAuthenticationError::InvalidSession)
+    ));
+
+    let failed_totp_challenge = service
+        .begin_login(
+            &admin_email,
+            "Admin-Service-Test-Password-2026!",
+            "192.0.2.44".parse().expect("test IP should be valid"),
+        )
+        .await
+        .expect("correct password should issue a second TOTP challenge");
+    let invalid_totp_code = usahapintar_api::identity::totp::code_for_step(
+        &service_totp_secret,
+        current_totp_step as u64 + 5,
+    )
+    .expect("out-of-window TOTP code should be generated");
     let invalid_totp = service
-        .complete_login(challenge.token.as_str(), "000000")
+        .complete_login(failed_totp_challenge.token.as_str(), &invalid_totp_code)
         .await;
     assert!(matches!(
         invalid_totp,
