@@ -3657,6 +3657,100 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
             .expect("revoked Admin session should no longer validate");
     assert!(inactive_session.is_none());
 
+    let active_admin_session_hash: Vec<u8> = sqlx::query_scalar(
+        "SELECT token_hash FROM public.admin_sessions \
+          WHERE user_id = $1::uuid AND revoked_at IS NULL LIMIT 1",
+    )
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("concurrent login should leave one active Admin session");
+
+    let pending_admin_challenge_hash = vec![0x46_u8; 32];
+    let _: String = sqlx::query_scalar(
+        "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
+    )
+    .bind(&admin_id)
+    .bind(&pending_admin_challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("active Admin should be able to create a challenge before deactivation");
+
+    sqlx::query("UPDATE public.users SET account_status = 'deactivated' WHERE id = $1::uuid")
+        .bind(&admin_id)
+        .execute(pool)
+        .await
+        .expect("Admin deactivation should revoke authentication state");
+
+    let deactivation_reason: Option<String> = sqlx::query_scalar(
+        "SELECT revocation_reason FROM public.admin_sessions WHERE token_hash = $1",
+    )
+    .bind(&active_admin_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("Admin session should be revoked after account deactivation");
+    assert_eq!(deactivation_reason.as_deref(), Some("account_status_changed"));
+
+    let deactivated_challenge: bool = sqlx::query_scalar(
+        "SELECT consumed_at IS NOT NULL FROM public.admin_login_challenges WHERE challenge_hash = $1",
+    )
+    .bind(&pending_admin_challenge_hash)
+    .fetch_one(pool)
+    .await
+    .expect("pending challenge should be consumed after account deactivation");
+    assert!(deactivated_challenge);
+
+    let deactivated_totp_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.get_admin_totp_credentials($1::uuid)",
+    )
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("inactive Admin must not retrieve TOTP credentials");
+    assert_eq!(deactivated_totp_count, 0);
+
+    assert!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT challenge_id::text FROM public.create_admin_login_challenge($1::uuid, $2)",
+        )
+        .bind(&admin_id)
+        .bind(vec![0x47_u8; 32])
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "inactive Admin must not receive a login challenge"
+    );
+
+    sqlx::query("UPDATE public.users SET account_status = 'active' WHERE id = $1::uuid")
+        .bind(&admin_id)
+        .execute(pool)
+        .await
+        .expect("Admin account may be reactivated after deactivation");
+
+    let resumed_session: Option<String> = sqlx::query_scalar(
+        "SELECT session_id::text FROM public.get_active_admin_session($1)",
+    )
+    .bind(&active_admin_session_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("revoked Admin session must remain invalid after account reactivation");
+    assert!(
+        resumed_session.is_none(),
+        "reactivating the account must not revive a revoked Admin session"
+    );
+
+    let deactivation_audit_count: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint FROM public.identity_audit_events \
+          WHERE actor_type = 'system' AND subject_user_id = $1::uuid \
+            AND action_code = 'identity.admin.access.revoked' \
+            AND reason_code = 'account_status_changed'",
+    )
+    .bind(&admin_id)
+    .fetch_one(pool)
+    .await
+    .expect("Admin deactivation audit event should be recorded");
+    assert_eq!(deactivation_audit_count, 1);
+
     let admin_audit_count: i64 = sqlx::query_scalar(
         "SELECT count(*)::bigint FROM public.identity_audit_events \
           WHERE actor_type = 'admin' AND actor_id = $1::uuid \
