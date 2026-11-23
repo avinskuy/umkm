@@ -779,7 +779,9 @@ mod tests {
     fn admin_totp_encryption_rejects_invalid_identity_and_secret_size() {
         let provider = TestKeyProvider;
         assert_eq!(
-            encrypt_admin_totp_secret(&provider, "not-a-uuid", &[0x01; 20]).unwrap_err(),
+            encrypt_admin_totp_secret(&provider, "not-a-uuid", &[0x01; 20])
+                .err()
+                .expect("invalid Admin identity should be rejected"),
             CryptoError::InvalidInput
         );
         assert_eq!(
@@ -788,7 +790,8 @@ mod tests {
                 "00000000-0000-4000-8000-000000000001",
                 &[0x01; 19]
             )
-            .unwrap_err(),
+            .err()
+            .expect("invalid Admin TOTP secret size should be rejected"),
             CryptoError::InvalidInput
         );
     }
@@ -800,7 +803,8 @@ mod tests {
                 KeyVersion(3),
                 &[(KeyVersion(2), "2222222222222222222222222222222222222222222222222222222222222222")]
             )
-            .unwrap_err(),
+            .err()
+            .expect("missing active key must be rejected"),
             CryptoError::KeyUnavailable
         );
         assert_eq!(
@@ -811,7 +815,8 @@ mod tests {
                     (KeyVersion(2), "3333333333333333333333333333333333333333333333333333333333333333")
                 ]
             )
-            .unwrap_err(),
+            .err()
+            .expect("duplicate key versions must be rejected"),
             CryptoError::InvalidInput
         );
     }
