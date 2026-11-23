@@ -19,7 +19,7 @@ CREATE TABLE public.admin_totp_credentials (
     CONSTRAINT admin_totp_credentials_user_fk
         FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE RESTRICT,
     CONSTRAINT admin_totp_credentials_ciphertext_check
-        CHECK (octet_length(secret_ciphertext) >= 32),
+        CHECK (octet_length(secret_ciphertext) = 36),
     CONSTRAINT admin_totp_credentials_nonce_check
         CHECK (octet_length(secret_nonce) = 12),
     CONSTRAINT admin_totp_credentials_key_version_check
