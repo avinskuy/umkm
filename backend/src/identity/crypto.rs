@@ -3,6 +3,8 @@
 //! Tidak ada key produksi yang dimuat oleh modul ini. Implementasi produksi
 //! harus menyediakan KeyProvider dari secret manager/KMS yang disetujui.
 
+use std::collections::HashMap;
+
 use ring::{
     aead, hmac,
     rand::{SecureRandom, SystemRandom},
@@ -15,12 +17,14 @@ const DIGEST_LEN: usize = 32;
 
 const CONTACT_DOMAIN: &[u8] = b"identity:contact-fingerprint:v1\0";
 const OTP_DOMAIN: &[u8] = b"identity:otp-verification:v1\0";
+const ADMIN_TOTP_DOMAIN: &[u8] = b"identity:admin-totp-secret:v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeyPurpose {
     DataEncryption,
     ContactFingerprint,
     OtpVerification,
+    AdminTotpSecret,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -153,7 +157,30 @@ pub fn encrypt(
     plaintext: &[u8],
     associated_data: &[u8],
 ) -> Result<EncryptedPayload, CryptoError> {
-    let versioned_key = provider.active_key(KeyPurpose::DataEncryption)?;
+    encrypt_for_purpose(
+        provider,
+        KeyPurpose::DataEncryption,
+        plaintext,
+        associated_data,
+    )
+}
+
+/// Enkripsi untuk tujuan key tertentu tanpa mengubah domain key antar-purpose.
+fn encrypt_for_purpose(
+    provider: &dyn KeyProvider,
+    purpose: KeyPurpose,
+    plaintext: &[u8],
+    associated_data: &[u8],
+) -> Result<EncryptedPayload, CryptoError> {
+    let versioned_key = provider.active_key(purpose)?;
+    encrypt_with_key(versioned_key, plaintext, associated_data)
+}
+
+fn encrypt_with_key(
+    versioned_key: VersionedKey,
+    plaintext: &[u8],
+    associated_data: &[u8],
+) -> Result<EncryptedPayload, CryptoError> {
     let unbound_key = aead::UnboundKey::new(&aead::AES_256_GCM, versioned_key.key.expose())
         .map_err(|_| CryptoError::InvalidKey)?;
     let key = aead::LessSafeKey::new(unbound_key);
@@ -180,7 +207,21 @@ pub fn decrypt(
     payload: &EncryptedPayload,
     associated_data: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, CryptoError> {
-    let key_material = provider.key(KeyPurpose::DataEncryption, payload.key_version)?;
+    decrypt_for_purpose(
+        provider,
+        KeyPurpose::DataEncryption,
+        payload,
+        associated_data,
+    )
+}
+
+fn decrypt_for_purpose(
+    provider: &dyn KeyProvider,
+    purpose: KeyPurpose,
+    payload: &EncryptedPayload,
+    associated_data: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, CryptoError> {
+    let key_material = provider.key(purpose, payload.key_version)?;
     let unbound_key = aead::UnboundKey::new(&aead::AES_256_GCM, key_material.expose())
         .map_err(|_| CryptoError::InvalidKey)?;
     let key = aead::LessSafeKey::new(unbound_key);
@@ -197,6 +238,64 @@ pub fn decrypt(
     let plaintext_len = plaintext.len();
     buffer.truncate(plaintext_len);
     Ok(buffer)
+}
+
+/// Enkripsi secret TOTP Admin dengan key-purpose terpisah dan AAD terikat akun.
+pub fn encrypt_admin_totp_secret(
+    provider: &dyn KeyProvider,
+    admin_user_id: &str,
+    secret: &[u8],
+) -> Result<EncryptedPayload, CryptoError> {
+    if !is_canonical_uuid(admin_user_id) || secret.len() != 20 {
+        return Err(CryptoError::InvalidInput);
+    }
+
+    let versioned_key = provider.active_key(KeyPurpose::AdminTotpSecret)?;
+    let associated_data = admin_totp_associated_data(admin_user_id, versioned_key.version)?;
+    encrypt_with_key(versioned_key, secret, &associated_data)
+}
+
+/// Dekripsi secret TOTP hanya untuk akun Admin yang sama dan versi key yang tersimpan.
+pub fn decrypt_admin_totp_secret(
+    provider: &dyn KeyProvider,
+    admin_user_id: &str,
+    payload: &EncryptedPayload,
+) -> Result<Zeroizing<Vec<u8>>, CryptoError> {
+    if !is_canonical_uuid(admin_user_id) {
+        return Err(CryptoError::InvalidInput);
+    }
+
+    let associated_data = admin_totp_associated_data(admin_user_id, payload.key_version)?;
+    let secret = decrypt_for_purpose(
+        provider,
+        KeyPurpose::AdminTotpSecret,
+        payload,
+        &associated_data,
+    )?;
+    if secret.len() != 20 {
+        return Err(CryptoError::AuthenticationFailed);
+    }
+    Ok(secret)
+}
+
+fn admin_totp_associated_data(
+    admin_user_id: &str,
+    version: KeyVersion,
+) -> Result<Zeroizing<Vec<u8>>, CryptoError> {
+    let version_label = key_version_label(version)?;
+    let mut associated_data = Zeroizing::new(ADMIN_TOTP_DOMAIN.to_vec());
+    append_field(&mut associated_data, admin_user_id.as_bytes())?;
+    append_field(&mut associated_data, b"admin_totp")?;
+    append_field(&mut associated_data, version_label.as_bytes())?;
+    Ok(associated_data)
+}
+
+fn is_canonical_uuid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_hexdigit(),
+        })
 }
 
 /// Fingerprint kontak untuk pencarian/rate-limit tanpa menyimpan kontak plaintext.
@@ -284,6 +383,143 @@ fn contact_fingerprint_with_key(
 }
 
 /// Representasi versi key yang disimpan pada kolom TEXT database.
+/// Keyring khusus secret TOTP Admin. Nilai key disediakan oleh secret manager
+/// melalui environment injection; tidak ada fallback key atau default development.
+pub struct AdminTotpKeyring {
+    active_version: KeyVersion,
+    keys: HashMap<KeyVersion, SecretKey>,
+}
+
+impl AdminTotpKeyring {
+    pub fn from_env() -> Result<Self, CryptoError> {
+        let active_label = Zeroizing::new(
+            std::env::var("ADMIN_TOTP_ENCRYPTION_KEY_ACTIVE_VERSION")
+                .map_err(|_| CryptoError::KeyUnavailable)?,
+        );
+        let active_version = parse_key_version(active_label.as_str())?;
+        let encoded_keys = Zeroizing::new(
+            std::env::var("ADMIN_TOTP_ENCRYPTION_KEYS").map_err(|_| CryptoError::KeyUnavailable)?,
+        );
+
+        let mut keys = HashMap::new();
+        for entry in encoded_keys.split(';') {
+            let (label, encoded_key) = entry.split_once(':').ok_or(CryptoError::InvalidInput)?;
+            let version = parse_key_version(label)?;
+            let key_bytes = decode_hex_key(encoded_key)?;
+            if keys
+                .insert(version, SecretKey::from_bytes(key_bytes))
+                .is_some()
+            {
+                return Err(CryptoError::InvalidInput);
+            }
+        }
+
+        if keys.is_empty() || !keys.contains_key(&active_version) {
+            return Err(CryptoError::KeyUnavailable);
+        }
+
+        Ok(Self {
+            active_version,
+            keys,
+        })
+    }
+
+    pub fn from_hex_entries(
+        active_version: KeyVersion,
+        entries: &[(KeyVersion, &str)],
+    ) -> Result<Self, CryptoError> {
+        if active_version.0 == 0 || entries.is_empty() {
+            return Err(CryptoError::InvalidInput);
+        }
+
+        let mut keys = HashMap::new();
+        for (version, encoded_key) in entries {
+            if version.0 == 0 {
+                return Err(CryptoError::InvalidInput);
+            }
+            let key_bytes = decode_hex_key(encoded_key)?;
+            if keys
+                .insert(*version, SecretKey::from_bytes(key_bytes))
+                .is_some()
+            {
+                return Err(CryptoError::InvalidInput);
+            }
+        }
+
+        if !keys.contains_key(&active_version) {
+            return Err(CryptoError::KeyUnavailable);
+        }
+
+        Ok(Self {
+            active_version,
+            keys,
+        })
+    }
+}
+
+impl KeyProvider for AdminTotpKeyring {
+    fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+        if purpose != KeyPurpose::AdminTotpSecret {
+            return Err(CryptoError::KeyUnavailable);
+        }
+        let key = self
+            .keys
+            .get(&self.active_version)
+            .ok_or(CryptoError::KeyUnavailable)?;
+        Ok(VersionedKey::new(
+            self.active_version,
+            SecretKey::from_bytes(*key.expose()),
+        ))
+    }
+
+    fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+        if purpose != KeyPurpose::AdminTotpSecret {
+            return Err(CryptoError::KeyUnavailable);
+        }
+        self.keys
+            .get(&version)
+            .map(|key| SecretKey::from_bytes(*key.expose()))
+            .ok_or(CryptoError::KeyUnavailable)
+    }
+
+    fn key_versions(&self, purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
+        if purpose != KeyPurpose::AdminTotpSecret {
+            return Err(CryptoError::KeyUnavailable);
+        }
+        let mut versions: Vec<_> = self.keys.keys().copied().collect();
+        versions.sort_by_key(|version| version.0);
+        Ok(versions)
+    }
+}
+
+fn decode_hex_key(value: &str) -> Result<[u8; KEY_LEN], CryptoError> {
+    if value.len() != KEY_LEN * 2 {
+        return Err(CryptoError::InvalidKey);
+    }
+
+    let mut decoded = Zeroizing::new([0_u8; KEY_LEN]);
+    for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        let high = hex_nibble(pair[0]).ok_or(CryptoError::InvalidKey)?;
+        let low = hex_nibble(pair[1]).ok_or(CryptoError::InvalidKey)?;
+        decoded[index] = (high << 4) | low;
+    }
+
+    if decoded.iter().all(|byte| *byte == 0) {
+        return Err(CryptoError::InvalidKey);
+    }
+
+    Ok(*decoded)
+}
+
+fn hex_nibble(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
+    }
+}
+
 pub fn key_version_label(version: KeyVersion) -> Result<String, CryptoError> {
     if version.0 == 0 {
         return Err(CryptoError::InvalidInput);
@@ -370,6 +606,7 @@ mod tests {
                 KeyPurpose::DataEncryption => 0x11,
                 KeyPurpose::ContactFingerprint => 0x22,
                 KeyPurpose::OtpVerification => 0x33,
+                KeyPurpose::AdminTotpSecret => 0x44,
             };
             Ok(SecretKey::from_bytes([marker; KEY_LEN]))
         }
@@ -439,6 +676,7 @@ mod tests {
                 (KeyPurpose::ContactFingerprint, KeyVersion(7)) => 0x77,
                 (KeyPurpose::DataEncryption, _) => 0x11,
                 (KeyPurpose::OtpVerification, _) => 0x33,
+                (KeyPurpose::AdminTotpSecret, _) => 0x44,
                 _ => return Err(CryptoError::KeyUnavailable),
             };
             Ok(SecretKey::from_bytes([marker; KEY_LEN]))
@@ -511,6 +749,113 @@ mod tests {
             &digest.digest,
         )
         .unwrap());
+    }
+
+    #[test]
+    fn admin_totp_secret_encryption_is_bound_to_admin_and_key_version() {
+        let provider = TestKeyProvider;
+        let admin_id = "00000000-0000-4000-8000-000000000001";
+        let other_admin_id = "00000000-0000-4000-8000-000000000002";
+        let secret = [0x5a_u8; 20];
+        let encrypted = encrypt_admin_totp_secret(&provider, admin_id, &secret)
+            .expect("Admin TOTP secret should be encrypted");
+
+        assert_eq!(encrypted.key_version, KeyVersion(7));
+        assert_eq!(
+            &decrypt_admin_totp_secret(&provider, admin_id, &encrypted).unwrap()[..],
+            &secret
+        );
+        assert_eq!(
+            decrypt_admin_totp_secret(&provider, other_admin_id, &encrypted).unwrap_err(),
+            CryptoError::AuthenticationFailed
+        );
+    }
+
+    #[test]
+    fn admin_totp_keyring_supports_versioned_decryption_and_rotation() {
+        let provider = AdminTotpKeyring::from_hex_entries(
+            KeyVersion(2),
+            &[
+                (
+                    KeyVersion(1),
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                ),
+                (
+                    KeyVersion(2),
+                    "2222222222222222222222222222222222222222222222222222222222222222",
+                ),
+            ],
+        )
+        .expect("valid Admin keyring should load");
+        let admin_id = "00000000-0000-4000-8000-000000000001";
+        let secret = [0x6b_u8; 20];
+        let encrypted = encrypt_admin_totp_secret(&provider, admin_id, &secret).unwrap();
+
+        assert_eq!(encrypted.key_version, KeyVersion(2));
+        assert_eq!(
+            provider.key_versions(KeyPurpose::AdminTotpSecret).unwrap(),
+            vec![KeyVersion(1), KeyVersion(2)]
+        );
+        assert!(provider.active_key(KeyPurpose::DataEncryption).is_err());
+        assert_eq!(
+            &decrypt_admin_totp_secret(&provider, admin_id, &encrypted).unwrap()[..],
+            &secret
+        );
+    }
+
+    #[test]
+    fn admin_totp_encryption_rejects_invalid_identity_and_secret_size() {
+        let provider = TestKeyProvider;
+        assert_eq!(
+            encrypt_admin_totp_secret(&provider, "not-a-uuid", &[0x01; 20])
+                .err()
+                .expect("invalid Admin identity should be rejected"),
+            CryptoError::InvalidInput
+        );
+        assert_eq!(
+            encrypt_admin_totp_secret(
+                &provider,
+                "00000000-0000-4000-8000-000000000001",
+                &[0x01; 19]
+            )
+            .err()
+            .expect("invalid Admin TOTP secret size should be rejected"),
+            CryptoError::InvalidInput
+        );
+    }
+
+    #[test]
+    fn admin_totp_keyring_rejects_missing_active_and_duplicate_versions() {
+        assert_eq!(
+            AdminTotpKeyring::from_hex_entries(
+                KeyVersion(3),
+                &[(
+                    KeyVersion(2),
+                    "2222222222222222222222222222222222222222222222222222222222222222",
+                )]
+            )
+            .err()
+            .expect("missing active key must be rejected"),
+            CryptoError::KeyUnavailable
+        );
+        assert_eq!(
+            AdminTotpKeyring::from_hex_entries(
+                KeyVersion(2),
+                &[
+                    (
+                        KeyVersion(2),
+                        "2222222222222222222222222222222222222222222222222222222222222222",
+                    ),
+                    (
+                        KeyVersion(2),
+                        "3333333333333333333333333333333333333333333333333333333333333333",
+                    )
+                ]
+            )
+            .err()
+            .expect("duplicate key versions must be rejected"),
+            CryptoError::InvalidInput
+        );
     }
 
     #[test]
