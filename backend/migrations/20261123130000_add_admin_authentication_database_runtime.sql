@@ -289,12 +289,20 @@ DECLARE
     v_user_id UUID;
     v_session_id UUID;
     v_last_step BIGINT;
+    v_current_step BIGINT;
 BEGIN
     IF p_challenge_hash IS NULL OR octet_length(p_challenge_hash) <> 32
        OR p_totp_step IS NULL OR p_totp_step < 0
        OR p_session_token_hash IS NULL OR octet_length(p_session_token_hash) <> 32 THEN
         RAISE EXCEPTION 'Admin login completion input is invalid'
             USING ERRCODE = '22023';
+    END IF;
+
+    v_current_step := floor(extract(epoch FROM clock_timestamp()) / 30)::BIGINT;
+    IF p_totp_step < greatest(0, v_current_step - 1)
+       OR p_totp_step > v_current_step + 1 THEN
+        RAISE EXCEPTION 'Admin TOTP step is outside the accepted time window'
+            USING ERRCODE = '42501';
     END IF;
 
     SELECT c.id, c.user_id
