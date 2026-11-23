@@ -312,8 +312,6 @@ impl<'a> AdminAuthenticationService<'a> {
             .map_err(|_| AdminAuthenticationError::Database)
     }
 }
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
