@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getCurrentAdmin, IdentityApiError, logoutAdmin, type AdminSession } from "./identityApi";
+import {
+  getCurrentAdmin,
+  IdentityApiError,
+  logoutAdmin,
+  type AdminSession,
+} from "./identityApi";
 import { navigateTo } from "./navigation";
 import styles from "./AdminDashboardPage.module.css";
 
@@ -80,10 +85,17 @@ export function AdminDashboardPage() {
         <p className={styles.eyebrow}>USAHAPINTAR · ADMIN</p>
         <h1>Sesi belum tersedia</h1>
         <p className={styles.error} role="alert">{notice}</p>
-        <button type="button" onClick={() => setRetryCount((value) => value + 1)}>
+        <button
+          type="button"
+          onClick={() => setRetryCount((value) => value + 1)}
+        >
           Coba lagi
         </button>
-        <button className={styles.secondaryButton} type="button" onClick={() => navigateTo("/admin/login")}>
+        <button
+          className={styles.secondaryButton}
+          type="button"
+          onClick={() => navigateTo("/admin/login")}
+        >
           Kembali ke login
         </button>
       </main>
@@ -103,7 +115,10 @@ export function AdminDashboardPage() {
         </button>
       </header>
 
-      <section className={styles.content} aria-labelledby="admin-dashboard-title">
+      <section
+        className={styles.content}
+        aria-labelledby="admin-dashboard-title"
+      >
         <p className={styles.eyebrow}>ADMINISTRATOR WORKSPACE</p>
         <h1 id="admin-dashboard-title">Dashboard Admin</h1>
         <p className={styles.description}>
@@ -111,10 +126,15 @@ export function AdminDashboardPage() {
           bertahap setelah modul dan kontrol aksesnya selesai diaudit.
         </p>
 
-        <section className={styles.sessionCard} aria-label="Informasi sesi Admin">
+        <section
+          className={styles.sessionCard}
+          aria-label="Informasi sesi Admin"
+        >
           <div>
             <span className={styles.fieldLabel}>Status sesi</span>
-            <strong className={styles.sessionStatus}>Aktif dan terverifikasi</strong>
+            <strong className={styles.sessionStatus}>
+              Aktif dan terverifikasi
+            </strong>
           </div>
           <div>
             <span className={styles.fieldLabel}>Peran</span>
