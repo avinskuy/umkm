@@ -12,12 +12,14 @@ use super::{
 
 mod admin_authentication;
 mod authentication;
+pub mod authorization;
 mod handlers;
 mod password_reset;
 mod recovery;
 pub use super::password::PasswordPolicy as RegistrationPasswordPolicy;
 pub use admin_authentication::{admin_authentication_router, AdminAuthenticationApiState};
 pub use authentication::{authentication_router, AuthenticationApiState};
+pub use authorization::{require_permission, AuthorizationApiState};
 pub use handlers::registration_router;
 pub use recovery::recovery_router;
 

@@ -8,6 +8,7 @@
 pub mod admin_authentication;
 mod audit;
 pub mod authentication;
+pub mod authorization;
 pub mod crypto;
 pub mod delivery;
 pub mod http;
@@ -26,6 +27,11 @@ pub use audit::{append_audit_event, AuditActorType, AuditEvent, AuditOutcome};
 pub use authentication::{
     AuthenticatedSession, AuthenticationConfigError, AuthenticationError,
     AuthenticationRateLimitKey, AuthenticationService, LoginRole, LoginSession, RotatedSession,
+};
+pub use authorization::{
+    evaluate as evaluate_authorization, AccessDecision, AccessPurpose, AuthorizationContext,
+    AuthorizationResource, AuthorizationRole, DataClassification, DenialReason, Permission,
+    ResourceVisibility, PERMISSION_CATALOG,
 };
 pub use delivery::{
     DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
