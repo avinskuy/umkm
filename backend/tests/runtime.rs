@@ -1510,14 +1510,13 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
     let totp_secret = [0x6B_u8; 20];
     let encrypted = encrypt_admin_totp_secret(keyring.as_ref(), &admin_id, &totp_secret)
         .expect("Admin TOTP secret should be encrypted");
-    let key_version = key_version_label(encrypted.key_version)
-        .expect("Admin key version label should be valid");
-    let current_step: i64 = sqlx::query_scalar(
-        "SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint",
-    )
-    .fetch_one(&admin_pool)
-    .await
-    .expect("current TOTP step should be available");
+    let key_version =
+        key_version_label(encrypted.key_version).expect("Admin key version label should be valid");
+    let current_step: i64 =
+        sqlx::query_scalar("SELECT floor(extract(epoch FROM clock_timestamp()) / 30)::bigint")
+            .fetch_one(&admin_pool)
+            .await
+            .expect("current TOTP step should be available");
 
     let credential_exists: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM public.admin_totp_credentials WHERE user_id = $1::uuid)",
@@ -1555,15 +1554,14 @@ async fn admin_http_authentication_uses_isolated_secure_cookies_end_to_end() {
     };
     assert!(prepared);
 
-    let activated: bool = sqlx::query_scalar(
-        "SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)",
-    )
-    .bind(&admin_id)
-    .bind(current_step - 1)
-    .bind(OPERATOR_ID)
-    .fetch_one(&admin_pool)
-    .await
-    .expect("operator should activate the Admin TOTP credential");
+    let activated: bool =
+        sqlx::query_scalar("SELECT public.activate_admin_totp_enrollment($1::uuid, $2, $3::uuid)")
+            .bind(&admin_id)
+            .bind(current_step - 1)
+            .bind(OPERATOR_ID)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("operator should activate the Admin TOTP credential");
     assert!(activated);
 
     let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32))
