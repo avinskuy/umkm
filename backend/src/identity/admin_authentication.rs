@@ -64,6 +64,17 @@ pub struct AdminAuthenticatedSession {
     pub user_id: String,
 }
 
+fn map_admin_completion_error(error: sqlx::Error) -> AdminAuthenticationError {
+    let database_code = error
+        .as_database_error()
+        .and_then(|database_error| database_error.code());
+    if database_code.as_deref() == Some("42501") {
+        AdminAuthenticationError::InvalidChallenge
+    } else {
+        AdminAuthenticationError::Database
+    }
+}
+
 pub struct AdminAuthenticationService<'a> {
     pool: &'a PgPool,
     rate_limit_key: &'a AuthenticationRateLimitKey,
@@ -261,7 +272,7 @@ impl<'a> AdminAuthenticationService<'a> {
         .bind(session_hash.to_vec())
         .fetch_one(self.pool)
         .await
-        .map_err(|_| AdminAuthenticationError::InvalidChallenge)?;
+        .map_err(map_admin_completion_error)?;
 
         Ok(AdminLoginSession {
             user_id,
