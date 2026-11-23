@@ -92,33 +92,6 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION public.get_admin_totp_credentials(p_user_id UUID)
-RETURNS TABLE (
-    secret_ciphertext BYTEA,
-    secret_nonce BYTEA,
-    encryption_key_version TEXT,
-    last_accepted_step BIGINT
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog
-AS $$
-BEGIN
-    IF p_user_id IS NULL THEN
-        RETURN;
-    END IF;
-
-    RETURN QUERY
-    SELECT c.secret_ciphertext, c.secret_nonce, c.encryption_key_version, c.last_accepted_step
-      FROM public.admin_totp_credentials AS c
-      JOIN public.users AS u ON u.id = c.user_id
-     WHERE c.user_id = p_user_id
-       AND c.enabled_at IS NOT NULL
-       AND u.primary_role = 'admin'
-       AND u.account_status = 'active';
-END;
-$$;
-
 CREATE FUNCTION public.get_admin_login_totp_credentials(p_challenge_hash BYTEA)
 RETURNS TABLE (
     user_id UUID,
