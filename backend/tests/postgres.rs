@@ -2785,6 +2785,28 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         (true, true, true, true, true, true, true, true)
     );
 
+    let admin_function_grants: i64 = sqlx::query_scalar(
+        "SELECT count(*)::bigint \
+           FROM pg_catalog.unnest(ARRAY[ \
+               'public.find_active_admin_password_login(text)'::regprocedure, \
+               'public.get_admin_totp_credentials(uuid)'::regprocedure, \
+               'public.reserve_admin_login_attempt(bytea,bytea)'::regprocedure, \
+               'public.create_admin_login_challenge(uuid,bytea)'::regprocedure, \
+               'public.record_admin_login_challenge_failure(bytea)'::regprocedure, \
+               'public.complete_admin_login(bytea,bigint,bytea)'::regprocedure, \
+               'public.get_active_admin_session(bytea)'::regprocedure, \
+               'public.revoke_admin_session(bytea)'::regprocedure \
+           ]::regprocedure[]) AS f(signature) \
+          WHERE has_function_privilege(current_user, f.signature, 'EXECUTE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("Admin authentication function grants should be inspectable");
+    assert_eq!(
+        admin_function_grants, 8,
+        "application should execute only the explicit Admin authentication functions"
+    );
+
     let created_user_id: String =
         sqlx::query_scalar("SELECT public.create_client_user_with_profile_and_policy($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)::text")
             .bind("Pemilik Bootstrap")
