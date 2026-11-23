@@ -139,7 +139,7 @@ DECLARE
 BEGIN
     IF p_user_id IS NULL
        OR p_secret_ciphertext IS NULL
-       OR octet_length(p_secret_ciphertext) < 32
+       OR octet_length(p_secret_ciphertext) <> 36
        OR p_secret_nonce IS NULL
        OR octet_length(p_secret_nonce) <> 12
        OR p_encryption_key_version IS NULL
@@ -214,7 +214,7 @@ DECLARE
 BEGIN
     IF p_user_id IS NULL
        OR p_secret_ciphertext IS NULL
-       OR octet_length(p_secret_ciphertext) < 32
+       OR octet_length(p_secret_ciphertext) <> 36
        OR p_secret_nonce IS NULL
        OR octet_length(p_secret_nonce) <> 12
        OR p_encryption_key_version IS NULL
@@ -394,7 +394,7 @@ DECLARE
 BEGIN
     IF p_user_id IS NULL
        OR p_secret_ciphertext IS NULL
-       OR octet_length(p_secret_ciphertext) < 32
+       OR octet_length(p_secret_ciphertext) <> 36
        OR p_secret_nonce IS NULL
        OR octet_length(p_secret_nonce) <> 12
        OR p_encryption_key_version IS NULL
