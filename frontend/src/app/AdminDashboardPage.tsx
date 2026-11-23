@@ -122,8 +122,8 @@ export function AdminDashboardPage() {
         <p className={styles.eyebrow}>ADMINISTRATOR WORKSPACE</p>
         <h1 id="admin-dashboard-title">Dashboard Admin</h1>
         <p className={styles.description}>
-          Sesi administrator terverifikasi. Area operasional akan diaktifkan secara
-          bertahap setelah modul dan kontrol aksesnya selesai diaudit.
+          Sesi administrator terverifikasi. Area operasional akan diaktifkan
+          secara bertahap setelah modul dan kontrol aksesnya selesai diaudit.
         </p>
 
         <section
@@ -147,8 +147,8 @@ export function AdminDashboardPage() {
         </section>
 
         <div className={styles.notice} role="status">
-          Fondasi autentikasi Admin sudah aktif. Fitur pengelolaan belum tersedia pada
-          tahap ini.
+          Fondasi autentikasi Admin sudah aktif. Fitur pengelolaan belum tersedia
+          pada tahap ini.
         </div>
         {notice && <p className={styles.error} role="alert">{notice}</p>}
       </section>
