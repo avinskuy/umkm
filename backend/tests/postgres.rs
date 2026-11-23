@@ -2671,8 +2671,7 @@ async fn assert_admin_authentication_service(pool: &PgPool) {
 
     let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"cd".repeat(32))
         .expect("test Admin rate-limit key should be valid");
-    let service =
-        AdminAuthenticationService::new(pool, &rate_limit_key, &VerificationTestKeys);
+    let service = AdminAuthenticationService::new(pool, &rate_limit_key, &VerificationTestKeys);
 
     let invalid_password = service
         .begin_login(
