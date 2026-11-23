@@ -144,23 +144,30 @@ fn is_same_origin_request(headers: &HeaderMap) -> bool {
         return false;
     }
 
-    let Some(host) = headers
-        .get(header::HOST)
-        .and_then(|value| value.to_str().ok())
-    else {
+    let mut hosts = headers.get_all(header::HOST).iter();
+    let Some(host) = hosts.next().and_then(|value| value.to_str().ok()) else {
         return false;
     };
-    let Some(origin) = headers
-        .get(header::ORIGIN)
-        .and_then(|value| value.to_str().ok())
-    else {
+    if hosts.next().is_some() {
+        return false;
+    }
+
+    let mut origins = headers.get_all(header::ORIGIN).iter();
+    let Some(origin) = origins.next().and_then(|value| value.to_str().ok()) else {
         return false;
     };
-    let Some((scheme, remainder)) = origin.split_once("://") else {
+    if origins.next().is_some() {
+        return false;
+    }
+
+    let Some((scheme, authority)) = origin.split_once("://") else {
         return false;
     };
-    let authority = remainder.split('/').next().unwrap_or_default();
-    if authority.is_empty() || !same_authority(authority, host, scheme) {
+    if authority.is_empty()
+        || authority.bytes().any(|byte| matches!(byte, b'/' | b'?' | b'#' | b'@'))
+        || authority.parse::<axum::http::uri::Authority>().is_err()
+        || !same_authority(authority, host, scheme)
+    {
         return false;
     }
 
@@ -648,6 +655,39 @@ mod tests {
             "app.example.test"
         )));
         assert!(!is_same_origin_request(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn same_origin_validation_rejects_non_origin_uri_components_and_ambiguous_headers() {
+        for origin in [
+            "https://app.example.test/path",
+            "https://app.example.test?next=evil",
+            "https://app.example.test#fragment",
+            "https://user@app.example.test",
+            "ftp://app.example.test",
+        ] {
+            assert!(
+                !is_same_origin_request(&headers_with_origin(origin, "app.example.test")),
+                "non-origin URI form must be rejected: {origin}"
+            );
+        }
+
+        let mut duplicate_origin = headers_with_origin(
+            "https://app.example.test",
+            "app.example.test",
+        );
+        duplicate_origin.append(
+            header::ORIGIN,
+            HeaderValue::from_static("https://evil.example.test"),
+        );
+        assert!(!is_same_origin_request(&duplicate_origin));
+
+        let mut duplicate_host = headers_with_origin(
+            "https://app.example.test",
+            "app.example.test",
+        );
+        duplicate_host.append(header::HOST, HeaderValue::from_static("evil.example.test"));
+        assert!(!is_same_origin_request(&duplicate_host));
     }
 
     #[test]
