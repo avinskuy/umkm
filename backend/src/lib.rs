@@ -67,7 +67,8 @@ pub fn app_with_authentication_and_admin(
     authentication: AuthenticationApiState,
     admin_authentication: AdminAuthenticationApiState,
 ) -> Router {
-    app_with_authentication(pool, authentication).merge(admin_authentication_router(admin_authentication))
+    app_with_authentication(pool, authentication)
+        .merge(admin_authentication_router(admin_authentication))
 }
 
 /// Build the public API with password authentication and account recovery routes mounted.
