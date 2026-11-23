@@ -438,7 +438,6 @@ BEGIN
         'public.get_admin_totp_credentials(uuid)',
         'public.get_admin_login_totp_credentials(bytea)',
         'public.reserve_admin_login_attempt(bytea,bytea)',
-        'public.clear_admin_login_identifier_limit(bytea)',
         'public.create_admin_login_challenge(uuid,bytea)',
         'public.record_admin_login_challenge_failure(bytea)',
         'public.complete_admin_login(bytea,bigint,bytea)',
@@ -492,8 +491,6 @@ GRANT EXECUTE ON FUNCTION public.get_admin_totp_credentials(UUID)
 GRANT EXECUTE ON FUNCTION public.get_admin_login_totp_credentials(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.reserve_admin_login_attempt(BYTEA, BYTEA)
-    TO usahapintar_app;
-GRANT EXECUTE ON FUNCTION public.clear_admin_login_identifier_limit(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.create_admin_login_challenge(UUID, BYTEA)
     TO usahapintar_app;
