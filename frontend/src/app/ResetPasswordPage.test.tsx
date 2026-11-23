@@ -6,6 +6,7 @@ describe("ResetPasswordPage", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/reset-password");
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("rejects a missing reset token without rendering a password form", async () => {
@@ -21,7 +22,9 @@ describe("ResetPasswordPage", () => {
     window.history.replaceState(null, "", "/reset-password#token=" + "a".repeat(64));
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: "Password berhasil diperbarui. Silakan masuk kembali." }),
+      json: async () => ({
+        message: "Password berhasil diperbarui. Silakan masuk kembali.",
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
