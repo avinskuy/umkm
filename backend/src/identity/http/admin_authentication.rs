@@ -250,10 +250,8 @@ async fn begin_login(
                 .expires_at_unix
                 .saturating_sub(now)
                 .clamp(1, ADMIN_CHALLENGE_MAX_AGE_SECONDS);
-            let cookie = Zeroizing::new(format!(
-                "{ADMIN_CHALLENGE_COOKIE}={}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Strict",
-                challenge.token.as_str()
-            ));
+            let cookie =
+                admin_challenge_cookie_header(challenge.token.as_str(), max_age);
             let Ok(cookie_value) = HeaderValue::from_str(cookie.as_str()) else {
                 return error(
                     StatusCode::SERVICE_UNAVAILABLE,
@@ -311,10 +309,7 @@ async fn complete_login(
         .await
     {
         Ok(session) => {
-            let session_cookie = Zeroizing::new(format!(
-                "{ADMIN_SESSION_COOKIE}={}; Path=/; Max-Age={ADMIN_SESSION_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Strict",
-                session.token.as_str()
-            ));
+            let session_cookie = admin_session_cookie_header(session.token.as_str());
             let Ok(session_cookie_value) = HeaderValue::from_str(session_cookie.as_str()) else {
                 return error(
                     StatusCode::SERVICE_UNAVAILABLE,
@@ -422,6 +417,18 @@ fn cookie_value(headers: &HeaderMap, expected_name: &str) -> Option<Zeroizing<St
         }
         Some(Zeroizing::new(value.to_owned()))
     })
+}
+
+fn admin_session_cookie_header(token: &str) -> Zeroizing<String> {
+    Zeroizing::new(format!(
+        "{ADMIN_SESSION_COOKIE}={token}; Path=/; Max-Age={ADMIN_SESSION_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Strict"
+    ))
+}
+
+fn admin_challenge_cookie_header(token: &str, max_age: i64) -> Zeroizing<String> {
+    Zeroizing::new(format!(
+        "{ADMIN_CHALLENGE_COOKIE}={token}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Strict"
+    ))
 }
 
 fn clear_admin_session_cookie(response: &mut Response) {
@@ -580,6 +587,24 @@ mod tests {
                 && cookie.contains("SameSite=Strict")
                 && !cookie.to_ascii_lowercase().contains("domain=")
         }));
+    }
+
+    #[test]
+    fn issued_admin_cookies_use_strict_host_only_attributes_and_expected_lifetimes() {
+        let session = admin_session_cookie_header("a".repeat(64).as_str());
+        assert!(session.contains("Path=/"));
+        assert!(session.contains("Max-Age=28800"));
+        assert!(session.contains("HttpOnly"));
+        assert!(session.contains("Secure"));
+        assert!(session.contains("SameSite=Strict"));
+        assert!(!session.to_ascii_lowercase().contains("domain="));
+
+        let challenge = admin_challenge_cookie_header("b".repeat(64).as_str(), 300);
+        assert!(challenge.contains("Max-Age=300"));
+        assert!(challenge.contains("HttpOnly"));
+        assert!(challenge.contains("Secure"));
+        assert!(challenge.contains("SameSite=Strict"));
+        assert!(!challenge.to_ascii_lowercase().contains("domain="));
     }
 
     #[test]
