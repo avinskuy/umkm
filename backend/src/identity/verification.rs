@@ -39,7 +39,6 @@ pub enum VerificationError {
     Crypto(super::crypto::CryptoError),
     InvalidInput,
     InvalidStoredData,
-    ProviderRejected,
     ProviderUnavailable,
 }
 
@@ -50,7 +49,6 @@ impl std::fmt::Display for VerificationError {
             Self::Crypto(_) => "verification cryptographic operation failed",
             Self::InvalidInput => "verification input is invalid",
             Self::InvalidStoredData => "stored verification data is invalid",
-            Self::ProviderRejected => "verification provider rejected the operation",
             Self::ProviderUnavailable => "verification provider is unavailable",
         };
         formatter.write_str(message)
