@@ -1,6 +1,13 @@
+export type ClientRole = "business_owner" | "investor";
+
 export type AdminSession = {
   user_id: string;
   role: "admin";
+};
+
+export type ClientSession = {
+  user_id: string;
+  role: ClientRole;
 };
 
 type ApiPayload = {
@@ -60,6 +67,43 @@ async function requestIdentityApi(
   }
 
   return payload;
+}
+
+export async function loginClient(
+  role: ClientRole,
+  identifier: string,
+  password: string,
+): Promise<void> {
+  const endpoint =
+    role === "business_owner"
+      ? "/api/v1/identity/login/owner"
+      : "/api/v1/identity/login/investor";
+
+  await requestIdentityApi(endpoint, {
+    method: "POST",
+    body: JSON.stringify({ identifier, password }),
+  });
+}
+
+export async function getCurrentClient(
+  expectedRole: ClientRole,
+): Promise<ClientSession> {
+  const payload = await requestIdentityApi("/api/v1/identity/me");
+  if (
+    typeof payload.user_id !== "string" ||
+    payload.user_id.trim().length === 0 ||
+    payload.role !== expectedRole
+  ) {
+    throw new IdentityApiError(
+      502,
+      "Sesi akun tidak sesuai dengan jenis akun yang dipilih.",
+    );
+  }
+
+  return {
+    user_id: payload.user_id,
+    role: expectedRole,
+  };
 }
 
 export async function beginAdminLogin(
