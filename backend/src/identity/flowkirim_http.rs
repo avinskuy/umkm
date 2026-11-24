@@ -5,7 +5,7 @@
 
 use std::time::Duration;
 
-use reqwest::{header, Client, StatusCode};
+use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
