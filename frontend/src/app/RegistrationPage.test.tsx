@@ -26,8 +26,15 @@ describe("RegistrationPage", () => {
     expect(screen.getByLabelText("Nomor WhatsApp")).toHaveAttribute("type", "tel");
     expect(screen.getByLabelText("Nomor WhatsApp")).toHaveAttribute(
       "placeholder",
-      "Contoh: +6281234567890",
+      "08xxxxxxxxxx atau +628xxxxxxxxxx",
     );
+  });
+
+  it("explains that WhatsApp accepts local and international number formats", () => {
+    render(<RegistrationPage />);
+    fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
+
+    expect(screen.getByText(/format lokal 08.*internasional 628.*\+628/i)).toBeInTheDocument();
   });
 
   it("does not submit or send data while public registration is unavailable", () => {
