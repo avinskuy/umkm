@@ -120,6 +120,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_admin_totp_operator_workflows(&pool).await;
     assert_admin_authentication_database_runtime(&pool).await;
     assert_admin_authentication_service(&pool).await;
+    assert_identity_abuse_rate_limits(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -4154,4 +4155,62 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("dedicated Admin session table should be inspectable by migrator");
     assert!(dedicated_session_count >= 2);
+}
+
+
+async fn assert_identity_abuse_rate_limits(pool: &PgPool) {
+    let fingerprint = vec![0x5a_u8; 32];
+    sqlx::query(
+        "DELETE FROM public.identity_abuse_rate_limits \
+         WHERE scope = 'registration:create:ip' AND key_hash = $1",
+    )
+    .bind(&fingerprint)
+    .execute(pool)
+    .await
+    .expect("test rate-limit fingerprint should be clearable");
+
+    for expected in [true, true, false] {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_identity_abuse_attempt(\
+                'registration:create:ip', $1, 2, 900\
+             )",
+        )
+        .bind(&fingerprint)
+        .fetch_one(pool)
+        .await
+        .expect("Identity rate-limit reservation should succeed");
+        assert_eq!(allowed, expected);
+    }
+
+    let attempts: i32 = sqlx::query_scalar(
+        "SELECT attempt_count FROM public.identity_abuse_rate_limits \
+         WHERE scope = 'registration:create:ip' AND key_hash = $1",
+    )
+    .bind(&fingerprint)
+    .fetch_one(pool)
+    .await
+    .expect("rate-limit counter should be persisted");
+    assert_eq!(attempts, 3);
+
+    let invalid_hash = sqlx::query_scalar::<_, bool>(
+        "SELECT public.reserve_identity_abuse_attempt(\
+            'registration:create:ip', $1, 2, 900\
+         )",
+    )
+    .bind(vec![0x01_u8; 31])
+    .fetch_one(pool)
+    .await;
+    assert!(
+        invalid_hash.is_err(),
+        "database function must reject fingerprints that are not 32 bytes"
+    );
+
+    sqlx::query(
+        "DELETE FROM public.identity_abuse_rate_limits \
+         WHERE scope = 'registration:create:ip' AND key_hash = $1",
+    )
+    .bind(&fingerprint)
+    .execute(pool)
+    .await
+    .expect("test rate-limit fingerprint should be removed");
 }
