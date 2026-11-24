@@ -495,10 +495,8 @@ pub(crate) fn normalize_indonesian_phone(value: &str) -> Option<String> {
         value
     } else if let Some(value) = compact.strip_prefix("62") {
         value
-    } else if let Some(value) = compact.strip_prefix('0') {
-        value
     } else {
-        return None;
+        compact.strip_prefix('0')?
     };
 
     if !(9..=12).contains(&subscriber.len())
