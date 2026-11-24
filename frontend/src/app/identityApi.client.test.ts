@@ -4,25 +4,28 @@ import { getCurrentClient, IdentityApiError, loginClient } from "./identityApi";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Client identity API", () => {
-  it("uses the Owner login endpoint with same-origin no-store credentials", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+  it(
+    "uses the Owner login endpoint with same-origin no-store credentials",
+    async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
 
-    await loginClient("business_owner", "owner@example.test", "test-password");
+      await loginClient("business_owner", "owner@example.test", "test-password");
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/identity/login/owner",
-      expect.objectContaining({
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        body: JSON.stringify({
-          identifier: "owner@example.test",
-          password: "test-password",
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/identity/login/owner",
+        expect.objectContaining({
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({
+            identifier: "owner@example.test",
+            password: "test-password",
+          }),
         }),
-      }),
-    );
-  });
+      );
+    },
+  );
 
   it("uses the Investor login endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
