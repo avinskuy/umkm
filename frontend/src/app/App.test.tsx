@@ -27,7 +27,9 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "Selamat datang kembali" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Jenis akun" }),
+    ).toBeInTheDocument();
   });
 
   it("routes the registration path to the registration page", () => {
