@@ -73,6 +73,7 @@ impl FlowKirimHttpProvider {
         response: reqwest::Response,
     ) -> Result<(StatusCode, Vec<u8>), ()> {
         let status = response.status();
+
         if response
             .content_length()
             .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
@@ -82,12 +83,15 @@ impl FlowKirimHttpProvider {
 
         let mut body = Vec::new();
         let mut response = response;
+
         while let Some(chunk) = response.chunk().await.map_err(|_| ())? {
             if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
                 return Err(());
             }
+
             body.extend_from_slice(&chunk);
         }
+
         Ok((status, body))
     }
 
@@ -166,6 +170,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                 Ok(result) => result,
                 Err(()) => return FlowKirimProviderOutcome::Unavailable,
             };
+
             if !status.is_success() {
                 return Self::classify_start_status(status);
             }
@@ -201,6 +206,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                 request_id: &request_id,
                 code: code.as_str(),
             };
+
             let response = match self
                 .client
                 .post(format!("{}/check", self.base_url))
@@ -217,6 +223,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                 Ok(result) => result,
                 Err(()) => return FlowKirimProviderOutcome::Unavailable,
             };
+
             if !status.is_success() {
                 return if status.is_client_error()
                     && !matches!(
@@ -224,7 +231,8 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                    ) {
+                    )
+                {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
@@ -259,36 +267,49 @@ mod tests {
     ) -> (String, thread::JoinHandle<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
+
         let handle = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
+
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
 
             let mut request = Vec::new();
             let mut buffer = [0_u8; 2048];
+
             let expected_len = loop {
                 let read = stream.read(&mut buffer).unwrap();
+
                 assert!(read > 0, "client closed before sending a complete request");
+
                 request.extend_from_slice(&buffer[..read]);
 
-                if let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                if let Some(header_end) = request
+                    .windows(4)
+                    .position(|part| part == b"\r\n\r\n")
+                {
                     let headers = String::from_utf8_lossy(&request[..header_end]);
+
                     let content_length = headers
                         .lines()
                         .find_map(|line| {
                             let (name, value) = line.split_once(':')?;
+
                             name.eq_ignore_ascii_case("content-length")
                                 .then(|| value.trim().parse::<usize>().unwrap())
                         })
                         .unwrap_or(0);
+
                     break header_end + 4 + content_length;
                 }
             };
 
             while request.len() < expected_len {
                 let read = stream.read(&mut buffer).unwrap();
+
                 assert!(read > 0, "client closed before sending the full body");
+
                 request.extend_from_slice(&buffer[..read]);
             }
 
@@ -299,6 +320,7 @@ mod tests {
                 response_body
             )
             .unwrap();
+
             String::from_utf8(request).unwrap()
         });
 
@@ -312,10 +334,9 @@ mod tests {
 
     #[tokio::test]
     async fn start_sends_authenticated_idempotent_whatsapp_request() {
-        let (base_url, server) = mock_server(
-            "200 OK",
-            r#"{"request_id":"verify_123"}"#.to_owned(),
-        );
+        let (base_url, server) =
+            mock_server("200 OK", r#"{"request_id":"verify_123"}"#.to_owned());
+
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
             &base_url,
@@ -328,18 +349,30 @@ mod tests {
                 "registration-whatsapp-challenge-1".to_owned(),
             )
             .await;
+
         assert_eq!(
             outcome,
             FlowKirimProviderOutcome::Accepted("verify_123".to_owned())
         );
 
         let request = server.join().unwrap();
+
         assert!(request.starts_with("POST /start HTTP/1.1"));
-        assert!(request.to_ascii_lowercase().contains("authorization: bearer test-secret"));
-        assert!(request
-            .to_ascii_lowercase()
-            .contains("idempotency-key: registration-whatsapp-challenge-1"));
+
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("authorization: bearer test-secret")
+        );
+
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("idempotency-key: registration-whatsapp-challenge-1")
+        );
+
         let body = request_body(&request);
+
         assert_eq!(body["phone"], "+628123456789");
         assert_eq!(body["channel"], "whatsapp");
         assert_eq!(body["code_length"], OTP_CODE_LENGTH);
@@ -350,6 +383,7 @@ mod tests {
     async fn check_sends_request_id_and_code_and_accepts_verified_response() {
         let (base_url, server) =
             mock_server("200 OK", r#"{"status":"verified"}"#.to_owned());
+
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
             &base_url,
@@ -362,12 +396,21 @@ mod tests {
                 Zeroizing::new("123456".to_owned()),
             )
             .await;
+
         assert_eq!(outcome, FlowKirimProviderOutcome::Accepted(true));
 
         let request = server.join().unwrap();
+
         assert!(request.starts_with("POST /check HTTP/1.1"));
-        assert!(request.to_ascii_lowercase().contains("authorization: bearer test-secret"));
+
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("authorization: bearer test-secret")
+        );
+
         let body = request_body(&request);
+
         assert_eq!(body["request_id"], "verify_123");
         assert_eq!(body["code"], "123456");
     }
@@ -376,6 +419,7 @@ mod tests {
     async fn check_maps_non_verified_status_to_rejected_code_result() {
         let (base_url, server) =
             mock_server("200 OK", r#"{"status":"invalid"}"#.to_owned());
+
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
             &base_url,
@@ -388,14 +432,18 @@ mod tests {
                 Zeroizing::new("000000".to_owned()),
             )
             .await;
+
         assert_eq!(outcome, FlowKirimProviderOutcome::Accepted(false));
+
         server.join().unwrap();
     }
 
     #[tokio::test]
     async fn oversized_response_is_unavailable() {
         let oversized = format!(r#"{{"request_id":"{}"}}"#, "x".repeat(MAX_RESPONSE_BYTES));
+
         let (base_url, server) = mock_server("200 OK", oversized);
+
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
             &base_url,
@@ -408,24 +456,35 @@ mod tests {
                 "registration-whatsapp-challenge-2".to_owned(),
             )
             .await;
+
         assert_eq!(outcome, FlowKirimProviderOutcome::Unavailable);
+
         server.join().unwrap();
     }
 
     #[test]
     fn parses_only_a_valid_start_request_id() {
-        let parsed: StartResponse = serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
+        let parsed: StartResponse =
+            serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
+
         assert_eq!(parsed.request_id, "verify_123");
+
         assert!(serde_json::from_str::<StartResponse>(r#"{"request_id":""}"#).is_ok());
+
         assert!(serde_json::from_str::<StartResponse>(r#"{"id":"verify_123"}"#).is_err());
     }
 
     #[test]
     fn check_accepts_only_documented_verified_status() {
-        let verified: CheckResponse = serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
-        let not_verified: CheckResponse = serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
+        let verified: CheckResponse =
+            serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
+
+        let not_verified: CheckResponse =
+            serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
+
         assert_eq!(verified.status, "verified");
         assert_ne!(not_verified.status, "verified");
+
         assert!(serde_json::from_str::<CheckResponse>(r#"{"verified":true}"#).is_err());
     }
 
@@ -435,4 +494,4 @@ mod tests {
         assert_eq!(OTP_TTL_SECONDS, 600);
         assert_eq!(MAX_RESPONSE_BYTES, 16 * 1024);
     }
-}
+            }
