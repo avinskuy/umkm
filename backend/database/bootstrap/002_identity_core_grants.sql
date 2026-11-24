@@ -148,7 +148,10 @@ BEGIN
         'public.get_pending_otp_challenge(uuid)',
         'public.reserve_otp_challenge(uuid,uuid,bytea,text,bytea[])',
         'public.record_otp_delivery_result(uuid,text)',
-        'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])'
+        'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])',
+        'public.reserve_flowkirim_otp_challenge(uuid,uuid,bytea[])',
+        'public.bind_flowkirim_otp_request(uuid,uuid,text)',
+        'public.get_pending_flowkirim_otp_challenge(uuid)'
     ] LOOP
         SELECT pg_catalog.pg_get_userbyid(p.proowner),
                p.prosecdef,
@@ -180,6 +183,12 @@ GRANT EXECUTE ON FUNCTION public.reserve_otp_challenge(UUID, UUID, BYTEA, TEXT, 
 GRANT EXECUTE ON FUNCTION public.record_otp_delivery_result(UUID, TEXT)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.record_otp_verification_attempt(UUID, UUID, BOOLEAN, BYTEA[])
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.reserve_flowkirim_otp_challenge(UUID, UUID, BYTEA[])
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.bind_flowkirim_otp_request(UUID, UUID, TEXT)
+    TO usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.get_pending_flowkirim_otp_challenge(UUID)
     TO usahapintar_app;
 
 
