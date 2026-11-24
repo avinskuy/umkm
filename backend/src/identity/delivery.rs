@@ -8,6 +8,8 @@ pub enum DeliveryChannel {
 }
 
 pub struct OtpDeliveryMessage {
+    /// Stable per-challenge key used to make provider retries idempotent.
+    pub idempotency_key: String,
     pub destination: Zeroizing<String>,
     pub channel: DeliveryChannel,
     pub code: Zeroizing<String>,
@@ -81,6 +83,7 @@ mod tests {
             let provider = FakeProvider { result: status };
             let result = provider
                 .dispatch(OtpDeliveryMessage {
+                    idempotency_key: "test-challenge-1".to_owned(),
                     destination: Zeroizing::new("recipient@example.test".to_owned()),
                     channel: DeliveryChannel::Email,
                     code: Zeroizing::new("123456".to_owned()),

@@ -5,11 +5,13 @@ use sqlx::PgPool;
 use super::{
     crypto::{random_bytes, KeyProvider},
     delivery::OtpDeliveryProvider,
+    flowkirim::FlowKirimVerifyProvider,
     recovery::RecoveryService,
     registration::ContactChannel,
-    verification::VerificationService,
+    verification::{normalize_indonesian_phone, VerificationService},
 };
 
+mod abuse_guard;
 mod admin_authentication;
 mod authentication;
 pub mod authorization;
@@ -17,6 +19,7 @@ mod handlers;
 mod password_reset;
 mod recovery;
 pub use super::password::PasswordPolicy as RegistrationPasswordPolicy;
+pub use abuse_guard::PostgresRegistrationAbuseGuard;
 pub use admin_authentication::{admin_authentication_router, AdminAuthenticationApiState};
 pub use authentication::{authentication_router, AuthenticationApiState};
 pub use authorization::{require_permission, AuthorizationApiState};
@@ -125,12 +128,7 @@ pub(super) fn valid_contact_input(
             _ => false,
         },
         ContactChannel::Phone => match (email, phone) {
-            (None, Some(phone)) => {
-                let digits = phone.trim().strip_prefix('+').unwrap_or_default();
-                (8..=15).contains(&digits.len())
-                    && digits.bytes().all(|byte| byte.is_ascii_digit())
-                    && !digits.starts_with('0')
-            }
+            (None, Some(phone)) => normalize_indonesian_phone(phone).is_some(),
             _ => false,
         },
     }
@@ -141,6 +139,7 @@ pub struct RegistrationApiState {
     pub(super) pool: PgPool,
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
+    pub(super) flowkirim: Option<Arc<dyn FlowKirimVerifyProvider>>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
     pub(super) password_policy: Arc<dyn RegistrationPasswordPolicy>,
     pub(super) policy_versions: RegistrationPolicyVersions,
@@ -159,14 +158,30 @@ impl RegistrationApiState {
             pool,
             keys,
             delivery,
+            flowkirim: None,
             abuse_guard,
             password_policy,
             policy_versions,
         }
     }
 
+    pub fn with_flowkirim_provider(mut self, provider: Arc<dyn FlowKirimVerifyProvider>) -> Self {
+        self.flowkirim = Some(provider);
+        self
+    }
+
     pub(super) fn verification_service(&self) -> VerificationService<'_> {
-        VerificationService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+        match self.flowkirim.as_deref() {
+            Some(provider) => VerificationService::new_with_flowkirim(
+                &self.pool,
+                self.keys.as_ref(),
+                self.delivery.as_ref(),
+                provider,
+            ),
+            None => {
+                VerificationService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+            }
+        }
     }
 }
 
@@ -175,6 +190,7 @@ pub struct RecoveryApiState {
     pub(super) pool: PgPool,
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
+    pub(super) flowkirim: Option<Arc<dyn FlowKirimVerifyProvider>>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
     pub(super) password_policy: Option<Arc<dyn RegistrationPasswordPolicy>>,
 }
@@ -190,9 +206,15 @@ impl RecoveryApiState {
             pool,
             keys,
             delivery,
+            flowkirim: None,
             abuse_guard,
             password_policy: None,
         }
+    }
+
+    pub fn with_flowkirim_provider(mut self, provider: Arc<dyn FlowKirimVerifyProvider>) -> Self {
+        self.flowkirim = Some(provider);
+        self
     }
 
     pub fn with_password_policy(mut self, policy: Arc<dyn RegistrationPasswordPolicy>) -> Self {
@@ -201,7 +223,15 @@ impl RecoveryApiState {
     }
 
     pub(super) fn recovery_service(&self) -> RecoveryService<'_> {
-        RecoveryService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+        match self.flowkirim.as_deref() {
+            Some(provider) => RecoveryService::new_with_flowkirim(
+                &self.pool,
+                self.keys.as_ref(),
+                self.delivery.as_ref(),
+                provider,
+            ),
+            None => RecoveryService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref()),
+        }
     }
 }
 
@@ -269,15 +299,17 @@ mod tests {
             Some("user@example.test"),
             Some("+628123456789")
         ));
-        assert!(valid_contact_input(
-            ContactChannel::Phone,
-            None,
-            Some("+628123456789")
-        ));
+        for phone in ["08123456789", "628123456789", "+628123456789"] {
+            assert!(valid_contact_input(
+                ContactChannel::Phone,
+                None,
+                Some(phone)
+            ));
+        }
         assert!(!valid_contact_input(
             ContactChannel::Phone,
             None,
-            Some("08123456789")
+            Some("8123456789")
         ));
     }
 

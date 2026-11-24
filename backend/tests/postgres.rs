@@ -8,12 +8,14 @@ use usahapintar_api::{
             encrypt_admin_totp_secret, key_version_label, CryptoError, KeyProvider, KeyPurpose,
             KeyVersion, SecretKey, VersionedKey,
         },
+        flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
         password::hash_password,
         AdminAuthenticationService, AuthenticationRateLimitKey, ClientRegistration, ClientRole,
         ContactChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
         VerificationService,
     },
 };
+use zeroize::Zeroizing;
 
 struct VerificationTestKeys;
 
@@ -57,6 +59,28 @@ impl OtpDeliveryProvider for FakeOtpDelivery {
     }
 }
 
+struct FakeFlowKirim;
+
+impl FlowKirimVerifyProvider for FakeFlowKirim {
+    fn start<'a>(
+        &'a self,
+        _destination: Zeroizing<String>,
+        _idempotency_key: String,
+    ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<String>> + Send + 'a>> {
+        Box::pin(async {
+            FlowKirimProviderOutcome::Accepted("flowkirim-test-request-001".to_owned())
+        })
+    }
+
+    fn check<'a>(
+        &'a self,
+        _request_id: String,
+        code: Zeroizing<String>,
+    ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a>> {
+        Box::pin(async move { FlowKirimProviderOutcome::Accepted(code.as_str() == "123456") })
+    }
+}
+
 #[tokio::test]
 #[ignore = "requires a disposable PostgreSQL database; enabled explicitly in CI"]
 async fn postgres_connection_and_identity_schema_invariants_work() {
@@ -86,6 +110,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_profile_and_policy_records(&pool).await;
     assert_verification_schema_invariants(&pool).await;
     assert_verification_database_operations(&pool).await;
+    assert_flowkirim_verification_database_operations(&pool).await;
     assert_otp_resend_during_verification_lock(&pool).await;
     assert_authentication_session_invariants(&pool).await;
     assert_authentication_database_operations(&pool).await;
@@ -95,6 +120,7 @@ async fn postgres_connection_and_identity_schema_invariants_work() {
     assert_admin_totp_operator_workflows(&pool).await;
     assert_admin_authentication_database_runtime(&pool).await;
     assert_admin_authentication_service(&pool).await;
+    assert_identity_abuse_rate_limits(&pool).await;
     assert_database_principal_bootstrap(&pool).await;
 
     pool.close().await;
@@ -1227,6 +1253,226 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     .await
     .expect("failed attempt counter should be queryable");
     assert_eq!(failed_attempt_count, 1);
+}
+
+async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
+    let phone = format!("+6281234{:06}", std::process::id() % 1_000_000);
+    let user_id: String =
+        sqlx::query_scalar("SELECT public.create_client_user($1, $2, $3, $4, $5)::text")
+            .bind("investor")
+            .bind("phone")
+            .bind(Option::<String>::None)
+            .bind(&phone)
+            .bind("encoded-password-hash")
+            .fetch_one(pool)
+            .await
+            .expect("pending WhatsApp registration account should be created");
+
+    let session_id = "99999999-9999-4999-8999-999999999999";
+    let persisted_session_id: String = sqlx::query_scalar(
+        "SELECT public.create_registration_verification_session(\
+            $1::uuid, $2::uuid, 'whatsapp', $3, $4, 'enc-v1', $5, 'hmac-v1', \
+            clock_timestamp() + INTERVAL '10 minutes')::text",
+    )
+    .bind(session_id)
+    .bind(&user_id)
+    .bind(vec![1_u8])
+    .bind(vec![2_u8])
+    .bind(vec![3_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("WhatsApp registration verification session should be created");
+    assert_eq!(persisted_session_id, session_id);
+
+    let challenge_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    let reserved: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, delivery_event_id::text \
+         FROM public.reserve_flowkirim_otp_challenge($1::uuid, $2::uuid, $3)",
+    )
+    .bind(session_id)
+    .bind(challenge_id)
+    .bind(vec![vec![3_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("FlowKirim challenge should reserve delivery quota");
+    assert_eq!(reserved.0, challenge_id);
+
+    let payload: (Option<Vec<u8>>, Option<String>, String) = sqlx::query_as(
+        "SELECT code_hash, hash_key_version, provider \
+         FROM public.verification_challenges WHERE id = $1::uuid",
+    )
+    .bind(challenge_id)
+    .fetch_one(pool)
+    .await
+    .expect("FlowKirim challenge metadata should be queryable");
+    assert!(
+        payload.0.is_none(),
+        "provider-managed OTP must not store a fake local hash"
+    );
+    assert!(
+        payload.1.is_none(),
+        "provider-managed OTP must not store a local key version"
+    );
+    assert_eq!(payload.2, "flowkirim");
+
+    assert!(
+        sqlx::query(
+            "UPDATE public.verification_challenges \
+             SET status = 'consumed', consumed_at = clock_timestamp() \
+             WHERE id = $1::uuid",
+        )
+        .bind(challenge_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "FlowKirim challenge cannot be consumed before its request ID is bound"
+    );
+
+    assert!(
+        sqlx::query("SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, '   ')")
+            .bind(session_id)
+            .bind(challenge_id)
+            .execute(pool)
+            .await
+            .is_err(),
+        "blank FlowKirim request IDs must be rejected"
+    );
+
+    sqlx::query("SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-request-123')")
+        .bind(session_id)
+        .bind(challenge_id)
+        .execute(pool)
+        .await
+        .expect("FlowKirim request ID should bind once");
+
+    sqlx::query("SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-request-123')")
+        .bind(session_id)
+        .bind(challenge_id)
+        .execute(pool)
+        .await
+        .expect("repeating the same provider binding should be idempotent");
+
+    assert!(
+        sqlx::query(
+            "SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-request-other')"
+        )
+        .bind(session_id)
+        .bind(challenge_id)
+        .execute(pool)
+        .await
+        .is_err(),
+        "a bound FlowKirim request ID must be immutable"
+    );
+
+    let pending: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, provider_request_id \
+         FROM public.get_pending_flowkirim_otp_challenge($1::uuid)",
+    )
+    .bind(session_id)
+    .fetch_one(pool)
+    .await
+    .expect("runtime should retrieve the bound FlowKirim request");
+    assert_eq!(pending.0, challenge_id);
+    assert_eq!(pending.1, "fk-request-123");
+
+    assert!(
+        sqlx::query("SELECT * FROM public.get_pending_otp_challenge($1::uuid)")
+            .bind(session_id)
+            .fetch_one(pool)
+            .await
+            .is_err(),
+        "local OTP lookup must not return provider-managed challenges"
+    );
+
+    let verified: bool = sqlx::query_scalar(
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
+    )
+    .bind(session_id)
+    .bind(challenge_id)
+    .bind(vec![vec![3_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("successful FlowKirim provider result should activate the pending account atomically");
+    assert!(verified);
+
+    let account_status: String =
+        sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
+            .bind(&user_id)
+            .fetch_one(pool)
+            .await
+            .expect("FlowKirim-verified account status should be queryable");
+    assert_eq!(account_status, "active");
+
+    let recovery_session_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    let recovery_case_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    let created_recovery: (String, String) = sqlx::query_as(
+        "SELECT session_id::text, case_id::text \
+         FROM public.create_account_recovery_verification_session(\
+            $1::uuid, $2::uuid, 'password_reset', 'whatsapp', $3, $4, 'enc-v1', $5, 'hmac-v1', \
+            clock_timestamp() + INTERVAL '10 minutes')",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_case_id)
+    .bind(vec![4_u8])
+    .bind(vec![5_u8])
+    .bind(vec![4_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("WhatsApp account recovery session should be created");
+    assert_eq!(created_recovery.0, recovery_session_id);
+    assert_eq!(created_recovery.1, recovery_case_id);
+
+    let recovery_challenge_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    let recovery_reserved: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, delivery_event_id::text \
+         FROM public.reserve_flowkirim_otp_challenge($1::uuid, $2::uuid, $3)",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_challenge_id)
+    .bind(vec![vec![4_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("FlowKirim challenge should reserve WhatsApp account recovery delivery");
+    assert_eq!(recovery_reserved.0, recovery_challenge_id);
+
+    sqlx::query(
+        "SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-recovery-request-001')",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_challenge_id)
+    .execute(pool)
+    .await
+    .expect("FlowKirim request ID should bind for account recovery");
+
+    let recovery_pending: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, provider_request_id \
+         FROM public.get_pending_flowkirim_otp_challenge($1::uuid)",
+    )
+    .bind(recovery_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("runtime should retrieve pending FlowKirim account recovery challenge");
+    assert_eq!(recovery_pending.0, recovery_challenge_id);
+    assert_eq!(recovery_pending.1, "fk-recovery-request-001");
+
+    let recovery_verified: bool = sqlx::query_scalar(
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_challenge_id)
+    .bind(vec![vec![4_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("valid FlowKirim result should verify account recovery contact");
+    assert!(recovery_verified);
+
+    let recovery_status: String =
+        sqlx::query_scalar("SELECT status FROM public.verification_sessions WHERE id = $1::uuid")
+            .bind(recovery_session_id)
+            .fetch_one(pool)
+            .await
+            .expect("recovery verification status should be queryable");
+    assert_eq!(recovery_status, "verified");
 }
 
 async fn assert_otp_resend_during_verification_lock(pool: &PgPool) {
@@ -2861,6 +3107,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
                    'account_recovery_case_signals', 'account_recovery_review_decisions', 'admin_totp_credentials', \
                    'admin_login_rate_limits', 'admin_login_challenges', 'admin_sessions', \
+                   'identity_abuse_rate_limits', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
@@ -2973,6 +3220,18 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     assert_eq!(
         admin_function_grants, 8,
         "application should execute only the explicit Admin authentication functions"
+    );
+
+    let identity_abuse_function_access: bool = sqlx::query_scalar(
+        "SELECT has_function_privilege(current_user, \
+                'public.reserve_identity_abuse_attempt(text,bytea,integer,integer)', 'EXECUTE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("Identity abuse-rate-limit function privilege should be queryable");
+    assert!(
+        identity_abuse_function_access,
+        "application should execute the Identity abuse-rate-limit function"
     );
 
     let operator_function_access: (bool, bool, bool) = sqlx::query_as(
@@ -3134,7 +3393,8 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         messages: Mutex::new(Vec::new()),
         status: DispatchStatus::Accepted,
     };
-    let service = VerificationService::new(app_pool, &keys, &delivery);
+    let flowkirim = FakeFlowKirim;
+    let service = VerificationService::new_with_flowkirim(app_pool, &keys, &delivery, &flowkirim);
     let registration = ClientRegistration {
         display_name: "Pemilik Usaha Demo",
         role: ClientRole::BusinessOwner,
@@ -3239,22 +3499,21 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .expect("explicit marketing opt-in should be recorded");
     assert_eq!(phone_marketing_events, 1);
 
-    let phone_code = {
+    {
         let messages = delivery
             .messages
             .lock()
             .expect("fake delivery message lock should be available");
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 1);
         assert_eq!(
-            messages[1].channel,
-            usahapintar_api::identity::DeliveryChannel::WhatsApp
+            messages[0].channel,
+            usahapintar_api::identity::DeliveryChannel::Email
         );
-        messages[1].code.as_str().to_owned()
-    };
+    }
     assert!(service
-        .verify(&phone_started.session_id, &phone_code)
+        .verify(&phone_started.session_id, "123456")
         .await
-        .expect("WhatsApp OTP should verify and activate the pending account"));
+        .expect("FlowKirim should verify the WhatsApp OTP and activate the pending account"));
 
     let phone_account_status: String =
         sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
@@ -3980,4 +4239,61 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     .await
     .expect("dedicated Admin session table should be inspectable by migrator");
     assert!(dedicated_session_count >= 2);
+}
+
+async fn assert_identity_abuse_rate_limits(pool: &PgPool) {
+    let fingerprint = vec![0x5a_u8; 32];
+    sqlx::query(
+        "DELETE FROM public.identity_abuse_rate_limits \
+         WHERE scope = 'registration:create:ip' AND key_hash = $1",
+    )
+    .bind(&fingerprint)
+    .execute(pool)
+    .await
+    .expect("test rate-limit fingerprint should be clearable");
+
+    for expected in [true, true, false] {
+        let allowed: bool = sqlx::query_scalar(
+            "SELECT public.reserve_identity_abuse_attempt(\
+                'registration:create:ip', $1, 2, 900\
+             )",
+        )
+        .bind(&fingerprint)
+        .fetch_one(pool)
+        .await
+        .expect("Identity rate-limit reservation should succeed");
+        assert_eq!(allowed, expected);
+    }
+
+    let attempts: i32 = sqlx::query_scalar(
+        "SELECT attempt_count FROM public.identity_abuse_rate_limits \
+         WHERE scope = 'registration:create:ip' AND key_hash = $1",
+    )
+    .bind(&fingerprint)
+    .fetch_one(pool)
+    .await
+    .expect("rate-limit counter should be persisted");
+    assert_eq!(attempts, 3);
+
+    let invalid_hash = sqlx::query_scalar::<_, bool>(
+        "SELECT public.reserve_identity_abuse_attempt(\
+            'registration:create:ip', $1, 2, 900\
+         )",
+    )
+    .bind(vec![0x01_u8; 31])
+    .fetch_one(pool)
+    .await;
+    assert!(
+        invalid_hash.is_err(),
+        "database function must reject fingerprints that are not 32 bytes"
+    );
+
+    sqlx::query(
+        "DELETE FROM public.identity_abuse_rate_limits \
+         WHERE scope = 'registration:create:ip' AND key_hash = $1",
+    )
+    .bind(&fingerprint)
+    .execute(pool)
+    .await
+    .expect("test rate-limit fingerprint should be removed");
 }

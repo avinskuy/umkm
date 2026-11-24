@@ -19,6 +19,17 @@ pub trait PasswordPolicy: Send + Sync {
     fn accepts(&self, password: &str) -> bool;
 }
 
+/// Kebijakan password sederhana: 8–128 karakter tanpa aturan komposisi.
+/// Spasi, Unicode, huruf, angka, dan simbol diperbolehkan.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SimplePasswordPolicy;
+
+impl PasswordPolicy for SimplePasswordPolicy {
+    fn accepts(&self, password: &str) -> bool {
+        (8..=128).contains(&password.chars().count())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PasswordError {
     HashingFailed,
@@ -93,6 +104,19 @@ pub fn verify_password(password: &[u8], encoded_hash: &str) -> Result<bool, Pass
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn simple_password_policy_accepts_eight_to_128_characters_without_composition_rules() {
+        let policy = SimplePasswordPolicy;
+
+        assert!(!policy.accepts("short7!"));
+        assert!(policy.accepts("abcdefgh"));
+        assert!(policy.accepts("        "));
+        assert!(policy.accepts("kata sandi dengan spasi"));
+        assert!(policy.accepts("pässwörd-🔐"));
+        assert!(policy.accepts(&"a".repeat(128)));
+        assert!(!policy.accepts(&"a".repeat(129)));
+    }
 
     #[test]
     fn password_hashes_are_salted_and_verifiable() {

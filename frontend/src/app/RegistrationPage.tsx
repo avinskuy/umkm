@@ -103,10 +103,17 @@ export function RegistrationPage() {
             type={channel === "email" ? "email" : "tel"}
             autoComplete={channel === "email" ? "email" : "tel"}
             placeholder={
-              channel === "email" ? "nama@email.com" : "Contoh: +6281234567890"
+              channel === "email"
+                ? "nama@email.com"
+                : "08xxxxxxxxxx atau +628xxxxxxxxxx"
             }
             required
           />
+          {channel === "whatsapp" && (
+            <p className={styles.hint}>
+              Gunakan format lokal 08... atau internasional 628... / +628...
+            </p>
+          )}
 
           <label htmlFor="registration-password">Password</label>
           <input

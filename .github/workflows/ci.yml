@@ -61,10 +61,8 @@ jobs:
         run: |
           psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
             -c "CREATE DATABASE usahapintar_test OWNER usahapintar_ci_admin"
-          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \
-            -v ON_ERROR_STOP=1 -f backend/database/bootstrap/001_create_principals.sql
-          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \
-            -v ON_ERROR_STOP=1 -f backend/database/bootstrap/001_create_principals.sql
+          psql "$CI_TARGET_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f backend/database/bootstrap/001_create_principals.sql
           psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER ROLE usahapintar_migrator PASSWORD 'ci_migrator_only_password';
           ALTER ROLE usahapintar_app_login PASSWORD 'ci_app_only_password';

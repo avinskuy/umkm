@@ -8,6 +8,7 @@ use super::{
         KeyProvider, OtpVerificationContext,
     },
     delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
+    flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
     registration::{create_client_user, ClientRegistration, ContactChannel},
 };
 
@@ -23,6 +24,7 @@ pub struct VerificationService<'a> {
     pool: &'a PgPool,
     keys: &'a dyn KeyProvider,
     delivery: &'a dyn OtpDeliveryProvider,
+    flowkirim: Option<&'a dyn FlowKirimVerifyProvider>,
 }
 
 pub struct RegistrationStart {
@@ -37,6 +39,7 @@ pub enum VerificationError {
     Crypto(super::crypto::CryptoError),
     InvalidInput,
     InvalidStoredData,
+    ProviderUnavailable,
 }
 
 impl std::fmt::Display for VerificationError {
@@ -46,6 +49,7 @@ impl std::fmt::Display for VerificationError {
             Self::Crypto(_) => "verification cryptographic operation failed",
             Self::InvalidInput => "verification input is invalid",
             Self::InvalidStoredData => "stored verification data is invalid",
+            Self::ProviderUnavailable => "verification provider is unavailable",
         };
         formatter.write_str(message)
     }
@@ -75,6 +79,21 @@ impl<'a> VerificationService<'a> {
             pool,
             keys,
             delivery,
+            flowkirim: None,
+        }
+    }
+
+    pub fn new_with_flowkirim(
+        pool: &'a PgPool,
+        keys: &'a dyn KeyProvider,
+        delivery: &'a dyn OtpDeliveryProvider,
+        flowkirim: &'a dyn FlowKirimVerifyProvider,
+    ) -> Self {
+        Self {
+            pool,
+            keys,
+            delivery,
+            flowkirim: Some(flowkirim),
         }
     }
 
@@ -142,6 +161,22 @@ impl<'a> VerificationService<'a> {
 
     /// Memeriksa OTP, mencatat percobaan, dan mengaktifkan akun secara atomik di database.
     pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
+        validate_uuid(session_id)?;
+        let session = load_verification_session(self.pool, session_id, "registration").await?;
+        if session.0 == "whatsapp" {
+            let provider = self
+                .flowkirim
+                .ok_or(VerificationError::ProviderUnavailable)?;
+            return verify_flowkirim_session(
+                self.pool,
+                self.keys,
+                provider,
+                session_id,
+                "registration",
+                code,
+            )
+            .await;
+        }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
     }
 
@@ -149,6 +184,20 @@ impl<'a> VerificationService<'a> {
         &self,
         session_id: &str,
     ) -> Result<DispatchStatus, VerificationError> {
+        let session = load_verification_session(self.pool, session_id, "registration").await?;
+        if session.0 == "whatsapp" {
+            let provider = self
+                .flowkirim
+                .ok_or(VerificationError::ProviderUnavailable)?;
+            return dispatch_flowkirim_challenge(
+                self.pool,
+                self.keys,
+                provider,
+                session_id,
+                "registration",
+            )
+            .await;
+        }
         dispatch_otp_challenge(
             self.pool,
             self.keys,
@@ -158,6 +207,124 @@ impl<'a> VerificationService<'a> {
         )
         .await
     }
+}
+
+pub(crate) async fn dispatch_flowkirim_challenge(
+    pool: &PgPool,
+    keys: &dyn KeyProvider,
+    provider: &dyn FlowKirimVerifyProvider,
+    session_id: &str,
+    purpose: &str,
+) -> Result<DispatchStatus, VerificationError> {
+    if !matches!(purpose, "registration" | "account_recovery") {
+        return Err(VerificationError::InvalidInput);
+    }
+    validate_uuid(session_id)?;
+    let session = load_verification_session(pool, session_id, purpose).await?;
+    if session.0 != "whatsapp" {
+        return Err(VerificationError::InvalidInput);
+    }
+    let destination = decrypt_destination(keys, session_id, purpose, &session)?;
+    let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
+    let alias_bytes = aliases
+        .into_iter()
+        .map(|alias| alias.digest.to_vec())
+        .collect::<Vec<_>>();
+    let challenge_id = new_uuid()?;
+
+    let (reserved_challenge_id, delivery_event_id) = sqlx::query_as::<_, (String, String)>(
+        "SELECT challenge_id::text, delivery_event_id::text FROM public.reserve_flowkirim_otp_challenge($1::uuid, $2::uuid, $3)",
+    )
+    .bind(session_id)
+    .bind(&challenge_id)
+    .bind(alias_bytes)
+    .fetch_one(pool)
+    .await?;
+
+    if reserved_challenge_id != challenge_id {
+        return Err(VerificationError::InvalidStoredData);
+    }
+
+    let idempotency_key = format!("{purpose}-whatsapp-{challenge_id}");
+    let status = match provider.start(destination, idempotency_key).await {
+        FlowKirimProviderOutcome::Accepted(request_id) => {
+            if request_id.trim().is_empty() || request_id.len() > 256 {
+                DispatchStatus::Unknown
+            } else {
+                sqlx::query("SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, $3)")
+                    .bind(session_id)
+                    .bind(&challenge_id)
+                    .bind(request_id)
+                    .execute(pool)
+                    .await?;
+                DispatchStatus::Accepted
+            }
+        }
+        FlowKirimProviderOutcome::Rejected => DispatchStatus::Failed,
+        FlowKirimProviderOutcome::Unavailable => DispatchStatus::Unknown,
+    };
+
+    sqlx::query("SELECT public.record_otp_delivery_result($1::uuid, $2)")
+        .bind(delivery_event_id)
+        .bind(status.as_db_value())
+        .execute(pool)
+        .await?;
+
+    Ok(status)
+}
+
+pub(crate) async fn verify_flowkirim_session(
+    pool: &PgPool,
+    keys: &dyn KeyProvider,
+    provider: &dyn FlowKirimVerifyProvider,
+    session_id: &str,
+    purpose: &str,
+    code: &str,
+) -> Result<bool, VerificationError> {
+    if !matches!(purpose, "registration" | "account_recovery")
+        || code.len() != OTP_DIGITS as usize
+        || !code.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(VerificationError::InvalidInput);
+    }
+    validate_uuid(session_id)?;
+    let session = load_verification_session(pool, session_id, purpose).await?;
+    if session.0 != "whatsapp" {
+        return Err(VerificationError::InvalidInput);
+    }
+    let destination = decrypt_destination(keys, session_id, purpose, &session)?;
+    let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
+    let (challenge_id, request_id) = sqlx::query_as::<_, (String, String)>(
+        "SELECT challenge_id::text, provider_request_id FROM public.get_pending_flowkirim_otp_challenge($1::uuid)",
+    )
+    .bind(session_id)
+    .fetch_one(pool)
+    .await?;
+
+    let provider_matches = match provider
+        .check(request_id, Zeroizing::new(code.to_owned()))
+        .await
+    {
+        FlowKirimProviderOutcome::Accepted(matches) => matches,
+        FlowKirimProviderOutcome::Rejected => false,
+        FlowKirimProviderOutcome::Unavailable => {
+            return Err(VerificationError::ProviderUnavailable)
+        }
+    };
+    let alias_bytes = aliases
+        .into_iter()
+        .map(|alias| alias.digest.to_vec())
+        .collect::<Vec<_>>();
+    sqlx::query_scalar::<_, bool>(
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, $3, $4)",
+    )
+    .bind(session_id)
+    .bind(challenge_id)
+    .bind(provider_matches)
+    .bind(alias_bytes)
+    .fetch_one(pool)
+    .await
+    .map_err(VerificationError::from)
 }
 
 pub(crate) async fn dispatch_otp_challenge(
@@ -202,6 +369,7 @@ pub(crate) async fn dispatch_otp_challenge(
 
     let dispatch_status = delivery
         .dispatch(OtpDeliveryMessage {
+            idempotency_key: format!("otp-{purpose}-{challenge_id}"),
             destination,
             channel: delivery_channel(channel),
             code,
@@ -338,6 +506,33 @@ pub(crate) fn contact_aliases(
     Ok(aliases)
 }
 
+/// Menerima nomor Indonesia dalam format lokal (08...), internasional (628...)
+/// atau E.164 (+628...), lalu menyimpannya dalam bentuk kanonis +62.
+pub(crate) fn normalize_indonesian_phone(value: &str) -> Option<String> {
+    let compact = value
+        .trim()
+        .chars()
+        .filter(|character| !matches!(*character, ' ' | '-' | '(' | ')'))
+        .collect::<String>();
+
+    let subscriber = if let Some(value) = compact.strip_prefix("+62") {
+        value
+    } else if let Some(value) = compact.strip_prefix("62") {
+        value
+    } else {
+        compact.strip_prefix('0')?
+    };
+
+    if !(9..=12).contains(&subscriber.len())
+        || !subscriber.starts_with('8')
+        || !subscriber.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+
+    Some(format!("+62{subscriber}"))
+}
+
 pub(crate) fn normalize_contact(
     channel: ContactChannel,
     email: Option<&str>,
@@ -369,17 +564,8 @@ pub(crate) fn normalize_contact(
             if email.is_some() {
                 return Err(VerificationError::InvalidInput);
             }
-            let phone = phone
-                .ok_or(VerificationError::InvalidInput)?
-                .trim()
-                .to_owned();
-            let digits = phone.strip_prefix('+').unwrap_or_default();
-            if !(8..=15).contains(&digits.len())
-                || !digits.bytes().all(|byte| byte.is_ascii_digit())
-                || digits.starts_with('0')
-            {
-                return Err(VerificationError::InvalidInput);
-            }
+            let phone = normalize_indonesian_phone(phone.ok_or(VerificationError::InvalidInput)?)
+                .ok_or(VerificationError::InvalidInput)?;
             Ok(("whatsapp", phone))
         }
     }
@@ -463,6 +649,25 @@ fn generate_otp() -> Result<Zeroizing<String>, VerificationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indonesian_phone_formats_normalize_to_e164() {
+        for input in [
+            "08123456789",
+            "628123456789",
+            "+628123456789",
+            "0812-3456-789",
+        ] {
+            assert_eq!(
+                normalize_indonesian_phone(input).as_deref(),
+                Some("+628123456789")
+            );
+        }
+
+        for input in ["8123456789", "008123456789", "+658123456789", "08123abc789"] {
+            assert!(normalize_indonesian_phone(input).is_none(), "{input}");
+        }
+    }
 
     #[test]
     fn uuid_generator_creates_valid_v4_identifiers() {

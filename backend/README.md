@@ -10,9 +10,23 @@ Server membaca alamat bind dari variabel lingkungan:
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | Alamat IP untuk bind. Mendukung literal IPv4 dan IPv6. |
 | `PORT` | `5000` | Port TCP. Harus berupa bilangan bulat dari 1 sampai 65535. |
-| `AUTH_RATE_LIMIT_HMAC_KEY` | — | Wajib. Secret 32 byte dalam 64 karakter hex untuk fingerprint rate limit login. Gunakan nilai acak dari secret manager; jangan commit ke repository atau log. |
+| `AUTH_RATE_LIMIT_HMAC_KEY` | — | Wajib. Secret 32 byte dalam 64 karakter hex untuk fingerprint rate limit login dan abuse guard registrasi/recovery. Gunakan nilai acak dari secret manager; jangan commit ke repository atau log. |
+| `IDENTITY_DATA_ENCRYPTION_KEY_ACTIVE_VERSION` | — | Wajib. Versi aktif key enkripsi tujuan kontak, misalnya `v1`. |
+| `IDENTITY_DATA_ENCRYPTION_KEYS` | — | Wajib. Daftar key hex 32 byte dengan format `v1:<64-hex>`; beberapa versi dipisahkan titik koma. |
+| `IDENTITY_CONTACT_FINGERPRINT_KEY_ACTIVE_VERSION` | — | Wajib. Versi aktif key fingerprint kontak. |
+| `IDENTITY_CONTACT_FINGERPRINT_KEYS` | — | Wajib. Daftar key fingerprint dengan format versi yang sama. |
+| `IDENTITY_OTP_VERIFICATION_KEY_ACTIVE_VERSION` | — | Wajib. Versi aktif key HMAC OTP. |
+| `IDENTITY_OTP_VERIFICATION_KEYS` | — | Wajib. Daftar key OTP dengan format versi yang sama. |
+| `RESEND_API_KEY` | — | Wajib. API key Resend untuk pengiriman OTP email. |
+| `RESEND_FROM_EMAIL` | — | Wajib. Sender email dari domain yang sudah diverifikasi di Resend. |
+| `FLOWKIRIM_API_KEY` | — | Wajib. API key FlowKirim Verify untuk OTP WhatsApp. |
+| `REGISTRATION_TERMS_VERSION` | — | Wajib. Label versi Terms yang dicatat saat pendaftaran. |
+| `REGISTRATION_PRIVACY_VERSION` | — | Wajib. Label versi Privacy yang dicatat saat pendaftaran. |
+| `REGISTRATION_MARKETING_NOTICE_VERSION` | Tidak | Versi pemberitahuan marketing; wajib tersedia jika consent marketing diaktifkan. |
 
-Jika salah satu variabel tidak diisi, server menggunakan nilai bawaannya. Nilai yang tidak valid akan menghentikan proses startup dengan kesalahan konfigurasi, bukan diam-diam diganti dengan nilai bawaan.
+Variabel wajib yang tercantum tanpa nilai bawaan harus disediakan sebelum server dijalankan. Konfigurasi key Identity, Resend, FlowKirim, dan versi kebijakan divalidasi saat startup; konfigurasi yang hilang atau tidak valid menghentikan startup. Setiap purpose Identity harus memakai material key yang berbeda. Pertahankan versi key lama selama data yang dienkripsi atau fingerprint yang dibuat dengan versi tersebut masih perlu dibaca. Jangan menaruh key produksi di source control, dokumentasi, atau log.
+
+`HOST` dan `PORT` memakai nilai bawaan jika tidak diisi. Variabel wajib tanpa nilai bawaan harus disediakan; nilai yang tidak valid menghentikan startup dengan kesalahan konfigurasi.
 
 Alamat loopback bawaan menjaga API tetap dapat diakses dari host itu sendiri. Atur `HOST=0.0.0.0` hanya jika lingkungan deployment memang memerlukan antarmuka yang dapat dijangkau dari luar. Lindungi layanan menggunakan kontrol jaringan atau reverse proxy yang sesuai. Jangan membuka API secara langsung ke internet publik tanpa tinjauan keamanan deployment yang jelas.
 
@@ -49,6 +63,21 @@ Gunakan liveness untuk mengetahui apakah proses perlu dipulihkan dan readiness u
 Siapkan database lokal dan principal aplikasi terlebih dahulu, kemudian jalankan:
 
 ```sh
+# Buat setiap key Identity secara terpisah; jangan gunakan satu key untuk beberapa purpose.
+export IDENTITY_DATA_ENCRYPTION_KEY_ACTIVE_VERSION=v1
+export IDENTITY_DATA_ENCRYPTION_KEYS="v1:$(openssl rand -hex 32)"
+export IDENTITY_CONTACT_FINGERPRINT_KEY_ACTIVE_VERSION=v1
+export IDENTITY_CONTACT_FINGERPRINT_KEYS="v1:$(openssl rand -hex 32)"
+export IDENTITY_OTP_VERIFICATION_KEY_ACTIVE_VERSION=v1
+export IDENTITY_OTP_VERIFICATION_KEYS="v1:$(openssl rand -hex 32)"
+
+# Isi dengan kredensial akun/provider pengembangan yang sesuai.
+export RESEND_API_KEY='re_your_development_key'
+export RESEND_FROM_EMAIL='USahapintar <noreply@your-verified-domain.example>'
+export FLOWKIRIM_API_KEY='your_flowkirim_development_key'
+export REGISTRATION_TERMS_VERSION='terms-v1'
+export REGISTRATION_PRIVACY_VERSION='privacy-v1'
+
 AUTH_RATE_LIMIT_HMAC_KEY="$(openssl rand -hex 32)" APP_DATABASE_URL='postgres://usahapintar_app_login:local_password@127.0.0.1:5432/usahapintar_dev' HOST=127.0.0.1 PORT=5000 cargo run --locked -p usahapintar-api
 ```
 
@@ -81,11 +110,11 @@ Lapisan `usahapintar_api::identity` menyediakan operasi terbatas untuk registras
 - `append_audit_event` menambahkan event ke tabel audit append-only. Principal aplikasi tidak memperoleh hak membaca, mengubah, atau menghapus event audit.
 - `VerificationService` mengorkestrasi registrasi, penerbitan/resend OTP, pencatatan hasil pengiriman, verifikasi, dan aktivasi akun. Password diproses menggunakan komponen hashing backend; password plaintext tidak disimpan atau diteruskan ke provider.
 - `RecoveryService` memakai mekanisme OTP bersama dengan purpose separation untuk membuat sesi recovery tanpa akun terikat, verifikasi kontak, daftar kandidat akun setelah verifikasi, dan pemilihan akun dengan validasi kepemilikan kontak di PostgreSQL.
-- `registration_router` dan `recovery_router` menyediakan endpoint HTTP terinjeksi dengan key provider, delivery provider, dan abuse guard. Keduanya belum dipasang pada `app()`/`main()` default. `app_with_authentication_and_recovery` menyediakan builder eksplisit untuk pemasangan terkontrol.
+- `registration_router` dan `recovery_router` menyediakan endpoint HTTP terinjeksi dengan key provider, delivery provider, dan abuse guard. Runtime `main()` memasang router registrasi dan recovery melalui `app_with_authentication_admin_registration_and_recovery`; builder `app()` tetap menjadi aplikasi dasar tanpa route identitas.
 
-Registrasi publik menggunakan email + password dengan OTP email atau nomor telepon/WhatsApp + password dengan OTP WhatsApp. Router registrasi tersedia tetapi belum dipasang pada server default. Login Owner/Investor menggunakan email/nomor telepon + password tanpa OTP rutin dan sudah tersedia pada runtime. Recovery HTTP tersedia sebagai router terinjeksi, tetapi belum dipasang pada server default karena key provider, delivery provider, dan abuse guard produksi belum dikonfigurasi. Recovery mendukung pencatatan kecocokan sesi aktif yang sudah ada sebelum kasus dibuat serta keputusan approval/rejection oleh Admin melalui `RecoveryReviewService`. Reviewer ID dan token sesi wajib berasal dari konteks Admin aktif yang divalidasi server. Alur login Admin dan endpoint Admin untuk review belum tersedia. `PasswordResetIssuanceService` dapat menerbitkan token acak sekali pakai setelah kasus disetujui; token disimpan sebagai hash, berlaku 15 menit, dikirim melalui provider terpisah, dan dicabut jika pengiriman dinyatakan gagal. `POST /api/v1/identity/recovery/password-reset` memvalidasi token, menerapkan kebijakan password, mengganti hash secara atomik, mencabut seluruh sesi aktif, menyelesaikan kasus recovery, dan menulis audit event. Penerbitan token belum diorkestrasi otomatis dari alur review Admin; pemanggilan service tetap harus dilakukan oleh komponen server tepercaya setelah approval. Notifikasi keamanan pasca-reset dan UI frontend reset password belum terintegrasi. Sinyal sesi hanya bukti tambahan dan tidak cukup untuk menyetujui recovery dengan sendirinya. Penerapan middleware sesi pada endpoint fitur dan UI daftar/pencabutan sesi perangkat juga belum tersedia.
+Registrasi publik menggunakan email + password dengan OTP email melalui Resend atau nomor telepon/WhatsApp + password dengan OTP WhatsApp melalui FlowKirim Verify. Router registrasi sudah dipasang pada runtime utama; CI menguji komposisi route menggunakan provider lokal/fake dan tidak mengirim pesan sungguhan. Login Owner/Investor menggunakan email/nomor telepon + password tanpa OTP rutin dan sudah tersedia pada runtime. Router recovery sudah dipasang pada runtime dengan OTP email melalui Resend dan OTP WhatsApp melalui FlowKirim Verify. Recovery mendukung pencatatan kecocokan sesi aktif yang sudah ada sebelum kasus dibuat serta keputusan approval/rejection oleh Admin melalui `RecoveryReviewService`. Reviewer ID dan token sesi wajib berasal dari konteks Admin aktif yang divalidasi server. Alur login Admin dan endpoint Admin untuk review belum tersedia. `PasswordResetIssuanceService` dapat menerbitkan token acak sekali pakai setelah kasus disetujui; token disimpan sebagai hash, berlaku 15 menit, dikirim melalui provider terpisah, dan dicabut jika pengiriman dinyatakan gagal. `POST /api/v1/identity/recovery/password-reset` memvalidasi token, menerapkan kebijakan password, mengganti hash secara atomik, mencabut seluruh sesi aktif, menyelesaikan kasus recovery, dan menulis audit event. Penerbitan token belum diorkestrasi otomatis dari alur review Admin; pemanggilan service tetap harus dilakukan oleh komponen server tepercaya setelah approval. Notifikasi keamanan pasca-reset dan UI frontend reset password belum terintegrasi. Sinyal sesi hanya bukti tambahan dan tidak cukup untuk menyetujui recovery dengan sendirinya. Penerapan middleware sesi pada endpoint fitur dan UI daftar/pencabutan sesi perangkat juga belum tersedia.
 
-Provider pengiriman masih berupa abstraksi. Resend (email) dan FlowKirim (WhatsApp) merupakan target adapter, bukan integrasi nyata yang telah dikonfigurasi atau diuji dengan pengiriman langsung. CI menggunakan fake provider dan tidak mengirim pesan.
+Adapter HTTP Resend (email) dan FlowKirim Verify (WhatsApp) sudah tersedia dan dikonfigurasi dari environment runtime. Pengiriman langsung ke provider eksternal belum menjadi bagian dari CI; CI menggunakan provider lokal/fake dan tidak mengirim pesan. Pastikan domain sender Resend sudah diverifikasi sebelum mengaktifkan pendaftaran email.
 
 Endpoint recovery pada router terinjeksi:
 - `POST /api/v1/identity/recovery` membuat sesi dan kasus recovery tanpa mengungkap apakah kontak terdaftar.
@@ -96,4 +125,4 @@ Endpoint recovery pada router terinjeksi:
 
 Untuk menjaga konsistensi, operasi pembuatan akun, profil, penerimaan Terms/Privacy, consent opsional, dan event audit yang terkait harus menggunakan transaksi sesuai kontrak database dan hanya commit setelah seluruh operasi berhasil. Untuk audit, `actor_type` dan `actor_id` wajib berasal dari konteks server tepercaya, bukan payload klien. Metadata hanya boleh memuat key allowlist non-sensitif; jangan memasukkan password, OTP, token, kontak plaintext, isi chat, atau payload privat.
 
-Login password Owner/Investor, middleware sesi untuk endpoint identitas, refresh/rotasi token, logout perangkat saat ini, logout semua perangkat, serta komponen HTTP recovery dan endpoint konsumsi token reset telah tersedia. Router registrasi dan recovery belum dipasang pada server default. HTTP endpoint untuk review Admin, orkestrasi penerbitan token dari keputusan review, notifikasi keamanan pasca-reset, UI frontend reset password, adapter provider OTP nyata, production key provider, middleware sesi pada endpoint fitur, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.
+Login password Owner/Investor, middleware sesi untuk endpoint identitas, refresh/rotasi token, logout perangkat saat ini, logout semua perangkat, router registrasi dan recovery runtime, adapter HTTP Resend/FlowKirim Verify untuk kedua alur, keyring Identity berbasis environment, dan endpoint konsumsi token reset telah tersedia. HTTP endpoint untuk review Admin, orkestrasi penerbitan token dari keputusan review, notifikasi keamanan pasca-reset, UI frontend reset password, pengujian pengiriman langsung provider, middleware sesi pada endpoint fitur, dan pembacaan audit belum tersedia. Tambahkan operasi baru hanya setelah kontrak akses, kebutuhan data minimum, pemeriksaan otorisasi, grant database, dan tes principal aplikasi ditinjau bersama. Jangan memberikan SELECT langsung pada tabel identitas sebagai jalan pintas.

@@ -11,11 +11,14 @@ pub mod authentication;
 pub mod authorization;
 pub mod crypto;
 pub mod delivery;
+pub mod flowkirim;
+pub mod flowkirim_http;
 pub mod http;
 pub mod password;
 pub mod password_reset;
 pub mod recovery;
 mod registration;
+pub mod resend_http;
 pub mod totp;
 pub mod verification;
 

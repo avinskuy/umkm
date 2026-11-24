@@ -1,3 +1,5 @@
+use zeroize::Zeroizing;
+
 use axum::{
     body::Body,
     extract::ConnectInfo,
@@ -619,6 +621,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
             PasswordResetDeliveryMessage, PasswordResetDeliveryProvider,
         },
+        flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
         password::{hash_password, verify_password},
         password_reset::PasswordResetIssuanceService,
         ClientRegistration, ClientRole, ContactChannel, RecoveryReviewDecision,
@@ -649,6 +652,28 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
 
     struct RecoveryDelivery {
         last_code: Arc<Mutex<Option<String>>>,
+    }
+
+    struct FakeRecoveryFlowKirim;
+
+    impl FlowKirimVerifyProvider for FakeRecoveryFlowKirim {
+        fn start<'a>(
+            &'a self,
+            _destination: Zeroizing<String>,
+            _idempotency_key: String,
+        ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<String>> + Send + 'a>> {
+            Box::pin(async {
+                FlowKirimProviderOutcome::Accepted("flowkirim-recovery-runtime-request".to_owned())
+            })
+        }
+
+        fn check<'a>(
+            &'a self,
+            _request_id: String,
+            code: Zeroizing<String>,
+        ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a>> {
+            Box::pin(async move { FlowKirimProviderOutcome::Accepted(code.as_str() == "123456") })
+        }
     }
 
     struct CapturingPasswordResetDelivery {
@@ -842,6 +867,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             }),
             Arc::new(AllowRecoveryGuard),
         )
+        .with_flowkirim_provider(Arc::new(FakeRecoveryFlowKirim))
         .with_password_policy(Arc::new(ResetPasswordPolicy)),
     );
     let make_recovery_request =
@@ -863,6 +889,63 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             ));
             request
         };
+
+    let recovery_phone = format!("+62812345{:06}", std::process::id() % 1_000_000);
+    let whatsapp_started = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            "/api/v1/identity/recovery".to_owned(),
+            Some(serde_json::json!({
+                "contact_channel": "whatsapp",
+                "phone": recovery_phone,
+                "requested_action": "password_reset"
+            })),
+            false,
+        ))
+        .await
+        .expect("WhatsApp recovery start route should respond");
+    assert_eq!(whatsapp_started.status(), axum::http::StatusCode::ACCEPTED);
+    let whatsapp_started_body = whatsapp_started
+        .into_body()
+        .collect()
+        .await
+        .expect("WhatsApp recovery response should be readable")
+        .to_bytes();
+    let whatsapp_started_payload: serde_json::Value =
+        serde_json::from_slice(&whatsapp_started_body)
+            .expect("WhatsApp recovery response should be JSON");
+    let whatsapp_verification_id = whatsapp_started_payload["verification_id"]
+        .as_str()
+        .expect("WhatsApp recovery should return a verification ID")
+        .to_owned();
+    let whatsapp_case_id = whatsapp_started_payload["recovery_case_id"]
+        .as_str()
+        .expect("WhatsApp recovery should return a case ID")
+        .to_owned();
+
+    let whatsapp_verified = recovery_router
+        .clone()
+        .oneshot(make_recovery_request(
+            Method::POST,
+            format!("/api/v1/identity/recovery/{whatsapp_verification_id}/verify"),
+            Some(serde_json::json!({ "code": "123456" })),
+            false,
+        ))
+        .await
+        .expect("WhatsApp recovery verify route should respond");
+    assert_eq!(
+        whatsapp_verified.status(),
+        axum::http::StatusCode::OK,
+        "FlowKirim Verify should validate WhatsApp account recovery"
+    );
+    let whatsapp_case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&whatsapp_case_id)
+            .fetch_one(&admin_pool)
+            .await
+            .expect("WhatsApp recovery case status should be queryable");
+    assert_eq!(whatsapp_case_status, "account_selection_required");
 
     let started = recovery_router
         .clone()
