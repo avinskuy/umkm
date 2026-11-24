@@ -1402,6 +1402,78 @@ async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
             .await
             .expect("FlowKirim-verified account status should be queryable");
     assert_eq!(account_status, "active");
+
+    let recovery_session_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    let recovery_case_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    let created_recovery: (String, String) = sqlx::query_as(
+        "SELECT session_id::text, case_id::text \
+         FROM public.create_account_recovery_verification_session(\
+            $1::uuid, $2::uuid, 'password_reset', 'whatsapp', $3, $4, 'enc-v1', $5, 'hmac-v1', \
+            clock_timestamp() + INTERVAL '10 minutes')",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_case_id)
+    .bind(vec![4_u8])
+    .bind(vec![5_u8])
+    .bind(vec![4_u8; 32])
+    .fetch_one(pool)
+    .await
+    .expect("WhatsApp account recovery session should be created");
+    assert_eq!(created_recovery.0, recovery_session_id);
+    assert_eq!(created_recovery.1, recovery_case_id);
+
+    let recovery_challenge_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    let recovery_reserved: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, delivery_event_id::text \
+         FROM public.reserve_flowkirim_otp_challenge($1::uuid, $2::uuid, $3)",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_challenge_id)
+    .bind(vec![vec![4_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("FlowKirim challenge should reserve WhatsApp account recovery delivery");
+    assert_eq!(recovery_reserved.0, recovery_challenge_id);
+
+    sqlx::query(
+        "SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-recovery-request-001')",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_challenge_id)
+    .execute(pool)
+    .await
+    .expect("FlowKirim request ID should bind for account recovery");
+
+    let recovery_pending: (String, String) = sqlx::query_as(
+        "SELECT challenge_id::text, provider_request_id \
+         FROM public.get_pending_flowkirim_otp_challenge($1::uuid)",
+    )
+    .bind(recovery_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("runtime should retrieve pending FlowKirim account recovery challenge");
+    assert_eq!(recovery_pending.0, recovery_challenge_id);
+    assert_eq!(recovery_pending.1, "fk-recovery-request-001");
+
+    let recovery_verified: bool = sqlx::query_scalar(
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, TRUE, $3)",
+    )
+    .bind(recovery_session_id)
+    .bind(recovery_challenge_id)
+    .bind(vec![vec![4_u8; 32]])
+    .fetch_one(pool)
+    .await
+    .expect("valid FlowKirim result should verify account recovery contact");
+    assert!(recovery_verified);
+
+    let recovery_status: String = sqlx::query_scalar(
+        "SELECT status FROM public.verification_sessions WHERE id = $1::uuid",
+    )
+    .bind(recovery_session_id)
+    .fetch_one(pool)
+    .await
+    .expect("recovery verification status should be queryable");
+    assert_eq!(recovery_status, "verified");
 }
 
 async fn assert_otp_resend_during_verification_lock(pool: &PgPool) {
