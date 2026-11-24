@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AdminDashboardPage } from "./AdminDashboardPage";
 import { AdminLoginPage } from "./AdminLoginPage";
+import { ClientLoginPage } from "./ClientLoginPage";
 import { ResetPasswordPage } from "./ResetPasswordPage";
 import styles from "./App.module.css";
 
@@ -21,6 +22,10 @@ export function App() {
     return <AdminDashboardPage />;
   }
 
+  if (path === "/login" || path === "/login/") {
+    return <ClientLoginPage />;
+  }
+
   if (path.endsWith("/reset-password") || path.endsWith("/reset-password/")) {
     return <ResetPasswordPage />;
   }
@@ -35,7 +40,15 @@ export function App() {
       <p className={styles.description}>
         Connecting business owners and investors through meaningful opportunities.
       </p>
-      <span className={styles.status}>Project foundation is ready to grow.</span>
+      <div className={styles.actions}>
+        <a className={styles.primaryAction} href="/login">
+          Masuk
+        </a>
+        <a className={styles.secondaryAction} href="/register">
+          Buat akun
+        </a>
+      </div>
+      <span className={styles.status}>Temukan peluang. Bangun koneksi.</span>
     </main>
   );
 }
