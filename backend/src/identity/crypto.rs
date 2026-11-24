@@ -501,9 +501,8 @@ struct PurposeKeyring {
 
 impl PurposeKeyring {
     fn from_env(active_name: &str, keys_name: &str) -> Result<Self, CryptoError> {
-        let active_label = Zeroizing::new(
-            std::env::var(active_name).map_err(|_| CryptoError::KeyUnavailable)?,
-        );
+        let active_label =
+            Zeroizing::new(std::env::var(active_name).map_err(|_| CryptoError::KeyUnavailable)?);
         let active_version = parse_key_version(active_label.as_str())?;
         let encoded_keys =
             Zeroizing::new(std::env::var(keys_name).map_err(|_| CryptoError::KeyUnavailable)?);
@@ -610,10 +609,7 @@ impl IdentityKeyring {
     }
 
     fn from_purpose_entries(
-        entries: [
-            (KeyPurpose, KeyVersion, &[(KeyVersion, &str)]);
-            3
-        ],
+        entries: [(KeyPurpose, KeyVersion, &[(KeyVersion, &str)]); 3],
     ) -> Result<Self, CryptoError> {
         let mut purposes = HashMap::new();
         for (purpose, active_version, keys) in entries {
@@ -982,15 +978,22 @@ mod tests {
         .expect("valid Identity keyring should load");
 
         assert_eq!(
-            provider.active_key(KeyPurpose::DataEncryption).unwrap().version,
+            provider
+                .active_key(KeyPurpose::DataEncryption)
+                .unwrap()
+                .version,
             KeyVersion(2)
         );
         assert_eq!(
-            provider.key_versions(KeyPurpose::ContactFingerprint).unwrap(),
+            provider
+                .key_versions(KeyPurpose::ContactFingerprint)
+                .unwrap(),
             vec![KeyVersion(1), KeyVersion(2)]
         );
         assert!(provider.active_key(KeyPurpose::AdminTotpSecret).is_err());
-        assert!(provider.key(KeyPurpose::OtpVerification, KeyVersion(2)).is_err());
+        assert!(provider
+            .key(KeyPurpose::OtpVerification, KeyVersion(2))
+            .is_err());
     }
 
     #[test]
@@ -1001,9 +1004,21 @@ mod tests {
 
         assert_eq!(
             IdentityKeyring::from_purpose_entries([
-                (KeyPurpose::DataEncryption, KeyVersion(1), &[(KeyVersion(1), SHARED)]),
-                (KeyPurpose::ContactFingerprint, KeyVersion(1), &[(KeyVersion(1), SHARED)]),
-                (KeyPurpose::OtpVerification, KeyVersion(1), &[(KeyVersion(1), OTP)]),
+                (
+                    KeyPurpose::DataEncryption,
+                    KeyVersion(1),
+                    &[(KeyVersion(1), SHARED)]
+                ),
+                (
+                    KeyPurpose::ContactFingerprint,
+                    KeyVersion(1),
+                    &[(KeyVersion(1), SHARED)]
+                ),
+                (
+                    KeyPurpose::OtpVerification,
+                    KeyVersion(1),
+                    &[(KeyVersion(1), OTP)]
+                ),
             ])
             .err()
             .expect("reused purpose key must be rejected"),
@@ -1011,9 +1026,21 @@ mod tests {
         );
 
         assert!(IdentityKeyring::from_purpose_entries([
-            (KeyPurpose::DataEncryption, KeyVersion(1), &[(KeyVersion(1), SHARED)]),
-            (KeyPurpose::ContactFingerprint, KeyVersion(1), &[(KeyVersion(1), CONTACT)]),
-            (KeyPurpose::OtpVerification, KeyVersion(1), &[(KeyVersion(1), OTP)]),
+            (
+                KeyPurpose::DataEncryption,
+                KeyVersion(1),
+                &[(KeyVersion(1), SHARED)]
+            ),
+            (
+                KeyPurpose::ContactFingerprint,
+                KeyVersion(1),
+                &[(KeyVersion(1), CONTACT)]
+            ),
+            (
+                KeyPurpose::OtpVerification,
+                KeyVersion(1),
+                &[(KeyVersion(1), OTP)]
+            ),
         ])
         .is_ok());
     }
