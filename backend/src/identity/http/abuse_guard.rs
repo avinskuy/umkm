@@ -4,9 +4,7 @@ use sqlx::PgPool;
 use zeroize::Zeroizing;
 
 use super::{AbuseDecision, RegistrationAbuseGuard, RegistrationAction};
-use crate::identity::authentication::{
-    ip_rate_limit_subject, AuthenticationRateLimitKey,
-};
+use crate::identity::authentication::{ip_rate_limit_subject, AuthenticationRateLimitKey};
 
 const WINDOW_SECONDS: i32 = 15 * 60;
 
@@ -43,9 +41,7 @@ impl PostgresRegistrationAbuseGuard {
         fingerprint: &[u8; 32],
         limit: i32,
     ) -> Result<bool, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT public.reserve_identity_abuse_attempt($1, $2, $3, $4)",
-        )
+        sqlx::query_scalar("SELECT public.reserve_identity_abuse_attempt($1, $2, $3, $4)")
         .bind(scope)
         .bind(fingerprint.as_slice())
         .bind(limit)
