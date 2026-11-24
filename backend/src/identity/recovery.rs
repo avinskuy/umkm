@@ -4,11 +4,12 @@ use super::{
     authentication::session_token_hash,
     crypto::{contact_fingerprint, encrypt, key_version_label, KeyProvider},
     delivery::{DispatchStatus, OtpDeliveryProvider},
+    flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
     registration::ContactChannel,
     verification::{
-        contact_aliases, decrypt_destination, destination_associated_data, dispatch_otp_challenge,
-        new_uuid, normalize_contact, validate_uuid, verify_otp_session, SessionRow,
-        VerificationError,
+        contact_aliases, decrypt_destination, destination_associated_data, dispatch_flowkirim_challenge,
+        dispatch_otp_challenge, load_verification_session, new_uuid, normalize_contact,
+        validate_uuid, verify_flowkirim_session, verify_otp_session, SessionRow, VerificationError,
     },
 };
 
@@ -49,6 +50,7 @@ pub struct RecoveryService<'a> {
     pool: &'a PgPool,
     keys: &'a dyn KeyProvider,
     delivery: &'a dyn OtpDeliveryProvider,
+    flowkirim: Option<&'a dyn FlowKirimVerifyProvider>,
 }
 
 impl<'a> RecoveryService<'a> {
@@ -61,6 +63,45 @@ impl<'a> RecoveryService<'a> {
             pool,
             keys,
             delivery,
+            flowkirim: None,
+        }
+    }
+
+    pub fn new_with_flowkirim(
+        pool: &'a PgPool,
+        keys: &'a dyn KeyProvider,
+        delivery: &'a dyn OtpDeliveryProvider,
+        flowkirim: &'a dyn FlowKirimVerifyProvider,
+    ) -> Self {
+        Self {
+            pool,
+            keys,
+            delivery,
+            flowkirim: Some(flowkirim),
+        }
+    }
+
+    async fn dispatch_challenge(&self, session_id: &str) -> Result<DispatchStatus, VerificationError> {
+        let session = load_verification_session(self.pool, session_id, "account_recovery").await?;
+        if session.0 == "whatsapp" {
+            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            dispatch_flowkirim_challenge(
+                self.pool,
+                self.keys,
+                provider,
+                session_id,
+                "account_recovery",
+            )
+            .await
+        } else {
+            dispatch_otp_challenge(
+                self.pool,
+                self.keys,
+                self.delivery,
+                session_id,
+                "account_recovery",
+            )
+            .await
         }
     }
 
@@ -103,14 +144,7 @@ impl<'a> RecoveryService<'a> {
         }
         transaction.commit().await?;
 
-        let dispatch_status = dispatch_otp_challenge(
-            self.pool,
-            self.keys,
-            self.delivery,
-            &session_id,
-            "account_recovery",
-        )
-        .await?;
+        let dispatch_status = self.dispatch_challenge(&session_id).await?;
 
         Ok(RecoveryStart {
             case_id,
@@ -120,18 +154,25 @@ impl<'a> RecoveryService<'a> {
     }
 
     pub async fn resend(&self, session_id: &str) -> Result<DispatchStatus, VerificationError> {
-        dispatch_otp_challenge(
-            self.pool,
-            self.keys,
-            self.delivery,
-            session_id,
-            "account_recovery",
-        )
-        .await
+        self.dispatch_challenge(session_id).await
     }
 
     pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
-        verify_otp_session(self.pool, self.keys, session_id, "account_recovery", code).await
+        let session = load_verification_session(self.pool, session_id, "account_recovery").await?;
+        if session.0 == "whatsapp" {
+            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            verify_flowkirim_session(
+                self.pool,
+                self.keys,
+                provider,
+                session_id,
+                "account_recovery",
+                code,
+            )
+            .await
+        } else {
+            verify_otp_session(self.pool, self.keys, session_id, "account_recovery", code).await
+        }
     }
 
     /// Menampilkan kandidat hanya setelah OTP valid; identitas akun tetap diperiksa DB saat dipilih.
