@@ -272,7 +272,7 @@ mod tests {
                 assert!(read > 0, "client closed before sending a complete request");
                 request.extend_from_slice(&buffer[..read]);
 
-                if let Some(header_end) = request.windows(4).position(|part| part == b"\\r\\n\\r\\n") {
+                if let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
                     let headers = String::from_utf8_lossy(&request[..header_end]);
                     let content_length = headers
                         .lines()
@@ -294,7 +294,7 @@ mod tests {
 
             write!(
                 stream,
-                "HTTP/1.1 {status_line}\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\r\\n{}",
+                "HTTP/1.1 {status_line}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 response_body.len(),
                 response_body
             )
@@ -306,7 +306,7 @@ mod tests {
     }
 
     fn request_body(request: &str) -> serde_json::Value {
-        let (_, body) = request.split_once("\\r\\n\\r\\n").unwrap();
+        let (_, body) = request.split_once("\r\n\r\n").unwrap();
         serde_json::from_str(body).unwrap()
     }
 
