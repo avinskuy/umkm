@@ -283,7 +283,11 @@ mod tests {
             Some("+628123456789")
         ));
         for phone in ["08123456789", "628123456789", "+628123456789"] {
-            assert!(valid_contact_input(ContactChannel::Phone, None, Some(phone)));
+            assert!(valid_contact_input(
+                ContactChannel::Phone,
+                None,
+                Some(phone)
+            ));
         }
         assert!(!valid_contact_input(
             ContactChannel::Phone,
