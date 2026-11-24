@@ -4170,7 +4170,6 @@ async fn assert_admin_authentication_database_runtime(pool: &PgPool) {
     assert!(dedicated_session_count >= 2);
 }
 
-
 async fn assert_identity_abuse_rate_limits(pool: &PgPool) {
     let fingerprint = vec![0x5a_u8; 32];
     sqlx::query(
