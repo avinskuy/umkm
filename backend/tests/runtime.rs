@@ -670,9 +670,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             _request_id: String,
             code: Zeroizing<String>,
         ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a>> {
-            Box::pin(async move {
-                FlowKirimProviderOutcome::Accepted(code.as_str() == "123456")
-            })
+            Box::pin(async move { FlowKirimProviderOutcome::Accepted(code.as_str() == "123456") })
         }
     }
 
@@ -905,10 +903,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         ))
         .await
         .expect("WhatsApp recovery start route should respond");
-    assert_eq!(
-        whatsapp_started.status(),
-        axum::http::StatusCode::ACCEPTED
-    );
+    assert_eq!(whatsapp_started.status(), axum::http::StatusCode::ACCEPTED);
     let whatsapp_started_body = whatsapp_started
         .into_body()
         .collect()
@@ -942,13 +937,12 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         axum::http::StatusCode::OK,
         "FlowKirim Verify should validate WhatsApp account recovery"
     );
-    let whatsapp_case_status: String = sqlx::query_scalar(
-        "SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid",
-    )
-    .bind(&whatsapp_case_id)
-    .fetch_one(&pool)
-    .await
-    .expect("WhatsApp recovery case status should be queryable");
+    let whatsapp_case_status: String =
+        sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
+            .bind(&whatsapp_case_id)
+            .fetch_one(&pool)
+            .await
+            .expect("WhatsApp recovery case status should be queryable");
     assert_eq!(whatsapp_case_status, "account_selection_required");
 
     let started = recovery_router
