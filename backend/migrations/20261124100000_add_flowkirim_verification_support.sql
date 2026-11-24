@@ -298,11 +298,37 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
+DECLARE
+    v_existing_request_id TEXT;
 BEGIN
     IF p_provider_request_id IS NULL
        OR length(btrim(p_provider_request_id)) NOT BETWEEN 1 AND 256 THEN
         RAISE EXCEPTION 'FlowKirim request identifier is invalid'
             USING ERRCODE = '22023';
+    END IF;
+
+    SELECT provider_request_id
+      INTO v_existing_request_id
+      FROM public.verification_challenges
+     WHERE id = p_challenge_id
+       AND verification_session_id = p_session_id
+       AND provider = 'flowkirim'
+       AND status = 'pending'
+       AND expires_at > clock_timestamp()
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'pending FlowKirim challenge was not found'
+            USING ERRCODE = 'P0002';
+    END IF;
+
+    IF v_existing_request_id = p_provider_request_id THEN
+        RETURN;
+    END IF;
+
+    IF v_existing_request_id IS NOT NULL THEN
+        RAISE EXCEPTION 'FlowKirim request identifier is already bound'
+            USING ERRCODE = '23514';
     END IF;
 
     UPDATE public.verification_challenges
@@ -311,13 +337,7 @@ BEGIN
        AND verification_session_id = p_session_id
        AND provider = 'flowkirim'
        AND status = 'pending'
-       AND provider_request_id IS NULL
-       AND expires_at > clock_timestamp();
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'pending FlowKirim challenge was not found'
-            USING ERRCODE = 'P0002';
-    END IF;
+       AND provider_request_id IS NULL;
 END;
 $$;
 
