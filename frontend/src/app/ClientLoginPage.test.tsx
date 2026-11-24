@@ -10,10 +10,13 @@ describe("ClientLoginPage", () => {
       .fn()
       .mockResolvedValueOnce(new Response("{}", { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ user_id: "owner-1", role: "business_owner" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({ user_id: "owner-1", role: "business_owner" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -82,10 +85,13 @@ describe("ClientLoginPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ error: "Email/nomor telepon atau password salah." }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({ error: "Email/nomor telepon atau password salah." }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       ),
     );
 
