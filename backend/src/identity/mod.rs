@@ -11,6 +11,7 @@ pub mod authentication;
 pub mod authorization;
 pub mod crypto;
 pub mod delivery;
+pub mod flowkirim;
 pub mod http;
 pub mod password;
 pub mod password_reset;
