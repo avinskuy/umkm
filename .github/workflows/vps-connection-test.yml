@@ -20,15 +20,17 @@ jobs:
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
           set -euo pipefail
           test -n "$VPS_SSH_PRIVATE_KEY"
           test -n "$VPS_KNOWN_HOSTS"
+          test -n "$VPS_HOST"
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
-          printf '%s\\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
-          ssh-keygen -F 116.212.72.31 -f "$HOME/.ssh/known_hosts" >/dev/null
+          ssh-keygen -F "$VPS_HOST" -f "$HOME/.ssh/known_hosts" >/dev/null
 
       - name: Test authenticated access and web-root boundary
         shell: bash
