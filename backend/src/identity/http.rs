@@ -8,7 +8,7 @@ use super::{
     flowkirim::FlowKirimVerifyProvider,
     recovery::RecoveryService,
     registration::ContactChannel,
-    verification::VerificationService,
+    verification::{normalize_indonesian_phone, VerificationService},
 };
 
 mod admin_authentication;
@@ -126,12 +126,7 @@ pub(super) fn valid_contact_input(
             _ => false,
         },
         ContactChannel::Phone => match (email, phone) {
-            (None, Some(phone)) => {
-                let digits = phone.trim().strip_prefix('+').unwrap_or_default();
-                (8..=15).contains(&digits.len())
-                    && digits.bytes().all(|byte| byte.is_ascii_digit())
-                    && !digits.starts_with('0')
-            }
+            (None, Some(phone)) => normalize_indonesian_phone(phone).is_some(),
             _ => false,
         },
     }
@@ -287,15 +282,13 @@ mod tests {
             Some("user@example.test"),
             Some("+628123456789")
         ));
-        assert!(valid_contact_input(
-            ContactChannel::Phone,
-            None,
-            Some("+628123456789")
-        ));
+        for phone in ["08123456789", "628123456789", "+628123456789"] {
+            assert!(valid_contact_input(ContactChannel::Phone, None, Some(phone)));
+        }
         assert!(!valid_contact_input(
             ContactChannel::Phone,
             None,
-            Some("08123456789")
+            Some("8123456789")
         ));
     }
 
