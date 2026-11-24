@@ -179,9 +179,10 @@ impl<'a> VerificationService<'a> {
     ) -> Result<DispatchStatus, VerificationError> {
         let session = load_verification_session(self.pool, session_id, "registration").await?;
         if session.0 == "whatsapp" {
-            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
-            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id)
-                    .await;
+            let provider = self
+                .flowkirim
+                .ok_or(VerificationError::ProviderUnavailable)?;
+            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id).await;
         }
         dispatch_otp_challenge(
             self.pool,
