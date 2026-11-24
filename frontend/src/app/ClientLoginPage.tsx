@@ -74,9 +74,7 @@ export function ClientLoginPage() {
         <div className={styles.rolePicker} role="group" aria-label="Jenis akun">
           {roleOptions.map((option) => (
             <button
-              className={
-                role === option.value ? styles.roleActive : styles.roleOption
-              }
+              className={role === option.value ? styles.roleActive : styles.roleOption}
               key={option.value}
               type="button"
               aria-pressed={role === option.value}
@@ -87,9 +85,7 @@ export function ClientLoginPage() {
               disabled={pending}
             >
               <span className={styles.roleLabel}>{option.label}</span>
-              <span className={styles.roleDescription}>
-                {option.description}
-              </span>
+              <span className={styles.roleDescription}>{option.description}</span>
             </button>
           ))}
         </div>
