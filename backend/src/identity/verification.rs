@@ -511,7 +511,7 @@ pub(crate) fn normalize_indonesian_phone(value: &str) -> Option<String> {
     Some(format!("+62{subscriber}"))
 }
 
-fn normalize_contact(
+pub(crate) fn normalize_contact(
     channel: ContactChannel,
     email: Option<&str>,
     phone: Option<&str>,
