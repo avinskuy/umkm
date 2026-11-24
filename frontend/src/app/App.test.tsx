@@ -30,6 +30,16 @@ describe("App", () => {
     expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
   });
 
+  it("routes the registration path to the registration page", () => {
+    window.history.replaceState(null, "", "/register");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Buat akun baru" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Pendaftaran belum dibuka.");
+  });
+
   it("routes the Admin login path to the dedicated login page", () => {
     window.history.replaceState(null, "", "/admin/login");
 
