@@ -1,3 +1,5 @@
+use zeroize::Zeroizing;
+
 use axum::{
     body::Body,
     extract::ConnectInfo,
