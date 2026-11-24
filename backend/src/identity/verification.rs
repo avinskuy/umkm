@@ -167,7 +167,8 @@ impl<'a> VerificationService<'a> {
         let session = load_verification_session(self.pool, session_id, "registration").await?;
         if session.0 == "whatsapp" {
             let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
-            return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code).await;
+            return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code)
+                    .await;
         }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
     }
@@ -179,7 +180,8 @@ impl<'a> VerificationService<'a> {
         let session = load_verification_session(self.pool, session_id, "registration").await?;
         if session.0 == "whatsapp" {
             let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
-            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id).await;
+            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id)
+                    .await;
         }
         dispatch_otp_challenge(
             self.pool,
@@ -205,7 +207,10 @@ async fn dispatch_flowkirim_challenge(
     }
     let destination = decrypt_destination(keys, session_id, "registration", &session)?;
     let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
-    let alias_bytes = aliases.into_iter().map(|alias| alias.digest.to_vec()).collect::<Vec<_>>();
+    let alias_bytes = aliases
+        .into_iter()
+        .map(|alias| alias.digest.to_vec())
+        .collect::<Vec<_>>();
     let challenge_id = new_uuid()?;
 
     let (reserved_challenge_id, delivery_event_id) = sqlx::query_as::<_, (String, String)>(
@@ -272,10 +277,15 @@ async fn verify_flowkirim_session(
     .fetch_one(pool)
     .await?;
 
-    let provider_matches = match provider.check(request_id, Zeroizing::new(code.to_owned())).await {
+    let provider_matches = match provider
+        .check(request_id, Zeroizing::new(code.to_owned()))
+        .await
+    {
         FlowKirimProviderOutcome::Accepted(matches) => matches,
         FlowKirimProviderOutcome::Rejected => return Err(VerificationError::ProviderRejected),
-        FlowKirimProviderOutcome::Unavailable => return Err(VerificationError::ProviderUnavailable),
+        FlowKirimProviderOutcome::Unavailable => {
+            return Err(VerificationError::ProviderUnavailable)
+        }
     };
     let alias_bytes = aliases.into_iter().map(|alias| alias.digest.to_vec()).collect::<Vec<_>>();
     sqlx::query_scalar::<_, bool>(
