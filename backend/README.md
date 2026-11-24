@@ -10,7 +10,7 @@ Server membaca alamat bind dari variabel lingkungan:
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | Alamat IP untuk bind. Mendukung literal IPv4 dan IPv6. |
 | `PORT` | `5000` | Port TCP. Harus berupa bilangan bulat dari 1 sampai 65535. |
-| `AUTH_RATE_LIMIT_HMAC_KEY` | — | Wajib. Secret 32 byte dalam 64 karakter hex untuk fingerprint rate limit login. Gunakan nilai acak dari secret manager; jangan commit ke repository atau log. |
+| `AUTH_RATE_LIMIT_HMAC_KEY` | — | Wajib. Secret 32 byte dalam 64 karakter hex untuk fingerprint rate limit login dan abuse guard registrasi/recovery. Gunakan nilai acak dari secret manager; jangan commit ke repository atau log. |
 | `IDENTITY_DATA_ENCRYPTION_KEY_ACTIVE_VERSION` | — | Wajib. Versi aktif key enkripsi tujuan kontak, misalnya `v1`. |
 | `IDENTITY_DATA_ENCRYPTION_KEYS` | — | Wajib. Daftar key hex 32 byte dengan format `v1:<64-hex>`; beberapa versi dipisahkan titik koma. |
 | `IDENTITY_CONTACT_FINGERPRINT_KEY_ACTIVE_VERSION` | — | Wajib. Versi aktif key fingerprint kontak. |
