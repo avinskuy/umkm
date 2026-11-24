@@ -1,6 +1,5 @@
-use std::{net::IpAddr, sync::Arc};
+use std::net::IpAddr;
 
-use ring::hmac;
 use sqlx::PgPool;
 use zeroize::Zeroizing;
 
