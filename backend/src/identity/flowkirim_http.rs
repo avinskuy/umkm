@@ -38,10 +38,18 @@ impl std::error::Error for FlowKirimHttpConfigError {}
 pub struct FlowKirimHttpProvider {
     client: Client,
     api_key: Zeroizing<String>,
+    base_url: String,
 }
 
 impl FlowKirimHttpProvider {
     pub fn new(api_key: Zeroizing<String>) -> Result<Self, FlowKirimHttpConfigError> {
+        Self::with_base_url(api_key, API_BASE)
+    }
+
+    fn with_base_url(
+        api_key: Zeroizing<String>,
+        base_url: &str,
+    ) -> Result<Self, FlowKirimHttpConfigError> {
         if api_key.trim().is_empty() || api_key.len() > 4096 {
             return Err(FlowKirimHttpConfigError::EmptyApiKey);
         }
@@ -54,7 +62,11 @@ impl FlowKirimHttpProvider {
             .build()
             .map_err(|_| FlowKirimHttpConfigError::InvalidClient)?;
 
-        Ok(Self { client, api_key })
+        Ok(Self {
+            client,
+            api_key,
+            base_url: base_url.trim_end_matches('/').to_owned(),
+        })
     }
 
     async fn read_bounded_response(
@@ -139,7 +151,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
 
             let response = match self
                 .client
-                .post(format!("{API_BASE}/start"))
+                .post(format!("{}/start", self.base_url))
                 .bearer_auth(self.api_key.as_str())
                 .header("Idempotency-Key", idempotency_key)
                 .json(&payload)
@@ -191,7 +203,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
             };
             let response = match self
                 .client
-                .post(format!("{API_BASE}/check"))
+                .post(format!("{}/check", self.base_url))
                 .bearer_auth(self.api_key.as_str())
                 .json(&payload)
                 .send()
@@ -235,6 +247,170 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+        thread,
+    };
+
+    fn mock_server(
+        status_line: &'static str,
+        response_body: String,
+    ) -> (String, thread::JoinHandle<String>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 2048];
+            let expected_len = loop {
+                let read = stream.read(&mut buffer).unwrap();
+                assert!(read > 0, "client closed before sending a complete request");
+                request.extend_from_slice(&buffer[..read]);
+
+                if let Some(header_end) = request.windows(4).position(|part| part == b"\\r\\n\\r\\n") {
+                    let headers = String::from_utf8_lossy(&request[..header_end]);
+                    let content_length = headers
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    break header_end + 4 + content_length;
+                }
+            };
+
+            while request.len() < expected_len {
+                let read = stream.read(&mut buffer).unwrap();
+                assert!(read > 0, "client closed before sending the full body");
+                request.extend_from_slice(&buffer[..read]);
+            }
+
+            write!(
+                stream,
+                "HTTP/1.1 {status_line}\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\r\\n{}",
+                response_body.len(),
+                response_body
+            )
+            .unwrap();
+            String::from_utf8(request).unwrap()
+        });
+
+        (format!("http://{address}"), handle)
+    }
+
+    fn request_body(request: &str) -> serde_json::Value {
+        let (_, body) = request.split_once("\\r\\n\\r\\n").unwrap();
+        serde_json::from_str(body).unwrap()
+    }
+
+    #[tokio::test]
+    async fn start_sends_authenticated_idempotent_whatsapp_request() {
+        let (base_url, server) = mock_server(
+            "200 OK",
+            r#"{"request_id":"verify_123"}"#.to_owned(),
+        );
+        let provider = FlowKirimHttpProvider::with_base_url(
+            Zeroizing::new("test-secret".to_owned()),
+            &base_url,
+        )
+        .unwrap();
+
+        let outcome = provider
+            .start(
+                Zeroizing::new("+628123456789".to_owned()),
+                "registration-whatsapp-challenge-1".to_owned(),
+            )
+            .await;
+        assert_eq!(
+            outcome,
+            FlowKirimProviderOutcome::Accepted("verify_123".to_owned())
+        );
+
+        let request = server.join().unwrap();
+        assert!(request.starts_with("POST /start HTTP/1.1"));
+        assert!(request.to_ascii_lowercase().contains("authorization: bearer test-secret"));
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("idempotency-key: registration-whatsapp-challenge-1"));
+        let body = request_body(&request);
+        assert_eq!(body["phone"], "+628123456789");
+        assert_eq!(body["channel"], "whatsapp");
+        assert_eq!(body["code_length"], OTP_CODE_LENGTH);
+        assert_eq!(body["ttl"], OTP_TTL_SECONDS);
+    }
+
+    #[tokio::test]
+    async fn check_sends_request_id_and_code_and_accepts_verified_response() {
+        let (base_url, server) =
+            mock_server("200 OK", r#"{"status":"verified"}"#.to_owned());
+        let provider = FlowKirimHttpProvider::with_base_url(
+            Zeroizing::new("test-secret".to_owned()),
+            &base_url,
+        )
+        .unwrap();
+
+        let outcome = provider
+            .check(
+                "verify_123".to_owned(),
+                Zeroizing::new("123456".to_owned()),
+            )
+            .await;
+        assert_eq!(outcome, FlowKirimProviderOutcome::Accepted(true));
+
+        let request = server.join().unwrap();
+        assert!(request.starts_with("POST /check HTTP/1.1"));
+        assert!(request.to_ascii_lowercase().contains("authorization: bearer test-secret"));
+        let body = request_body(&request);
+        assert_eq!(body["request_id"], "verify_123");
+        assert_eq!(body["code"], "123456");
+    }
+
+    #[tokio::test]
+    async fn check_maps_non_verified_status_to_rejected_code_result() {
+        let (base_url, server) =
+            mock_server("200 OK", r#"{"status":"invalid"}"#.to_owned());
+        let provider = FlowKirimHttpProvider::with_base_url(
+            Zeroizing::new("test-secret".to_owned()),
+            &base_url,
+        )
+        .unwrap();
+
+        let outcome = provider
+            .check(
+                "verify_123".to_owned(),
+                Zeroizing::new("000000".to_owned()),
+            )
+            .await;
+        assert_eq!(outcome, FlowKirimProviderOutcome::Accepted(false));
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn oversized_response_is_unavailable() {
+        let oversized = format!(r#"{{"request_id":"{}"}}"#, "x".repeat(MAX_RESPONSE_BYTES));
+        let (base_url, server) = mock_server("200 OK", oversized);
+        let provider = FlowKirimHttpProvider::with_base_url(
+            Zeroizing::new("test-secret".to_owned()),
+            &base_url,
+        )
+        .unwrap();
+
+        let outcome = provider
+            .start(
+                Zeroizing::new("+628123456789".to_owned()),
+                "registration-whatsapp-challenge-2".to_owned(),
+            )
+            .await;
+        assert_eq!(outcome, FlowKirimProviderOutcome::Unavailable);
+        server.join().unwrap();
+    }
 
     #[test]
     fn parses_only_a_valid_start_request_id() {
