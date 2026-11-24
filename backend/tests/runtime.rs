@@ -942,7 +942,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let whatsapp_case_status: String =
         sqlx::query_scalar("SELECT status FROM public.account_recovery_cases WHERE id = $1::uuid")
             .bind(&whatsapp_case_id)
-            .fetch_one(&pool)
+            .fetch_one(&admin_pool)
             .await
             .expect("WhatsApp recovery case status should be queryable");
     assert_eq!(whatsapp_case_status, "account_selection_required");
