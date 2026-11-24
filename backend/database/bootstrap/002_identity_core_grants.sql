@@ -508,3 +508,42 @@ GRANT EXECUTE ON FUNCTION public.get_active_admin_session(BYTEA)
     TO usahapintar_app;
 GRANT EXECUTE ON FUNCTION public.revoke_admin_session(BYTEA)
     TO usahapintar_app;
+
+
+-- Identity registration and recovery abuse-rate-limit operations.
+DO $identity_abuse_rate_limit_ownership_guard$
+DECLARE
+    v_owner TEXT;
+    v_is_security_definer BOOLEAN;
+    v_has_safe_search_path BOOLEAN;
+BEGIN
+    SELECT pg_catalog.pg_get_userbyid(p.proowner),
+           p.prosecdef,
+           COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog']::TEXT[], FALSE)
+      INTO v_owner, v_is_security_definer, v_has_safe_search_path
+      FROM pg_catalog.pg_proc AS p
+     WHERE p.oid = pg_catalog.to_regprocedure(
+        'public.reserve_identity_abuse_attempt(text,bytea,integer,integer)'
+     );
+
+    IF v_owner IS DISTINCT FROM 'usahapintar_migrator'
+       OR v_is_security_definer IS DISTINCT FROM TRUE
+       OR v_has_safe_search_path IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION
+            'Refusing Identity abuse-rate-limit grants: function must be SECURITY DEFINER owned by usahapintar_migrator with safe search_path';
+    END IF;
+
+    IF pg_catalog.pg_get_userbyid(
+        (SELECT c.relowner
+           FROM pg_catalog.pg_class AS c
+          WHERE c.oid = 'public.identity_abuse_rate_limits'::pg_catalog.regclass)
+    ) IS DISTINCT FROM 'usahapintar_migrator' THEN
+        RAISE EXCEPTION
+            'Refusing Identity abuse-rate-limit grants: table must be owned by usahapintar_migrator';
+    END IF;
+END;
+$identity_abuse_rate_limit_ownership_guard$;
+
+REVOKE ALL ON TABLE public.identity_abuse_rate_limits FROM usahapintar_app;
+GRANT EXECUTE ON FUNCTION public.reserve_identity_abuse_attempt(TEXT, BYTEA, INTEGER, INTEGER)
+    TO usahapintar_app;
