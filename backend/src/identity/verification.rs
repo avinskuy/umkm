@@ -488,7 +488,7 @@ pub(crate) fn normalize_indonesian_phone(value: &str) -> Option<String> {
     let compact = value
         .trim()
         .chars()
-        .filter(|character| !matches!(character, ' ' | '-' | '(' | ')'))
+        .filter(|character| !matches!(*character, ' ' | '-' | '(' | ')'))
         .collect::<String>();
 
     let subscriber = if let Some(value) = compact.strip_prefix("+62") {
