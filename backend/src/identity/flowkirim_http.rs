@@ -125,9 +125,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
         destination: Zeroizing<String>,
         idempotency_key: String,
     ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<Output = FlowKirimProviderOutcome<String>> + Send + 'a,
-        >,
+        Box<dyn std::future::Future<Output = FlowKirimProviderOutcome<String>> + Send + 'a>,
     > {
         Box::pin(async move {
             if idempotency_key.trim().is_empty() || idempotency_key.len() > 256 {
@@ -179,9 +177,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
         request_id: String,
         code: Zeroizing<String>,
     ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a,
-        >,
+        Box<dyn std::future::Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a>,
     > {
         Box::pin(async move {
             if request_id.trim().is_empty()
@@ -219,8 +215,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                    )
-                {
+                    ) {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
@@ -246,8 +241,7 @@ mod tests {
 
     #[test]
     fn parses_only_a_valid_start_request_id() {
-        let parsed: StartResponse =
-            serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
+        let parsed: StartResponse = serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
         assert_eq!(parsed.request_id, "verify_123");
         assert!(serde_json::from_str::<StartResponse>(r#"{"request_id":""}"#).is_ok());
         assert!(serde_json::from_str::<StartResponse>(r#"{"id":"verify_123"}"#).is_err());
@@ -255,10 +249,8 @@ mod tests {
 
     #[test]
     fn check_accepts_only_documented_verified_status() {
-        let verified: CheckResponse =
-            serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
-        let not_verified: CheckResponse =
-            serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
+        let verified: CheckResponse = serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
+        let not_verified: CheckResponse = serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
         assert_eq!(verified.status, "verified");
         assert_ne!(not_verified.status, "verified");
         assert!(serde_json::from_str::<CheckResponse>(r#"{"verified":true}"#).is_err());
