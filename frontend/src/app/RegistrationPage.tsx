@@ -44,9 +44,7 @@ export function RegistrationPage() {
         <div className={styles.rolePicker} role="group" aria-label="Jenis akun">
           {roleOptions.map((option) => (
             <button
-              className={
-                role === option.value ? styles.roleActive : styles.roleOption
-              }
+              className={role === option.value ? styles.roleActive : styles.roleOption}
               key={option.value}
               type="button"
               aria-pressed={role === option.value}
@@ -58,10 +56,7 @@ export function RegistrationPage() {
           ))}
         </div>
 
-        <form
-          className={styles.form}
-          onSubmit={(event) => event.preventDefault()}
-        >
+        <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
           <label htmlFor="registration-display-name">Nama tampilan publik</label>
           <input
             id="registration-display-name"
@@ -78,7 +73,9 @@ export function RegistrationPage() {
             <div className={styles.channelPicker}>
               <button
                 className={
-                  channel === "email" ? styles.channelActive : styles.channelOption
+                  channel === "email"
+                    ? styles.channelActive
+                    : styles.channelOption
                 }
                 type="button"
                 aria-pressed={channel === "email"}
@@ -88,7 +85,9 @@ export function RegistrationPage() {
               </button>
               <button
                 className={
-                  channel === "whatsapp" ? styles.channelActive : styles.channelOption
+                  channel === "whatsapp"
+                    ? styles.channelActive
+                    : styles.channelOption
                 }
                 type="button"
                 aria-pressed={channel === "whatsapp"}
