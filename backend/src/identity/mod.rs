@@ -18,6 +18,7 @@ pub mod password;
 pub mod password_reset;
 pub mod recovery;
 mod registration;
+pub mod resend_http;
 pub mod totp;
 pub mod verification;
 
