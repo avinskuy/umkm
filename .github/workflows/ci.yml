@@ -10,31 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  resolve-lockfile:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/registration-provider-integration'
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/registration-provider-integration
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Resolve and validate workspace dependencies
-        run: cargo check --workspace
-      - name: Commit only the generated lockfile
-        run: |
-          if git diff --quiet -- Cargo.lock; then
-            echo "Cargo.lock is already up to date."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock
-          git commit -m "build(deps): update Cargo.lock for FlowKirim HTTP client"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
-
   frontend:
     name: Frontend quality
     runs-on: ubuntu-latest
@@ -84,11 +59,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Provision disposable PostgreSQL principals
         run: |
-          psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+          psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \\
             -c "CREATE DATABASE usahapintar_test OWNER usahapintar_ci_admin"
-          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \
+          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \\
             -v ON_ERROR_STOP=1 -f backend/database/bootstrap/001_create_principals.sql
-          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \
+          psql "postgres://usahapintar_ci_admin:ci_admin_only_password@localhost:5432/usahapintar_test" \\
             -v ON_ERROR_STOP=1 -f backend/database/bootstrap/001_create_principals.sql
           psql "$CI_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER ROLE usahapintar_migrator PASSWORD 'ci_migrator_only_password';
