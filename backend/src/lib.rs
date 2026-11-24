@@ -107,11 +107,11 @@ mod tests {
         AuthenticationRateLimitKey,
     };
     use axum::body::Body;
-    use std::sync::Arc;
-    use zeroize::Zeroizing;
     use http_body_util::BodyExt;
     use sqlx::postgres::PgPoolOptions;
+    use std::sync::Arc;
     use tower::ServiceExt;
+    use zeroize::Zeroizing;
 
     #[tokio::test]
     async fn registration_http_routes_are_not_mounted_in_the_default_application() {
@@ -174,13 +174,9 @@ mod tests {
                 .expect("test Admin keyring should be valid"),
             )
         };
-        let authentication =
-            AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
-        let admin_authentication = AdminAuthenticationApiState::new(
-            pool.clone(),
-            rate_limit_key.clone(),
-            admin_keyring(),
-        );
+        let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+        let admin_authentication =
+            AdminAuthenticationApiState::new(pool.clone(), rate_limit_key.clone(), admin_keyring());
         let registration = RegistrationApiState::new(
             pool.clone(),
             admin_keyring(),
@@ -224,7 +220,10 @@ mod tests {
         .await
         .expect("router should respond");
 
-        assert_eq!(response.status(), axum::http::StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::METHOD_NOT_ALLOWED
+        );
     }
 
     #[tokio::test]
