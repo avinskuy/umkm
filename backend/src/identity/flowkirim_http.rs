@@ -227,7 +227,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                ){
+                ) {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
@@ -468,4 +468,4 @@ mod tests {
         assert_eq!(OTP_TTL_SECONDS, 600);
         assert_eq!(MAX_RESPONSE_BYTES, 16 * 1024);
     }
-    }
+}
