@@ -231,8 +231,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                    )
-                {
+                    ) {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
@@ -285,10 +284,7 @@ mod tests {
 
                 request.extend_from_slice(&buffer[..read]);
 
-                if let Some(header_end) = request
-                    .windows(4)
-                    .position(|part| part == b"\r\n\r\n")
-                {
+                if let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
                     let headers = String::from_utf8_lossy(&request[..header_end]);
 
                     let content_length = headers
@@ -334,8 +330,7 @@ mod tests {
 
     #[tokio::test]
     async fn start_sends_authenticated_idempotent_whatsapp_request() {
-        let (base_url, server) =
-            mock_server("200 OK", r#"{"request_id":"verify_123"}"#.to_owned());
+        let (base_url, server) = mock_server("200 OK", r#"{"request_id":"verify_123"}"#.to_owned());
 
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
@@ -359,17 +354,13 @@ mod tests {
 
         assert!(request.starts_with("POST /start HTTP/1.1"));
 
-        assert!(
-            request
-                .to_ascii_lowercase()
-                .contains("authorization: bearer test-secret")
-        );
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("authorization: bearer test-secret"));
 
-        assert!(
-            request
-                .to_ascii_lowercase()
-                .contains("idempotency-key: registration-whatsapp-challenge-1")
-        );
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("idempotency-key: registration-whatsapp-challenge-1"));
 
         let body = request_body(&request);
 
@@ -381,8 +372,7 @@ mod tests {
 
     #[tokio::test]
     async fn check_sends_request_id_and_code_and_accepts_verified_response() {
-        let (base_url, server) =
-            mock_server("200 OK", r#"{"status":"verified"}"#.to_owned());
+        let (base_url, server) = mock_server("200 OK", r#"{"status":"verified"}"#.to_owned());
 
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
@@ -391,10 +381,7 @@ mod tests {
         .unwrap();
 
         let outcome = provider
-            .check(
-                "verify_123".to_owned(),
-                Zeroizing::new("123456".to_owned()),
-            )
+            .check("verify_123".to_owned(), Zeroizing::new("123456".to_owned()))
             .await;
 
         assert_eq!(outcome, FlowKirimProviderOutcome::Accepted(true));
@@ -403,11 +390,9 @@ mod tests {
 
         assert!(request.starts_with("POST /check HTTP/1.1"));
 
-        assert!(
-            request
-                .to_ascii_lowercase()
-                .contains("authorization: bearer test-secret")
-        );
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("authorization: bearer test-secret"));
 
         let body = request_body(&request);
 
@@ -417,8 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn check_maps_non_verified_status_to_rejected_code_result() {
-        let (base_url, server) =
-            mock_server("200 OK", r#"{"status":"invalid"}"#.to_owned());
+        let (base_url, server) = mock_server("200 OK", r#"{"status":"invalid"}"#.to_owned());
 
         let provider = FlowKirimHttpProvider::with_base_url(
             Zeroizing::new("test-secret".to_owned()),
@@ -427,10 +411,7 @@ mod tests {
         .unwrap();
 
         let outcome = provider
-            .check(
-                "verify_123".to_owned(),
-                Zeroizing::new("000000".to_owned()),
-            )
+            .check("verify_123".to_owned(), Zeroizing::new("000000".to_owned()))
             .await;
 
         assert_eq!(outcome, FlowKirimProviderOutcome::Accepted(false));
@@ -464,8 +445,7 @@ mod tests {
 
     #[test]
     fn parses_only_a_valid_start_request_id() {
-        let parsed: StartResponse =
-            serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
+        let parsed: StartResponse = serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
 
         assert_eq!(parsed.request_id, "verify_123");
 
@@ -476,8 +456,7 @@ mod tests {
 
     #[test]
     fn check_accepts_only_documented_verified_status() {
-        let verified: CheckResponse =
-            serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
+        let verified: CheckResponse = serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
 
         let not_verified: CheckResponse =
             serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
@@ -494,4 +473,4 @@ mod tests {
         assert_eq!(OTP_TTL_SECONDS, 600);
         assert_eq!(MAX_RESPONSE_BYTES, 16 * 1024);
     }
-            }
+    }
