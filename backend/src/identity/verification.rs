@@ -482,7 +482,36 @@ pub(crate) fn contact_aliases(
     Ok(aliases)
 }
 
-pub(crate) fn normalize_contact(
+pub(crate) /// Menerima nomor Indonesia dalam format lokal (08...), internasional (628...)
+/// atau E.164 (+628...), lalu menyimpannya dalam bentuk kanonis +62.
+pub(crate) fn normalize_indonesian_phone(value: &str) -> Option<String> {
+    let compact = value
+        .trim()
+        .chars()
+        .filter(|character| !matches!(character, ' ' | '-' | '(' | ')'))
+        .collect::<String>();
+
+    let subscriber = if let Some(value) = compact.strip_prefix("+62") {
+        value
+    } else if let Some(value) = compact.strip_prefix("62") {
+        value
+    } else if let Some(value) = compact.strip_prefix('0') {
+        value
+    } else {
+        return None;
+    };
+
+    if !(9..=12).contains(&subscriber.len())
+        || !subscriber.starts_with('8')
+        || !subscriber.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+
+    Some(format!("+62{subscriber}"))
+}
+
+fn normalize_contact(
     channel: ContactChannel,
     email: Option<&str>,
     phone: Option<&str>,
@@ -513,17 +542,10 @@ pub(crate) fn normalize_contact(
             if email.is_some() {
                 return Err(VerificationError::InvalidInput);
             }
-            let phone = phone
-                .ok_or(VerificationError::InvalidInput)?
-                .trim()
-                .to_owned();
-            let digits = phone.strip_prefix('+').unwrap_or_default();
-            if !(8..=15).contains(&digits.len())
-                || !digits.bytes().all(|byte| byte.is_ascii_digit())
-                || digits.starts_with('0')
-            {
-                return Err(VerificationError::InvalidInput);
-            }
+            let phone = normalize_indonesian_phone(
+                phone.ok_or(VerificationError::InvalidInput)?,
+            )
+            .ok_or(VerificationError::InvalidInput)?;
             Ok(("whatsapp", phone))
         }
     }
@@ -607,6 +629,20 @@ fn generate_otp() -> Result<Zeroizing<String>, VerificationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indonesian_phone_formats_normalize_to_e164() {
+        for input in ["08123456789", "628123456789", "+628123456789", "0812-3456-789"] {
+            assert_eq!(
+                normalize_indonesian_phone(input).as_deref(),
+                Some("+628123456789")
+            );
+        }
+
+        for input in ["8123456789", "008123456789", "+658123456789", "08123abc789"] {
+            assert!(normalize_indonesian_phone(input).is_none(), "{input}");
+        }
+    }
 
     #[test]
     fn uuid_generator_creates_valid_v4_identifiers() {
