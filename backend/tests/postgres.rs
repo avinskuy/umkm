@@ -10,10 +10,12 @@ use usahapintar_api::{
         },
         password::hash_password,
         AdminAuthenticationService, AuthenticationRateLimitKey, ClientRegistration, ClientRole,
+        flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
         ContactChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
         VerificationService,
     },
 };
+use zeroize::Zeroizing;
 
 struct VerificationTestKeys;
 
@@ -53,6 +55,30 @@ impl OtpDeliveryProvider for FakeOtpDelivery {
                 .expect("fake delivery message lock should be available")
                 .push(message);
             self.status
+        })
+    }
+}
+
+struct FakeFlowKirim;
+
+impl FlowKirimVerifyProvider for FakeFlowKirim {
+    fn start<'a>(
+        &'a self,
+        _destination: Zeroizing<String>,
+        _idempotency_key: String,
+    ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<String>> + Send + 'a>> {
+        Box::pin(async {
+            FlowKirimProviderOutcome::Accepted("flowkirim-test-request-001".to_owned())
+        })
+    }
+
+    fn check<'a>(
+        &'a self,
+        _request_id: String,
+        code: Zeroizing<String>,
+    ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a>> {
+        Box::pin(async move {
+            FlowKirimProviderOutcome::Accepted(code.as_str() == "123456")
         })
     }
 }
@@ -3284,7 +3310,9 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         messages: Mutex::new(Vec::new()),
         status: DispatchStatus::Accepted,
     };
-    let service = VerificationService::new(app_pool, &keys, &delivery);
+    let flowkirim = FakeFlowKirim;
+    let service =
+        VerificationService::new_with_flowkirim(app_pool, &keys, &delivery, &flowkirim);
     let registration = ClientRegistration {
         display_name: "Pemilik Usaha Demo",
         role: ClientRole::BusinessOwner,
@@ -3389,22 +3417,21 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
     .expect("explicit marketing opt-in should be recorded");
     assert_eq!(phone_marketing_events, 1);
 
-    let phone_code = {
+    {
         let messages = delivery
             .messages
             .lock()
             .expect("fake delivery message lock should be available");
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 1);
         assert_eq!(
-            messages[1].channel,
-            usahapintar_api::identity::DeliveryChannel::WhatsApp
+            messages[0].channel,
+            usahapintar_api::identity::DeliveryChannel::Email
         );
-        messages[1].code.as_str().to_owned()
-    };
+    }
     assert!(service
-        .verify(&phone_started.session_id, &phone_code)
+        .verify(&phone_started.session_id, "123456")
         .await
-        .expect("WhatsApp OTP should verify and activate the pending account"));
+        .expect("FlowKirim should verify the WhatsApp OTP and activate the pending account"));
 
     let phone_account_status: String =
         sqlx::query_scalar("SELECT account_status FROM public.users WHERE id = $1::uuid")
