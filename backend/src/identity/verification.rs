@@ -166,7 +166,9 @@ impl<'a> VerificationService<'a> {
         validate_uuid(session_id)?;
         let session = load_verification_session(self.pool, session_id, "registration").await?;
         if session.0 == "whatsapp" {
-            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            let provider = self
+                .flowkirim
+                .ok_or(VerificationError::ProviderUnavailable)?;
             return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code)
                     .await;
         }
@@ -287,7 +289,10 @@ async fn verify_flowkirim_session(
             return Err(VerificationError::ProviderUnavailable)
         }
     };
-    let alias_bytes = aliases.into_iter().map(|alias| alias.digest.to_vec()).collect::<Vec<_>>();
+    let alias_bytes = aliases
+        .into_iter()
+        .map(|alias| alias.digest.to_vec())
+        .collect::<Vec<_>>();
     sqlx::query_scalar::<_, bool>(
         "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, $3, $4)",
     )
