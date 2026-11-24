@@ -227,7 +227,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                ) {
+                    ) {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
