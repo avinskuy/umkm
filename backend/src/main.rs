@@ -109,14 +109,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         policy_versions,
     )
     .with_flowkirim_provider(flowkirim.clone());
-    let recovery = RecoveryApiState::new(
-        pool.clone(),
-        identity_keyring,
-        resend,
-        abuse_guard,
-    )
-    .with_flowkirim_provider(flowkirim)
-    .with_password_policy(password_policy);
+    let recovery = RecoveryApiState::new(pool.clone(), identity_keyring, resend, abuse_guard)
+        .with_flowkirim_provider(flowkirim)
+        .with_password_policy(password_policy);
 
     let host = env::var("HOST").ok();
     let port = env::var("PORT").ok();
