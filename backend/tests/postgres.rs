@@ -1230,7 +1230,6 @@ async fn assert_verification_database_operations(pool: &PgPool) {
     assert_eq!(failed_attempt_count, 1);
 }
 
-
 async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
     let phone = format!("+6281234{:06}", std::process::id() % 1_000_000);
     let user_id: String =
@@ -1281,8 +1280,14 @@ async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
     .fetch_one(pool)
     .await
     .expect("FlowKirim challenge metadata should be queryable");
-    assert!(payload.0.is_none(), "provider-managed OTP must not store a fake local hash");
-    assert!(payload.1.is_none(), "provider-managed OTP must not store a local key version");
+    assert!(
+        payload.0.is_none(),
+        "provider-managed OTP must not store a fake local hash"
+    );
+    assert!(
+        payload.1.is_none(),
+        "provider-managed OTP must not store a local key version"
+    );
     assert_eq!(payload.2, "flowkirim");
 
     assert!(
@@ -1323,7 +1328,9 @@ async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
         .expect("repeating the same provider binding should be idempotent");
 
     assert!(
-        sqlx::query("SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-request-other')")
+        sqlx::query(
+            "SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-request-other')"
+        )
             .bind(session_id)
             .bind(challenge_id)
             .execute(pool)
