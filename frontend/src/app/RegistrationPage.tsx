@@ -103,6 +103,7 @@ export function RegistrationPage() {
             placeholder={
               channel === "email" ? "nama@email.com" : "Contoh: +6281234567890"
             }
+            required
           />
 
           <label htmlFor="registration-password">Password</label>
@@ -112,7 +113,7 @@ export function RegistrationPage() {
             type="password"
             autoComplete="new-password"
             maxLength={1024}
-            disabled
+            required
           />
 
           <label htmlFor="registration-password-confirmation">
