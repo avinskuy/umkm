@@ -11,9 +11,13 @@ describe("App", () => {
   it("renders the USahapintar project identity", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "USahapintar" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "USahapintar" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/business owners and investors/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Masuk" })).toHaveAttribute("href", "/login");
+    expect(
+      screen.getByRole("link", { name: "Masuk" }),
+    ).toHaveAttribute("href", "/login");
   });
 
   it("routes the client login path to the Owner and Investor login page", () => {
@@ -32,7 +36,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Admin sign in" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Admin sign in" }),
+    ).toBeInTheDocument();
   });
 
   it("routes the Admin workspace path to the protected dashboard shell", () => {
