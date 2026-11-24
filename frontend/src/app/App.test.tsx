@@ -1,7 +1,9 @@
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { screen } from "@testing-library/dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
+
+afterEach(() => cleanup());
 
 describe("App", () => {
   beforeEach(() => {
