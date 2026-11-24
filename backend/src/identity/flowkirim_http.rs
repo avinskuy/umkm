@@ -35,7 +35,6 @@ impl std::fmt::Display for FlowKirimHttpConfigError {
 
 impl std::error::Error for FlowKirimHttpConfigError {}
 
-#[derive(Clone)]
 pub struct FlowKirimHttpProvider {
     client: Client,
     api_key: Zeroizing<String>,
