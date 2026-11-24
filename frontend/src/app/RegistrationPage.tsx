@@ -73,9 +73,7 @@ export function RegistrationPage() {
             <div className={styles.channelPicker}>
               <button
                 className={
-                  channel === "email"
-                    ? styles.channelActive
-                    : styles.channelOption
+                  channel === "email" ? styles.channelActive : styles.channelOption
                 }
                 type="button"
                 aria-pressed={channel === "email"}
