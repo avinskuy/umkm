@@ -132,6 +132,7 @@ export function RegistrationPage() {
             type="password"
             autoComplete="new-password"
             maxLength={1024}
+            required
           />
 
           <p className={styles.hint}>
