@@ -25,6 +25,7 @@ pub enum PasswordResetError {
     InvalidStoredData,
     PasswordPolicyRejected,
     PasswordHashFailed,
+    VerificationUnavailable,
 }
 
 impl std::fmt::Display for PasswordResetError {
@@ -36,6 +37,7 @@ impl std::fmt::Display for PasswordResetError {
             Self::InvalidStoredData => "stored password reset data is invalid",
             Self::PasswordPolicyRejected => "new password does not meet the password policy",
             Self::PasswordHashFailed => "new password hashing failed",
+            Self::VerificationUnavailable => "verification provider is unavailable",
         };
         formatter.write_str(message)
     }
@@ -62,6 +64,7 @@ impl From<VerificationError> for PasswordResetError {
             VerificationError::Crypto(error) => Self::Crypto(error),
             VerificationError::InvalidInput => Self::InvalidInput,
             VerificationError::InvalidStoredData => Self::InvalidStoredData,
+            VerificationError::ProviderUnavailable => Self::VerificationUnavailable,
         }
     }
 }
