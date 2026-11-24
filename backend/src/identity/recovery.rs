@@ -4,7 +4,7 @@ use super::{
     authentication::session_token_hash,
     crypto::{contact_fingerprint, encrypt, key_version_label, KeyProvider},
     delivery::{DispatchStatus, OtpDeliveryProvider},
-    flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
+    flowkirim::FlowKirimVerifyProvider,
     registration::ContactChannel,
     verification::{
         contact_aliases, decrypt_destination, destination_associated_data, dispatch_flowkirim_challenge,
