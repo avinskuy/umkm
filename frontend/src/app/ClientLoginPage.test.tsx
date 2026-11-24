@@ -53,10 +53,13 @@ describe("ClientLoginPage", () => {
       .fn()
       .mockResolvedValueOnce(new Response("{}", { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ user_id: "investor-1", role: "investor" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({ user_id: "investor-1", role: "investor" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
 
