@@ -128,7 +128,7 @@ END;
 $$;
 
 
-CREATE FUNCTION public.reserve_flowkirim_otp_challenge(
+CREATE OR REPLACE FUNCTION public.reserve_flowkirim_otp_challenge(
     p_session_id UUID,
     p_challenge_id UUID,
     p_destination_hmac_aliases BYTEA[]
@@ -236,7 +236,7 @@ END;
 $$;
 
 
-CREATE FUNCTION public.get_pending_flowkirim_otp_challenge(p_session_id UUID)
+CREATE OR REPLACE FUNCTION public.get_pending_flowkirim_otp_challenge(p_session_id UUID)
 RETURNS TABLE (challenge_id UUID, provider_request_id TEXT, expires_at TIMESTAMPTZ)
 LANGUAGE plpgsql
 SECURITY DEFINER
