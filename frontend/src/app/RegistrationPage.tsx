@@ -56,7 +56,7 @@ export function RegistrationPage() {
           ))}
         </div>
 
-        <form className={styles.form}>
+        <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
           <label htmlFor="registration-display-name">Nama tampilan publik</label>
           <input
             id="registration-display-name"
@@ -66,7 +66,6 @@ export function RegistrationPage() {
             maxLength={120}
             placeholder="Nama yang akan terlihat oleh pengguna lain"
             required
-            disabled
           />
 
           <fieldset className={styles.channelFieldset}>
@@ -104,7 +103,6 @@ export function RegistrationPage() {
             placeholder={
               channel === "email" ? "nama@email.com" : "Contoh: +6281234567890"
             }
-            disabled
           />
 
           <label htmlFor="registration-password">Password</label>
