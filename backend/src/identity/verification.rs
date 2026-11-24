@@ -284,7 +284,7 @@ async fn verify_flowkirim_session(
         .await
     {
         FlowKirimProviderOutcome::Accepted(matches) => matches,
-        FlowKirimProviderOutcome::Rejected => return Err(VerificationError::ProviderRejected),
+        FlowKirimProviderOutcome::Rejected => false,
         FlowKirimProviderOutcome::Unavailable => {
             return Err(VerificationError::ProviderUnavailable)
         }
