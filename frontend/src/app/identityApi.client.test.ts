@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  getCurrentClient,
-  IdentityApiError,
-  loginClient,
-} from "./identityApi";
+import { getCurrentClient, IdentityApiError, loginClient } from "./identityApi";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -58,6 +54,8 @@ describe("Client identity API", () => {
       user_id: "owner-1",
       role: "business_owner",
     });
-    await expect(getCurrentClient("investor")).rejects.toBeInstanceOf(IdentityApiError);
+    await expect(getCurrentClient("investor")).rejects.toBeInstanceOf(
+      IdentityApiError,
+    );
   });
 });
