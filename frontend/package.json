@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --write src/app/RegistrationPage.tsx && git diff -- src/app/RegistrationPage.tsx && prettier --check .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc -b --pretty",
     "test": "vitest run",
     "test:watch": "vitest"
