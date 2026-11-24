@@ -168,7 +168,7 @@ impl<'a> VerificationService<'a> {
                 .flowkirim
                 .ok_or(VerificationError::ProviderUnavailable)?;
             return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code)
-                    .await;
+                .await;
         }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
     }
