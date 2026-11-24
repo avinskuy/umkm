@@ -13,6 +13,18 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "USahapintar" })).toBeInTheDocument();
     expect(screen.getByText(/business owners and investors/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Masuk" })).toHaveAttribute("href", "/login");
+  });
+
+  it("routes the client login path to the Owner and Investor login page", () => {
+    window.history.replaceState(null, "", "/login");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Selamat datang kembali" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
   });
 
   it("routes the Admin login path to the dedicated login page", () => {
