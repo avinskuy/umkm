@@ -26,7 +26,10 @@ describe("RegistrationPage", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
 
-    expect(screen.getByLabelText("Nomor WhatsApp")).toHaveAttribute("type", "tel");
+    expect(screen.getByLabelText("Nomor WhatsApp")).toHaveAttribute(
+      "type",
+      "tel",
+    );
     expect(screen.getByLabelText("Nomor WhatsApp")).toHaveAttribute(
       "placeholder",
       "Contoh: +6281234567890",
