@@ -8,9 +8,9 @@ use usahapintar_api::{
             encrypt_admin_totp_secret, key_version_label, CryptoError, KeyProvider, KeyPurpose,
             KeyVersion, SecretKey, VersionedKey,
         },
+        flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
         password::hash_password,
         AdminAuthenticationService, AuthenticationRateLimitKey, ClientRegistration, ClientRole,
-        flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
         ContactChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
         VerificationService,
     },
@@ -77,9 +77,7 @@ impl FlowKirimVerifyProvider for FakeFlowKirim {
         _request_id: String,
         code: Zeroizing<String>,
     ) -> Pin<Box<dyn Future<Output = FlowKirimProviderOutcome<bool>> + Send + 'a>> {
-        Box::pin(async move {
-            FlowKirimProviderOutcome::Accepted(code.as_str() == "123456")
-        })
+        Box::pin(async move { FlowKirimProviderOutcome::Accepted(code.as_str() == "123456") })
     }
 }
 
@@ -3311,8 +3309,7 @@ async fn assert_verification_orchestration(app_pool: &PgPool, migrator_pool: &Pg
         status: DispatchStatus::Accepted,
     };
     let flowkirim = FakeFlowKirim;
-    let service =
-        VerificationService::new_with_flowkirim(app_pool, &keys, &delivery, &flowkirim);
+    let service = VerificationService::new_with_flowkirim(app_pool, &keys, &delivery, &flowkirim);
     let registration = ClientRegistration {
         display_name: "Pemilik Usaha Demo",
         role: ClientRole::BusinessOwner,
