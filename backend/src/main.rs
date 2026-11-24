@@ -1,7 +1,7 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use usahapintar_api::{
-    app_with_authentication_admin_and_registration,
+    app_with_authentication_admin_registration_and_recovery,
     config::server_address,
     database::{connect, DatabaseConfig},
     identity::{
@@ -9,7 +9,7 @@ use usahapintar_api::{
         flowkirim_http::FlowKirimHttpProvider,
         http::{
             AdminAuthenticationApiState, AuthenticationApiState, PostgresRegistrationAbuseGuard,
-            RegistrationApiState, RegistrationPolicyVersions,
+            RecoveryApiState, RegistrationApiState, RegistrationPolicyVersions,
         },
         password::SimplePasswordPolicy,
         resend_http::ResendHttpProvider,
@@ -99,15 +99,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "Registration policy version configuration is invalid",
         )
     })?;
+    let password_policy = Arc::new(SimplePasswordPolicy);
     let registration = RegistrationApiState::new(
+        pool.clone(),
+        identity_keyring.clone(),
+        resend.clone(),
+        abuse_guard.clone(),
+        password_policy.clone(),
+        policy_versions,
+    )
+    .with_flowkirim_provider(flowkirim.clone());
+    let recovery = RecoveryApiState::new(
         pool.clone(),
         identity_keyring,
         resend,
         abuse_guard,
-        Arc::new(SimplePasswordPolicy),
-        policy_versions,
     )
-    .with_flowkirim_provider(flowkirim);
+    .with_flowkirim_provider(flowkirim)
+    .with_password_policy(password_policy);
 
     let host = env::var("HOST").ok();
     let port = env::var("PORT").ok();
@@ -120,11 +129,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     axum::serve(
         listener,
-        app_with_authentication_admin_and_registration(
+        app_with_authentication_admin_registration_and_recovery(
             pool,
             authentication,
             admin_authentication,
             registration,
+            recovery,
         )
         .into_make_service_with_connect_info::<SocketAddr>(),
     )
