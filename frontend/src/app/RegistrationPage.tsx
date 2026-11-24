@@ -83,9 +83,7 @@ export function RegistrationPage() {
               </button>
               <button
                 className={
-                  channel === "whatsapp"
-                    ? styles.channelActive
-                    : styles.channelOption
+                  channel === "whatsapp" ? styles.channelActive : styles.channelOption
                 }
                 type="button"
                 aria-pressed={channel === "whatsapp"}
