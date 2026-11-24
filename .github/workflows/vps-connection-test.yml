@@ -1,0 +1,49 @@
+name: VPS deployment connection test
+
+on:
+  push:
+    branches:
+      - chore/verify-vps-deploy-ssh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ssh:
+    name: Verify VPS SSH access
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure deployment SSH credentials
+        shell: bash
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_SSH_PRIVATE_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+          ssh-keygen -F 116.212.72.31 -f "$HOME/.ssh/known_hosts" >/dev/null
+
+      - name: Test authenticated access and web-root boundary
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          test -n "$VPS_PORT"
+          ssh -i "$HOME/.ssh/deploy_key" \\
+            -o IdentitiesOnly=yes \\
+            -o BatchMode=yes \\
+            -o StrictHostKeyChecking=yes \\
+            -o ConnectTimeout=15 \\
+            -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \\
+            'set -eu; printf "SSH_USER="; id -un; test -w /var/www/usahapintar; echo "WEB_ROOT_WRITE=OK"; test ! -w /etc; echo "SYSTEM_CONFIG_WRITE=BLOCKED"'
