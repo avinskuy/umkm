@@ -8,9 +8,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-use super::delivery::{
-    DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider,
-};
+use super::delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider};
 
 const API_URL: &str = "https://api.resend.com/emails";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -76,7 +74,9 @@ impl ResendHttpProvider {
         }
         if sender.trim().is_empty()
             || sender.len() > 254
-            || sender.chars().any(|character| matches!(character, '\r' | '\n'))
+            || sender
+                .chars()
+                .any(|character| matches!(character, '\\r' | '\\n'))
         {
             return Err(ResendHttpConfigError::InvalidSender);
         }
@@ -101,17 +101,23 @@ impl ResendHttpProvider {
         message.channel == DeliveryChannel::Email
             && message.destination.len() <= 254
             && !message.destination.trim().is_empty()
-            && !message.destination.chars().any(|character| matches!(character, '\r' | '\n'))
+            && !message
+                .destination
+                .chars()
+                .any(|character| matches!(character, '\\r' | '\\n'))
             && message.code.len() == OTP_LENGTH
             && message.code.bytes().all(|byte| byte.is_ascii_digit())
             && !message.idempotency_key.trim().is_empty()
             && message.idempotency_key.len() <= 256
-            && !message.idempotency_key.chars().any(|character| matches!(character, '\r' | '\n'))
+            && !message
+                .idempotency_key
+                .chars()
+                .any(|character| matches!(character, '\\r' | '\\n'))
     }
 
     fn payload<'a>(&'a self, message: &'a OtpDeliveryMessage) -> SendEmailRequest<'a> {
         let text = format!(
-            "Kode verifikasi USahapintar Anda: {}\nKode berlaku selama 10 menit. Jangan bagikan kode ini kepada siapa pun.",
+            "Kode verifikasi USahapintar Anda: {}\\nKode berlaku selama 10 menit. Jangan bagikan kode ini kepada siapa pun.",
             message.code.as_str()
         );
         let html = format!(
@@ -223,7 +229,7 @@ mod tests {
         assert_eq!(
             ResendHttpProvider::with_endpoint(
                 Zeroizing::new("re_test_key".to_owned()),
-                "noreply@example.test\r\nBcc: attacker@example.test".to_owned(),
+                "noreply@example.test\\r\\nBcc: attacker@example.test".to_owned(),
                 "https://api.resend.test/emails",
             )
             .err(),
@@ -251,7 +257,7 @@ mod tests {
     #[test]
     fn message_validation_rejects_line_breaks_in_idempotency_key() {
         let message = OtpDeliveryMessage {
-            idempotency_key: "otp-1\r\nX-Injected: yes".to_owned(),
+            idempotency_key: "otp-1\\r\\nX-Injected: yes".to_owned(),
             destination: Zeroizing::new("user@example.test".to_owned()),
             channel: DeliveryChannel::Email,
             code: Zeroizing::new("123456".to_owned()),
