@@ -57,10 +57,7 @@ struct SendEmailResponse {
 }
 
 impl ResendHttpProvider {
-    pub fn new(
-        api_key: Zeroizing<String>,
-        sender: String,
-    ) -> Result<Self, ResendHttpConfigError> {
+    pub fn new(api_key: Zeroizing<String>, sender: String) -> Result<Self, ResendHttpConfigError> {
         Self::with_endpoint(api_key, sender, API_URL)
     }
 
