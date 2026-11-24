@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use super::{
     crypto::{random_bytes, KeyProvider},
     delivery::OtpDeliveryProvider,
+    flowkirim::FlowKirimVerifyProvider,
     recovery::RecoveryService,
     registration::ContactChannel,
     verification::VerificationService,
@@ -141,6 +142,7 @@ pub struct RegistrationApiState {
     pub(super) pool: PgPool,
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
+    pub(super) flowkirim: Option<Arc<dyn FlowKirimVerifyProvider>>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
     pub(super) password_policy: Arc<dyn RegistrationPasswordPolicy>,
     pub(super) policy_versions: RegistrationPolicyVersions,
@@ -159,14 +161,35 @@ impl RegistrationApiState {
             pool,
             keys,
             delivery,
+            flowkirim: None,
             abuse_guard,
             password_policy,
             policy_versions,
         }
     }
 
+    pub fn with_flowkirim_provider(
+        mut self,
+        provider: Arc<dyn FlowKirimVerifyProvider>,
+    ) -> Self {
+        self.flowkirim = Some(provider);
+        self
+    }
+
     pub(super) fn verification_service(&self) -> VerificationService<'_> {
-        VerificationService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+        match self.flowkirim.as_deref() {
+            Some(provider) => VerificationService::new_with_flowkirim(
+                &self.pool,
+                self.keys.as_ref(),
+                self.delivery.as_ref(),
+                provider,
+            ),
+            None => VerificationService::new(
+                &self.pool,
+                self.keys.as_ref(),
+                self.delivery.as_ref(),
+            ),
+        }
     }
 }
 
