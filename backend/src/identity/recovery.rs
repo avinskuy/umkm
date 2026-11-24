@@ -166,7 +166,9 @@ impl<'a> RecoveryService<'a> {
     pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
         let session = load_verification_session(self.pool, session_id, "account_recovery").await?;
         if session.0 == "whatsapp" {
-            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            let provider = self
+                .flowkirim
+                .ok_or(VerificationError::ProviderUnavailable)?;
             verify_flowkirim_session(
                 self.pool,
                 self.keys,
