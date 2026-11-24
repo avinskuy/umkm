@@ -83,9 +83,7 @@ impl FlowKirimHttpProvider {
         if status.is_client_error()
             && !matches!(
                 status,
-                StatusCode::UNAUTHORIZED
-                    | StatusCode::FORBIDDEN
-                    | StatusCode::TOO_MANY_REQUESTS
+                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::TOO_MANY_REQUESTS
             )
         {
             FlowKirimProviderOutcome::Rejected
@@ -162,8 +160,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
 
             match serde_json::from_slice::<StartResponse>(&body) {
                 Ok(parsed)
-                    if !parsed.request_id.trim().is_empty()
-                        && parsed.request_id.len() <= 256 =>
+                    if !parsed.request_id.trim().is_empty() && parsed.request_id.len() <= 256 =>
                 {
                     FlowKirimProviderOutcome::Accepted(parsed.request_id)
                 }
@@ -215,7 +212,8 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                    ) {
+                    )
+                {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
@@ -241,7 +239,8 @@ mod tests {
 
     #[test]
     fn parses_only_a_valid_start_request_id() {
-        let parsed: StartResponse = serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
+        let parsed: StartResponse =
+            serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
         assert_eq!(parsed.request_id, "verify_123");
         assert!(serde_json::from_str::<StartResponse>(r#"{"request_id":""}"#).is_ok());
         assert!(serde_json::from_str::<StartResponse>(r#"{"id":"verify_123"}"#).is_err());
