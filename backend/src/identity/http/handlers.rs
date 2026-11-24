@@ -16,9 +16,8 @@ use super::super::{
     verification::VerificationError,
 };
 use super::{
-    authentication::resolved_client_ip,
-    opaque_verification_id, valid_contact_input, AbuseDecision, RegistrationAction,
-    RegistrationApiState,
+    authentication::resolved_client_ip, opaque_verification_id, valid_contact_input, AbuseDecision,
+    RegistrationAction, RegistrationApiState,
 };
 
 const MAX_REQUEST_BYTES: usize = 16 * 1024;
@@ -118,7 +117,11 @@ async fn register(
 ) -> Response {
     let decision = state
         .abuse_guard
-        .check(RegistrationAction::Create, resolved_client_ip(&headers, peer.ip()), None)
+        .check(
+            RegistrationAction::Create,
+            resolved_client_ip(&headers, peer.ip()),
+            None,
+        )
         .await;
     if let Some(response) = rate_limit_response(decision) {
         return response;
