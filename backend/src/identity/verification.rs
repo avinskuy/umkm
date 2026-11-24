@@ -482,7 +482,7 @@ pub(crate) fn contact_aliases(
     Ok(aliases)
 }
 
-pub(crate) /// Menerima nomor Indonesia dalam format lokal (08...), internasional (628...)
+/// Menerima nomor Indonesia dalam format lokal (08...), internasional (628...)
 /// atau E.164 (+628...), lalu menyimpannya dalam bentuk kanonis +62.
 pub(crate) fn normalize_indonesian_phone(value: &str) -> Option<String> {
     let compact = value
