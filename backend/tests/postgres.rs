@@ -1331,11 +1331,11 @@ async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
         sqlx::query(
             "SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, 'fk-request-other')"
         )
-            .bind(session_id)
-            .bind(challenge_id)
-            .execute(pool)
-            .await
-            .is_err(),
+        .bind(session_id)
+        .bind(challenge_id)
+        .execute(pool)
+        .await
+        .is_err(),
         "a bound FlowKirim request ID must be immutable"
     );
 
