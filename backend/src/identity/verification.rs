@@ -432,7 +432,7 @@ pub(crate) async fn verify_otp_session(
     .map_err(VerificationError::from)
 }
 
-pub(crate) pub(crate) async fn load_verification_session(
+pub(crate) async fn load_verification_session(
     pool: &PgPool,
     session_id: &str,
     purpose: &str,
