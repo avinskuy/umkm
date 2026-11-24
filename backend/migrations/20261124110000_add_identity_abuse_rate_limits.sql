@@ -7,7 +7,10 @@ CREATE TABLE public.identity_abuse_rate_limits (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (scope, key_hash),
     CHECK (octet_length(key_hash) = 32)
-);
+ );
+
+CREATE INDEX identity_abuse_rate_limits_updated_at_idx
+    ON public.identity_abuse_rate_limits (updated_at);
 
 CREATE FUNCTION public.reserve_identity_abuse_attempt(
     p_scope TEXT,
@@ -43,13 +46,13 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    INSERT INTO public.identity_abuse_rate_limits (
+    INSERT INTO public.identity_abuse_rate_limits AS current_limit (
         scope, key_hash, window_started_at, attempt_count, updated_at
     )
     VALUES (p_scope, p_key_hash, v_now, 1, v_now)
     ON CONFLICT (scope, key_hash) DO UPDATE
        SET window_started_at = CASE
-               WHEN public.identity_abuse_rate_limits.window_started_at
+               WHEN current_limit.window_started_at
                     <= v_now - pg_catalog.make_interval(secs => p_window_seconds)
                THEN v_now
                ELSE public.identity_abuse_rate_limits.window_started_at
@@ -58,7 +61,7 @@ BEGIN
                WHEN public.identity_abuse_rate_limits.window_started_at
                     <= v_now - pg_catalog.make_interval(secs => p_window_seconds)
                THEN 1
-               ELSE public.identity_abuse_rate_limits.attempt_count + 1
+               ELSE current_limit.attempt_count + 1
            END,
            updated_at = v_now
     RETURNING attempt_count INTO v_attempt_count;
