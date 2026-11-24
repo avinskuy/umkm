@@ -3036,6 +3036,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                    'recovery_contacts', 'account_recovery_cases', 'password_reset_tokens', \
                    'account_recovery_case_signals', 'account_recovery_review_decisions', 'admin_totp_credentials', \
                    'admin_login_rate_limits', 'admin_login_challenges', 'admin_sessions', \
+                   'identity_abuse_rate_limits', \
                    'user_profiles', 'policy_acceptance_records', 'consent_events' \
                ]::TEXT[]) AS t(table_name) \
               WHERE has_table_privilege(current_user, pg_catalog.format('public.%I', table_name), 'SELECT') \
@@ -3148,6 +3149,18 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
     assert_eq!(
         admin_function_grants, 8,
         "application should execute only the explicit Admin authentication functions"
+    );
+
+    let identity_abuse_function_access: bool = sqlx::query_scalar(
+        "SELECT has_function_privilege(current_user, \
+                'public.reserve_identity_abuse_attempt(text,bytea,integer,integer)', 'EXECUTE')",
+    )
+    .fetch_one(&app_pool)
+    .await
+    .expect("Identity abuse-rate-limit function privilege should be queryable");
+    assert!(
+        identity_abuse_function_access,
+        "application should execute the Identity abuse-rate-limit function"
     );
 
     let operator_function_access: (bool, bool, bool) = sqlx::query_as(
