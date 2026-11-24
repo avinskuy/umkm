@@ -146,7 +146,7 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                 .client
                 .post(format!("{API_BASE}/start"))
                 .bearer_auth(self.api_key.as_str())
-                .header(header::IDEMPOTENCY_KEY, idempotency_key)
+                .header("Idempotency-Key", idempotency_key)
                 .json(&payload)
                 .send()
                 .await
