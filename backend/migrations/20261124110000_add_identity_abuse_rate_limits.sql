@@ -55,10 +55,10 @@ BEGIN
                WHEN current_limit.window_started_at
                     <= v_now - pg_catalog.make_interval(secs => p_window_seconds)
                THEN v_now
-               ELSE public.identity_abuse_rate_limits.window_started_at
+               ELSE current_limit.window_started_at
            END,
            attempt_count = CASE
-               WHEN public.identity_abuse_rate_limits.window_started_at
+               WHEN current_limit.window_started_at
                     <= v_now - pg_catalog.make_interval(secs => p_window_seconds)
                THEN 1
                ELSE current_limit.attempt_count + 1
