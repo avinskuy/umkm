@@ -7,9 +7,10 @@ use super::{
     flowkirim::FlowKirimVerifyProvider,
     registration::ContactChannel,
     verification::{
-        contact_aliases, decrypt_destination, destination_associated_data, dispatch_flowkirim_challenge,
-        dispatch_otp_challenge, load_verification_session, new_uuid, normalize_contact,
-        validate_uuid, verify_flowkirim_session, verify_otp_session, SessionRow, VerificationError,
+        contact_aliases, decrypt_destination, destination_associated_data,
+        dispatch_flowkirim_challenge, dispatch_otp_challenge, load_verification_session, new_uuid,
+        normalize_contact, validate_uuid, verify_flowkirim_session, verify_otp_session, SessionRow,
+        VerificationError,
     },
 };
 
@@ -81,10 +82,15 @@ impl<'a> RecoveryService<'a> {
         }
     }
 
-    async fn dispatch_challenge(&self, session_id: &str) -> Result<DispatchStatus, VerificationError> {
+    async fn dispatch_challenge(
+        &self,
+        session_id: &str,
+    ) -> Result<DispatchStatus, VerificationError> {
         let session = load_verification_session(self.pool, session_id, "account_recovery").await?;
         if session.0 == "whatsapp" {
-            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            let provider = self
+                .flowkirim
+                .ok_or(VerificationError::ProviderUnavailable)?;
             dispatch_flowkirim_challenge(
                 self.pool,
                 self.keys,
