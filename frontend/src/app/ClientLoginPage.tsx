@@ -59,7 +59,9 @@ export function ClientLoginPage() {
     <main className={styles.page}>
       <section className={styles.panel} aria-labelledby="client-login-title">
         <a className={styles.brand} href="/" aria-label="USahapintar beranda">
-          <span className={styles.brandMark} aria-hidden="true">U</span>
+          <span className={styles.brandMark} aria-hidden="true">
+            U
+          </span>
           <span>USahapintar</span>
         </a>
 
@@ -72,7 +74,9 @@ export function ClientLoginPage() {
         <div className={styles.rolePicker} role="group" aria-label="Jenis akun">
           {roleOptions.map((option) => (
             <button
-              className={role === option.value ? styles.roleActive : styles.roleOption}
+              className={
+                role === option.value ? styles.roleActive : styles.roleOption
+              }
               key={option.value}
               type="button"
               aria-pressed={role === option.value}
@@ -83,7 +87,9 @@ export function ClientLoginPage() {
               disabled={pending}
             >
               <span className={styles.roleLabel}>{option.label}</span>
-              <span className={styles.roleDescription}>{option.description}</span>
+              <span className={styles.roleDescription}>
+                {option.description}
+              </span>
             </button>
           ))}
         </div>
@@ -138,7 +144,9 @@ export function ClientLoginPage() {
         <p className={styles.registerPrompt}>
           Belum punya akun? <a href="/register">Daftar sekarang</a>
         </p>
-        <a className={styles.backLink} href="/">Kembali ke beranda</a>
+        <a className={styles.backLink} href="/">
+          Kembali ke beranda
+        </a>
       </section>
     </main>
   );
