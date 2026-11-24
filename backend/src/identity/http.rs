@@ -11,6 +11,7 @@ use super::{
     verification::{normalize_indonesian_phone, VerificationService},
 };
 
+mod abuse_guard;
 mod admin_authentication;
 mod authentication;
 pub mod authorization;
@@ -18,6 +19,7 @@ mod handlers;
 mod password_reset;
 mod recovery;
 pub use super::password::PasswordPolicy as RegistrationPasswordPolicy;
+pub use abuse_guard::PostgresRegistrationAbuseGuard;
 pub use admin_authentication::{admin_authentication_router, AdminAuthenticationApiState};
 pub use authentication::{authentication_router, AuthenticationApiState};
 pub use authorization::{require_permission, AuthorizationApiState};
