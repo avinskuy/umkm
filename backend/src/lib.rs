@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn runtime_application_mounts_registration_routes() {
+    async fn runtime_application_mounts_registration_and_recovery_routes() {
         let pool = PgPoolOptions::new()
             .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
             .expect("lazy pool configuration should be valid");
@@ -194,22 +194,32 @@ mod tests {
                 .expect("test Admin keyring should be valid"),
             )
         };
-        let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
-        let admin_authentication =
-            AdminAuthenticationApiState::new(pool.clone(), rate_limit_key.clone(), admin_keyring());
-        let registration = RegistrationApiState::new(
-            pool.clone(),
-            admin_keyring(),
+        let resend = || {
             Arc::new(
                 ResendHttpProvider::new(
                     Zeroizing::new("test-resend-key".to_owned()),
                     "USahapintar <noreply@example.test>".to_owned(),
                 )
                 .expect("test Resend provider should be valid"),
-            ),
+            )
+        };
+        let flowkirim = || {
+            Arc::new(
+                FlowKirimHttpProvider::new(Zeroizing::new("test-flowkirim-key".to_owned()))
+                    .expect("test FlowKirim provider should be valid"),
+            )
+        };
+
+        let authentication = AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+        let admin_authentication =
+            AdminAuthenticationApiState::new(pool.clone(), rate_limit_key.clone(), admin_keyring());
+        let registration = RegistrationApiState::new(
+            pool.clone(),
+            admin_keyring(),
+            resend(),
             Arc::new(PostgresRegistrationAbuseGuard::new(
                 pool.clone(),
-                rate_limit_key,
+                rate_limit_key.clone(),
             )),
             Arc::new(SimplePasswordPolicy),
             RegistrationPolicyVersions::new(
@@ -219,140 +229,53 @@ mod tests {
             )
             .expect("test policy versions should be valid"),
         )
-        .with_flowkirim_provider(Arc::new(
-            FlowKirimHttpProvider::new(Zeroizing::new("test-flowkirim-key".to_owned()))
-                .expect("test FlowKirim provider should be valid"),
-        ));
-
+        .with_flowkirim_provider(flowkirim());
         let recovery = RecoveryApiState::new(
             pool.clone(),
             admin_keyring(),
-            Arc::new(
-                ResendHttpProvider::new(
-                    Zeroizing::new("test-resend-key".to_owned()),
-                    "USahapintar <noreply@example.test>".to_owned(),
-                )
-                .expect("test recovery Resend provider should be valid"),
-            ),
+            resend(),
             Arc::new(PostgresRegistrationAbuseGuard::new(
                 pool.clone(),
-                AuthenticationRateLimitKey::from_hex(&"33".repeat(32))
-                    .expect("test recovery rate-limit key should be valid"),
+                rate_limit_key,
             )),
         )
-        .with_flowkirim_provider(Arc::new(
-            FlowKirimHttpProvider::new(Zeroizing::new("test-flowkirim-key".to_owned()))
-                .expect("test recovery FlowKirim provider should be valid"),
-        ))
+        .with_flowkirim_provider(flowkirim())
         .with_password_policy(Arc::new(SimplePasswordPolicy));
 
-        let response = app_with_authentication_admin_registration_and_recovery(
+        let app = app_with_authentication_admin_registration_and_recovery(
             pool,
             authentication,
             admin_authentication,
             registration,
             recovery,
-        )
-        .oneshot(
-            axum::http::Request::builder()
-                .method(axum::http::Method::GET)
-                .uri("/api/v1/identity/registrations")
-                .body(Body::empty())
-                .expect("request should be valid"),
-        )
-        .await
-        .expect("router should respond");
+        );
 
+        let registration_response = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(axum::http::Method::GET)
+                    .uri("/api/v1/identity/registrations")
+                    .body(Body::empty())
+                    .expect("request should be valid"),
+            )
+            .await
+            .expect("router should respond");
         assert_eq!(
-            response.status(),
+            registration_response.status(),
             axum::http::StatusCode::METHOD_NOT_ALLOWED
         );
 
-        let recovery_response = app_with_authentication_admin_registration_and_recovery(
-            PgPoolOptions::new()
-                .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                .expect("lazy pool configuration should be valid"),
-            AuthenticationApiState::new(
-                PgPoolOptions::new()
-                    .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                    .expect("lazy pool configuration should be valid"),
-                AuthenticationRateLimitKey::from_hex(&"44".repeat(32))
-                    .expect("test auth rate-limit key should be valid"),
-            ),
-            AdminAuthenticationApiState::new(
-                PgPoolOptions::new()
-                    .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                    .expect("lazy pool configuration should be valid"),
-                AuthenticationRateLimitKey::from_hex(&"55".repeat(32))
-                    .expect("test admin rate-limit key should be valid"),
-                admin_keyring(),
-            ),
-            RegistrationApiState::new(
-                PgPoolOptions::new()
-                    .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                    .expect("lazy pool configuration should be valid"),
-                admin_keyring(),
-                Arc::new(
-                    ResendHttpProvider::new(
-                        Zeroizing::new("test-resend-key".to_owned()),
-                        "USahapintar <noreply@example.test>".to_owned(),
-                    )
-                    .expect("test Resend provider should be valid"),
-                ),
-                Arc::new(PostgresRegistrationAbuseGuard::new(
-                    PgPoolOptions::new()
-                        .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                        .expect("lazy pool configuration should be valid"),
-                    AuthenticationRateLimitKey::from_hex(&"66".repeat(32))
-                        .expect("test registration rate-limit key should be valid"),
-                )),
-                Arc::new(SimplePasswordPolicy),
-                RegistrationPolicyVersions::new(
-                    "terms-test-v1".to_owned(),
-                    "privacy-test-v1".to_owned(),
-                    None,
-                )
-                .expect("test policy versions should be valid"),
+        let recovery_response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(axum::http::Method::GET)
+                    .uri("/api/v1/identity/recovery")
+                    .body(Body::empty())
+                    .expect("request should be valid"),
             )
-            .with_flowkirim_provider(Arc::new(
-                FlowKirimHttpProvider::new(Zeroizing::new("test-flowkirim-key".to_owned()))
-                    .expect("test FlowKirim provider should be valid"),
-            )),
-            RecoveryApiState::new(
-                PgPoolOptions::new()
-                    .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                    .expect("lazy pool configuration should be valid"),
-                admin_keyring(),
-                Arc::new(
-                    ResendHttpProvider::new(
-                        Zeroizing::new("test-resend-key".to_owned()),
-                        "USahapintar <noreply@example.test>".to_owned(),
-                    )
-                    .expect("test recovery Resend provider should be valid"),
-                ),
-                Arc::new(PostgresRegistrationAbuseGuard::new(
-                    PgPoolOptions::new()
-                        .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
-                        .expect("lazy pool configuration should be valid"),
-                    AuthenticationRateLimitKey::from_hex(&"77".repeat(32))
-                        .expect("test recovery rate-limit key should be valid"),
-                )),
-            )
-            .with_flowkirim_provider(Arc::new(
-                FlowKirimHttpProvider::new(Zeroizing::new("test-flowkirim-key".to_owned()))
-                    .expect("test recovery FlowKirim provider should be valid"),
-            ))
-            .with_password_policy(Arc::new(SimplePasswordPolicy)),
-        )
-        .oneshot(
-            axum::http::Request::builder()
-                .method(axum::http::Method::GET)
-                .uri("/api/v1/identity/recovery")
-                .body(Body::empty())
-                .expect("request should be valid"),
-        )
-        .await
-        .expect("router should respond");
+            .await
+            .expect("router should respond");
         assert_eq!(
             recovery_response.status(),
             axum::http::StatusCode::METHOD_NOT_ALLOWED
