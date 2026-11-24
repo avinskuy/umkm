@@ -34,7 +34,9 @@ describe("RegistrationPage", () => {
     render(<RegistrationPage />);
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
 
-    expect(screen.getByText(/format lokal 08.*internasional 628.*\+628/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/format lokal 08.*internasional 628.*\+628/i)).toBeInTheDocument(,
+    ).toBeInTheDocument();
   });
 
   it("does not submit or send data while public registration is unavailable", () => {
