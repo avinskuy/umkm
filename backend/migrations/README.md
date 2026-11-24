@@ -25,6 +25,7 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 | 0017 | `20261123110000_add_password_reset_runtime.sql` | Penerbitan dan pencabutan token reset, konsumsi satu kali, penggantian hash password atomik, pencabutan seluruh sesi, penyelesaian kasus, dan audit event. |
 | 0018 | `20261123120000_add_single_admin_totp_credentials.sql` | Membatasi akun Admin menjadi satu dan menyediakan penyimpanan kredensial TOTP terenkripsi dengan perlindungan replay-counter dan perubahan langsung. 
 | 0019 | `20261123130000_add_admin_authentication_database_runtime.sql` | Challenge login Admin sekali pakai, rate limit terpisah, sesi Admin terisolasi, konsumsi TOTP atomik, dan audit login berhasil. |\n| 0020 | `20261123140000_add_admin_totp_operator_workflows.sql` | Aktivasi enrollment dan reset/re-enrollment TOTP melalui prosedur operator internal, termasuk pencabutan challenge/sesi dan audit. |
+| 0021 | `20261124100000_add_flowkirim_verification_support.sql` | Challenge OTP FlowKirim untuk registrasi WhatsApp, pengikatan request ID satu kali, dan operasi database terkontrol. |
 
 ## Batas runtime
 
@@ -37,7 +38,26 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 
 ## Status integrasi
 
-Migration 0001–0020 tersedia pada repository. Migration 0018 menyediakan fondasi akun Admin tunggal dan kredensial TOTP terenkripsi. Migration 0019 menyediakan operasi database terkontrol untuk lookup kredensial Admin, rate limit, challenge login, konsumsi time-step TOTP secara atomik, sesi Admin terpisah, dan audit login berhasil. Migration 0020 menyediakan aktivasi enrollment dan reset/re-enrollment TOTP melalui fungsi operator internal yang tidak diberikan kepada principal aplikasi; reset mencabut challenge dan sesi Admin aktif. Runtime kriptografi Admin, layanan autentikasi, endpoint HTTP, provisioning awal akun, dan dashboard Admin belum tersedia. Pengujian PostgreSQL CI mencakup invariant token reset, privilege function, serta operasi reset dan pencabutan sesi. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan account recovery.
+Migration 0001–0021 tersedia pada repository. Migration 0021 memisahkan challenge lokal berbasis keyed hash dari challenge FlowKirim yang tidak menyimpan hash OTP lokal, membatasi FlowKirim hanya untuk registrasi WhatsApp, serta mengikat provider request ID satu kali.  Migration 0018 menyediakan fondasi akun Admin tunggal dan kredensial TOTP terenkripsi. Migration 0019 menyediakan operasi database terkontrol untuk lookup kredensial Admin, rate limit, challenge login, konsumsi time-step TOTP secara atomik, sesi Admin terpisah, dan audit login berhasil. Migration 0020 menyediakan aktivasi enrollment dan reset/re-enrollment TOTP melalui fungsi operator internal yang tidak diberikan kepada principal aplikasi; reset mencabut challenge dan sesi Admin aktif. Runtime kriptografi Admin, layanan autentikasi, endpoint HTTP, provisioning awal akun, dan dashboard Admin belum tersedia. Pengujian PostgreSQL CI mencakup invariant token reset, privilege function, serta operasi reset dan pencabutan sesi. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan account recovery.
+
+Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal. Password reset memiliki service penerbitan token setelah approval dan endpoint konsumsi token pada recovery router. Token berlaku 15 menit, disimpan sebagai hash, hanya dapat digunakan sekali, dan kegagalan pengiriman mencabut token. Konsumsi token memperbarui hash password, mencabut seluruh sesi aktif, menyelesaikan kasus recovery, dan menulis audit event dalam satu operasi PostgreSQL. Orkestrasi penerbitan token dari keputusan review Admin, endpoint review Admin, notifikasi keamanan pasca-reset, dan UI frontend reset password belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
+
+## Pengujian
+
+Pengujian migration, invariant database, principal/privilege, dan operasi PostgreSQL berada di `backend/tests/postgres.rs`. Pengujian runtime HTTP berada di `backend/tests/runtime.rs`. CI menggunakan database disposable dan fake provider; pengujian tidak mengirim OTP nyata.
+
+Perintah pemeriksaan backend tersedia di [Backend README](../README.md).
+
+## Provisioning dan urutan operasi
+
+1. Provision principal dan grant dasar melalui skrip pada `backend/database/bootstrap/`.
+2. Jalankan migration secara eksplisit menggunakan principal migrator.
+3. Terapkan grant runtime setelah ownership fungsi dan privilege diperiksa.
+4. Jalankan pengujian PostgreSQL menggunakan principal yang sesuai.
+5. Verifikasi konfigurasi runtime sebelum layanan diaktifkan.
+
+Jangan mengubah file migration yang telah digunakan pada database bersama. Buat migration baru untuk setiap perubahan skema berikutnya.
+ Migration 0018 menyediakan fondasi akun Admin tunggal dan kredensial TOTP terenkripsi. Migration 0019 menyediakan operasi database terkontrol untuk lookup kredensial Admin, rate limit, challenge login, konsumsi time-step TOTP secara atomik, sesi Admin terpisah, dan audit login berhasil. Migration 0020 menyediakan aktivasi enrollment dan reset/re-enrollment TOTP melalui fungsi operator internal yang tidak diberikan kepada principal aplikasi; reset mencabut challenge dan sesi Admin aktif. Runtime kriptografi Admin, layanan autentikasi, endpoint HTTP, provisioning awal akun, dan dashboard Admin belum tersedia. Pengujian PostgreSQL CI mencakup invariant token reset, privilege function, serta operasi reset dan pencabutan sesi. Runtime identity menyediakan operasi registrasi/verifikasi, login password, session management, dan account recovery.
 
 Router registrasi dan recovery tersedia sebagai komponen terinjeksi, tetapi belum dipasang pada server default. Recovery mendukung sinyal sesi aktif sebelumnya dan keputusan review Admin melalui service internal. Password reset memiliki service penerbitan token setelah approval dan endpoint konsumsi token pada recovery router. Token berlaku 15 menit, disimpan sebagai hash, hanya dapat digunakan sekali, dan kegagalan pengiriman mencabut token. Konsumsi token memperbarui hash password, mencabut seluruh sesi aktif, menyelesaikan kasus recovery, dan menulis audit event dalam satu operasi PostgreSQL. Orkestrasi penerbitan token dari keputusan review Admin, endpoint review Admin, notifikasi keamanan pasca-reset, dan UI frontend reset password belum tersedia. Provider OTP nyata dan key provider produksi juga belum dikonfigurasi.
 
