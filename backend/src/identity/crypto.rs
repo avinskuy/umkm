@@ -297,7 +297,6 @@ fn is_canonical_uuid(value: &str) -> bool {
             _ => byte.is_ascii_hexdigit(),
         })
 }
-
 /// Fingerprint kontak untuk pencarian/rate-limit tanpa menyimpan kontak plaintext.
 pub fn contact_fingerprint(
     provider: &dyn KeyProvider,
@@ -580,6 +579,9 @@ pub struct IdentityKeyring {
     purposes: HashMap<KeyPurpose, PurposeKeyring>,
 }
 
+#[cfg(test)]
+type IdentityPurposeEntries<'a> = [(KeyPurpose, KeyVersion, &'a [(KeyVersion, &'a str)]); 3];
+
 impl IdentityKeyring {
     pub fn from_env() -> Result<Self, CryptoError> {
         let mut purposes = HashMap::new();
@@ -597,8 +599,7 @@ impl IdentityKeyring {
                 "IDENTITY_CONTACT_FINGERPRINT_KEYS",
             )?,
         );
-        purposes.insert(
-            KeyPurpose::OtpVerification,
+        purposes.insert(            KeyPurpose::OtpVerification,
             PurposeKeyring::from_env(
                 "IDENTITY_OTP_VERIFICATION_KEY_ACTIVE_VERSION",
                 "IDENTITY_OTP_VERIFICATION_KEYS",
@@ -608,9 +609,8 @@ impl IdentityKeyring {
         Ok(Self { purposes })
     }
 
-    fn from_purpose_entries(
-        entries: [(KeyPurpose, KeyVersion, &[(KeyVersion, &str)]); 3],
-    ) -> Result<Self, CryptoError> {
+    #[cfg(test)]
+    fn from_purpose_entries(entries: IdentityPurposeEntries<'_>) -> Result<Self, CryptoError> {
         let mut purposes = HashMap::new();
         for (purpose, active_version, keys) in entries {
             if purpose == KeyPurpose::AdminTotpSecret
@@ -897,8 +897,7 @@ mod tests {
         assert_eq!(parse_key_version("v0"), Err(CryptoError::InvalidInput));
     }
 
-    #[test]
-    fn otp_digest_is_bound_to_challenge_and_session() {
+    #[test]    fn otp_digest_is_bound_to_challenge_and_session() {
         let provider = TestKeyProvider;
         let original_context = OtpVerificationContext {
             challenge_id: b"challenge-a",
