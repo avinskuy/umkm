@@ -542,10 +542,8 @@ fn normalize_contact(
             if email.is_some() {
                 return Err(VerificationError::InvalidInput);
             }
-            let phone = normalize_indonesian_phone(
-                phone.ok_or(VerificationError::InvalidInput)?,
-            )
-            .ok_or(VerificationError::InvalidInput)?;
+            let phone = normalize_indonesian_phone(phone.ok_or(VerificationError::InvalidInput)?)
+                .ok_or(VerificationError::InvalidInput)?;
             Ok(("whatsapp", phone))
         }
     }
@@ -632,7 +630,12 @@ mod tests {
 
     #[test]
     fn indonesian_phone_formats_normalize_to_e164() {
-        for input in ["08123456789", "628123456789", "+628123456789", "0812-3456-789"] {
+        for input in [
+            "08123456789",
+            "628123456789",
+            "+628123456789",
+            "0812-3456-789",
+        ] {
             assert_eq!(
                 normalize_indonesian_phone(input).as_deref(),
                 Some("+628123456789")
