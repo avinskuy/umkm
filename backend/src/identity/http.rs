@@ -190,6 +190,7 @@ pub struct RecoveryApiState {
     pub(super) pool: PgPool,
     pub(super) keys: Arc<dyn KeyProvider>,
     pub(super) delivery: Arc<dyn OtpDeliveryProvider>,
+    pub(super) flowkirim: Option<Arc<dyn FlowKirimVerifyProvider>>,
     pub(super) abuse_guard: Arc<dyn RegistrationAbuseGuard>,
     pub(super) password_policy: Option<Arc<dyn RegistrationPasswordPolicy>>,
 }
@@ -205,9 +206,15 @@ impl RecoveryApiState {
             pool,
             keys,
             delivery,
+            flowkirim: None,
             abuse_guard,
             password_policy: None,
         }
+    }
+
+    pub fn with_flowkirim_provider(mut self, provider: Arc<dyn FlowKirimVerifyProvider>) -> Self {
+        self.flowkirim = Some(provider);
+        self
     }
 
     pub fn with_password_policy(mut self, policy: Arc<dyn RegistrationPasswordPolicy>) -> Self {
@@ -216,7 +223,15 @@ impl RecoveryApiState {
     }
 
     pub(super) fn recovery_service(&self) -> RecoveryService<'_> {
-        RecoveryService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+        match self.flowkirim.as_deref() {
+            Some(provider) => RecoveryService::new_with_flowkirim(
+                &self.pool,
+                self.keys.as_ref(),
+                self.delivery.as_ref(),
+                provider,
+            ),
+            None => RecoveryService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref()),
+        }
     }
 }
 
