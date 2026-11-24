@@ -20,7 +20,10 @@ describe("RegistrationPage", () => {
   it("switches the contact field between email and WhatsApp", () => {
     render(<RegistrationPage />);
 
-    expect(screen.getByLabelText("Alamat email")).toHaveAttribute("type", "email");
+    expect(screen.getByLabelText("Alamat email")).toHaveAttribute(
+      "type",
+      "email",
+    );
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
 
     expect(screen.getByLabelText("Nomor WhatsApp")).toHaveAttribute("type", "tel");
