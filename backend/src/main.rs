@@ -1,15 +1,31 @@
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{env, io, net::SocketAddr, sync::Arc};
 
 use usahapintar_api::{
-    app_with_authentication_and_admin,
+    app_with_authentication_admin_and_registration,
     config::server_address,
     database::{connect, DatabaseConfig},
     identity::{
-        crypto::AdminTotpKeyring,
-        http::{AdminAuthenticationApiState, AuthenticationApiState},
+        crypto::{AdminTotpKeyring, IdentityKeyring},
+        flowkirim_http::FlowKirimHttpProvider,
+        http::{
+            AdminAuthenticationApiState, AuthenticationApiState, PostgresRegistrationAbuseGuard,
+            RegistrationApiState, RegistrationPolicyVersions,
+        },
+        password::SimplePasswordPolicy,
+        resend_http::ResendHttpProvider,
         AuthenticationRateLimitKey,
     },
 };
+use zeroize::Zeroizing;
+
+fn required_env(name: &'static str) -> Result<String, io::Error> {
+    env::var(name).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("{name} is required"),
+        )
+    })
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,8 +57,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ADMIN_TOTP_ENCRYPTION_KEY_ACTIVE_VERSION and ADMIN_TOTP_ENCRYPTION_KEYS are required and must be valid",
         )
     })?);
-    let admin_authentication =
-        AdminAuthenticationApiState::new(pool.clone(), rate_limit_key, admin_totp_keyring);
+    let admin_authentication = AdminAuthenticationApiState::new(
+        pool.clone(),
+        rate_limit_key.clone(),
+        admin_totp_keyring,
+    );
+
+    let identity_keyring = Arc::new(IdentityKeyring::from_env().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Identity encryption, contact fingerprint, and OTP verification keys are required and must be valid",
+        )
+    })?);
+    let resend = Arc::new(
+        ResendHttpProvider::new(
+            Zeroizing::new(required_env("RESEND_API_KEY")?),
+            required_env("RESEND_FROM_EMAIL")?,
+        )
+        .map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Resend API configuration is invalid",
+            )
+        })?,
+    );
+    let flowkirim = Arc::new(
+        FlowKirimHttpProvider::new(Zeroizing::new(required_env("FLOWKIRIM_API_KEY")?))
+            .map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "FlowKirim API configuration is invalid",
+                )
+            })?,
+    );
+    let abuse_guard = Arc::new(PostgresRegistrationAbuseGuard::new(
+        pool.clone(),
+        rate_limit_key,
+    ));
+    let policy_versions = RegistrationPolicyVersions::new(
+        required_env("REGISTRATION_TERMS_VERSION")?,
+        required_env("REGISTRATION_PRIVACY_VERSION")?,
+        env::var("REGISTRATION_MARKETING_NOTICE_VERSION").ok(),
+    )
+    .map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Registration policy version configuration is invalid",
+        )
+    })?;
+    let registration = RegistrationApiState::new(
+        pool.clone(),
+        identity_keyring,
+        resend,
+        abuse_guard,
+        Arc::new(SimplePasswordPolicy),
+        policy_versions,
+    )
+    .with_flowkirim_provider(flowkirim);
 
     let host = env::var("HOST").ok();
     let port = env::var("PORT").ok();
@@ -55,8 +126,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     axum::serve(
         listener,
-        app_with_authentication_and_admin(pool, authentication, admin_authentication)
-            .into_make_service_with_connect_info::<SocketAddr>(),
+        app_with_authentication_admin_and_registration(
+            pool,
+            authentication,
+            admin_authentication,
+            registration,
+        )
+        .into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await?;
 
