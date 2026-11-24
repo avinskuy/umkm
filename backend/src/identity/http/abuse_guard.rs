@@ -124,8 +124,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fingerprints_are_stable_and_scope_separated() {
+    #[tokio::test]
+    async fn fingerprints_are_stable_and_scope_separated() {
         let key = AuthenticationRateLimitKey::from_hex(&"ab".repeat(32)).unwrap();
         let guard = PostgresRegistrationAbuseGuard::new(
             PgPool::connect_lazy("postgres://localhost/unused").unwrap(),
