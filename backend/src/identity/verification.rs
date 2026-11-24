@@ -167,7 +167,7 @@ impl<'a> VerificationService<'a> {
             let provider = self
                 .flowkirim
                 .ok_or(VerificationError::ProviderUnavailable)?;
-            return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code)
+            return verify_flowkirim_session(self.pool, self.keys, provider, session_id, "registration", code)
                 .await;
         }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
@@ -182,7 +182,8 @@ impl<'a> VerificationService<'a> {
             let provider = self
                 .flowkirim
                 .ok_or(VerificationError::ProviderUnavailable)?;
-            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id).await;
+            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id, "registration")
+                .await;
         }
         dispatch_otp_challenge(
             self.pool,
@@ -195,18 +196,22 @@ impl<'a> VerificationService<'a> {
     }
 }
 
-async fn dispatch_flowkirim_challenge(
+pub(crate) async fn dispatch_flowkirim_challenge(
     pool: &PgPool,
     keys: &dyn KeyProvider,
     provider: &dyn FlowKirimVerifyProvider,
     session_id: &str,
+    purpose: &str,
 ) -> Result<DispatchStatus, VerificationError> {
+    if !matches!(purpose, "registration" | "account_recovery") {
+        return Err(VerificationError::InvalidInput);
+    }
     validate_uuid(session_id)?;
-    let session = load_verification_session(pool, session_id, "registration").await?;
+    let session = load_verification_session(pool, session_id, purpose).await?;
     if session.0 != "whatsapp" {
         return Err(VerificationError::InvalidInput);
     }
-    let destination = decrypt_destination(keys, session_id, "registration", &session)?;
+    let destination = decrypt_destination(keys, session_id, purpose, &session)?;
     let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
     let alias_bytes = aliases
         .into_iter()
@@ -227,7 +232,7 @@ async fn dispatch_flowkirim_challenge(
         return Err(VerificationError::InvalidStoredData);
     }
 
-    let idempotency_key = format!("registration-whatsapp-{challenge_id}");
+    let idempotency_key = format!("{purpose}-whatsapp-{challenge_id}");
     let status = match provider.start(destination, idempotency_key).await {
         FlowKirimProviderOutcome::Accepted(request_id) => {
             if request_id.trim().is_empty() || request_id.len() > 256 {
@@ -255,21 +260,26 @@ async fn dispatch_flowkirim_challenge(
     Ok(status)
 }
 
-async fn verify_flowkirim_session(
+pub(crate) async fn verify_flowkirim_session(
     pool: &PgPool,
     keys: &dyn KeyProvider,
     provider: &dyn FlowKirimVerifyProvider,
     session_id: &str,
+    purpose: &str,
     code: &str,
 ) -> Result<bool, VerificationError> {
-    if code.len() != OTP_DIGITS as usize || !code.bytes().all(|byte| byte.is_ascii_digit()) {
+    if !matches!(purpose, "registration" | "account_recovery")
+        || code.len() != OTP_DIGITS as usize
+        || !code.bytes().all(|byte| byte.is_ascii_digit())
+    {
         return Err(VerificationError::InvalidInput);
     }
-    let session = load_verification_session(pool, session_id, "registration").await?;
+    validate_uuid(session_id)?;
+    let session = load_verification_session(pool, session_id, purpose).await?;
     if session.0 != "whatsapp" {
         return Err(VerificationError::InvalidInput);
     }
-    let destination = decrypt_destination(keys, session_id, "registration", &session)?;
+    let destination = decrypt_destination(keys, session_id, purpose, &session)?;
     let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
     let (challenge_id, request_id) = sqlx::query_as::<_, (String, String)>(
         "SELECT challenge_id::text, provider_request_id FROM public.get_pending_flowkirim_otp_challenge($1::uuid)",
