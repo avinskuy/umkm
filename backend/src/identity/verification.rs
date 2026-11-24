@@ -346,6 +346,7 @@ pub(crate) async fn dispatch_otp_challenge(
 
     let dispatch_status = delivery
         .dispatch(OtpDeliveryMessage {
+            idempotency_key: format!("otp-{purpose}-{challenge_id}"),
             destination,
             channel: delivery_channel(channel),
             code,
