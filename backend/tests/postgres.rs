@@ -1466,13 +1466,12 @@ async fn assert_flowkirim_verification_database_operations(pool: &PgPool) {
     .expect("valid FlowKirim result should verify account recovery contact");
     assert!(recovery_verified);
 
-    let recovery_status: String = sqlx::query_scalar(
-        "SELECT status FROM public.verification_sessions WHERE id = $1::uuid",
-    )
-    .bind(recovery_session_id)
-    .fetch_one(pool)
-    .await
-    .expect("recovery verification status should be queryable");
+    let recovery_status: String =
+        sqlx::query_scalar("SELECT status FROM public.verification_sessions WHERE id = $1::uuid")
+            .bind(recovery_session_id)
+            .fetch_one(pool)
+            .await
+            .expect("recovery verification status should be queryable");
     assert_eq!(recovery_status, "verified");
 }
 
