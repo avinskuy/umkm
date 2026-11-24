@@ -492,6 +492,169 @@ impl KeyProvider for AdminTotpKeyring {
     }
 }
 
+/// Keyring Identity terpisah dari keyring TOTP Admin.
+/// Setiap purpose memiliki versi aktif dan kumpulan versi lama sendiri.
+struct PurposeKeyring {
+    active_version: KeyVersion,
+    keys: HashMap<KeyVersion, SecretKey>,
+}
+
+impl PurposeKeyring {
+    fn from_env(active_name: &str, keys_name: &str) -> Result<Self, CryptoError> {
+        let active_label = Zeroizing::new(
+            std::env::var(active_name).map_err(|_| CryptoError::KeyUnavailable)?,
+        );
+        let active_version = parse_key_version(active_label.as_str())?;
+        let encoded_keys =
+            Zeroizing::new(std::env::var(keys_name).map_err(|_| CryptoError::KeyUnavailable)?);
+        let entries = encoded_keys
+            .split(';')
+            .map(|entry| {
+                let (label, encoded_key) =
+                    entry.split_once(':').ok_or(CryptoError::InvalidInput)?;
+                Ok((parse_key_version(label)?, encoded_key))
+            })
+            .collect::<Result<Vec<_>, CryptoError>>()?;
+        Self::from_hex_entries(active_version, &entries)
+    }
+
+    fn from_hex_entries(
+        active_version: KeyVersion,
+        entries: &[(KeyVersion, &str)],
+    ) -> Result<Self, CryptoError> {
+        if active_version.0 == 0 || entries.is_empty() {
+            return Err(CryptoError::InvalidInput);
+        }
+
+        let mut keys = HashMap::new();
+        for (version, encoded_key) in entries {
+            if version.0 == 0 {
+                return Err(CryptoError::InvalidInput);
+            }
+            let key_bytes = decode_hex_key(encoded_key)?;
+            if keys
+                .insert(*version, SecretKey::from_bytes(key_bytes))
+                .is_some()
+            {
+                return Err(CryptoError::InvalidInput);
+            }
+        }
+
+        if !keys.contains_key(&active_version) {
+            return Err(CryptoError::KeyUnavailable);
+        }
+
+        Ok(Self {
+            active_version,
+            keys,
+        })
+    }
+
+    fn active_key(&self) -> Result<VersionedKey, CryptoError> {
+        let key = self
+            .keys
+            .get(&self.active_version)
+            .ok_or(CryptoError::KeyUnavailable)?;
+        Ok(VersionedKey::new(
+            self.active_version,
+            SecretKey::from_bytes(*key.expose()),
+        ))
+    }
+
+    fn key(&self, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+        self.keys
+            .get(&version)
+            .map(|key| SecretKey::from_bytes(*key.expose()))
+            .ok_or(CryptoError::KeyUnavailable)
+    }
+
+    fn versions(&self) -> Vec<KeyVersion> {
+        let mut versions: Vec<_> = self.keys.keys().copied().collect();
+        versions.sort_by_key(|version| version.0);
+        versions
+    }
+}
+
+/// Provider produksi untuk tiga purpose Identity. TOTP Admin tetap memakai
+/// AdminTotpKeyring dan tidak dapat mengambil key dari provider ini.
+pub struct IdentityKeyring {
+    purposes: HashMap<KeyPurpose, PurposeKeyring>,
+}
+
+impl IdentityKeyring {
+    pub fn from_env() -> Result<Self, CryptoError> {
+        let mut purposes = HashMap::new();
+        purposes.insert(
+            KeyPurpose::DataEncryption,
+            PurposeKeyring::from_env(
+                "IDENTITY_DATA_ENCRYPTION_KEY_ACTIVE_VERSION",
+                "IDENTITY_DATA_ENCRYPTION_KEYS",
+            )?,
+        );
+        purposes.insert(
+            KeyPurpose::ContactFingerprint,
+            PurposeKeyring::from_env(
+                "IDENTITY_CONTACT_FINGERPRINT_KEY_ACTIVE_VERSION",
+                "IDENTITY_CONTACT_FINGERPRINT_KEYS",
+            )?,
+        );
+        purposes.insert(
+            KeyPurpose::OtpVerification,
+            PurposeKeyring::from_env(
+                "IDENTITY_OTP_VERIFICATION_KEY_ACTIVE_VERSION",
+                "IDENTITY_OTP_VERIFICATION_KEYS",
+            )?,
+        );
+        Ok(Self { purposes })
+    }
+
+    fn from_purpose_entries(
+        entries: [
+            (KeyPurpose, KeyVersion, &[(KeyVersion, &str)]);
+            3
+        ],
+    ) -> Result<Self, CryptoError> {
+        let mut purposes = HashMap::new();
+        for (purpose, active_version, keys) in entries {
+            if purpose == KeyPurpose::AdminTotpSecret
+                || purposes
+                    .insert(
+                        purpose,
+                        PurposeKeyring::from_hex_entries(active_version, keys)?,
+                    )
+                    .is_some()
+            {
+                return Err(CryptoError::InvalidInput);
+            }
+        }
+        Ok(Self { purposes })
+    }
+}
+
+impl KeyProvider for IdentityKeyring {
+    fn active_key(&self, purpose: KeyPurpose) -> Result<VersionedKey, CryptoError> {
+        self.purposes
+            .get(&purpose)
+            .ok_or(CryptoError::KeyUnavailable)?
+            .active_key()
+    }
+
+    fn key(&self, purpose: KeyPurpose, version: KeyVersion) -> Result<SecretKey, CryptoError> {
+        self.purposes
+            .get(&purpose)
+            .ok_or(CryptoError::KeyUnavailable)?
+            .key(version)
+    }
+
+    fn key_versions(&self, purpose: KeyPurpose) -> Result<Vec<KeyVersion>, CryptoError> {
+        Ok(self
+            .purposes
+            .get(&purpose)
+            .ok_or(CryptoError::KeyUnavailable)?
+            .versions())
+    }
+}
+
 fn decode_hex_key(value: &str) -> Result<[u8; KEY_LEN], CryptoError> {
     if value.len() != KEY_LEN * 2 {
         return Err(CryptoError::InvalidKey);
@@ -769,6 +932,45 @@ mod tests {
             decrypt_admin_totp_secret(&provider, other_admin_id, &encrypted).unwrap_err(),
             CryptoError::AuthenticationFailed
         );
+    }
+
+    #[test]
+    fn identity_keyring_keeps_purposes_separate_and_supports_rotation() {
+        const DATA_V1: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+        const DATA_V2: &str = "1212121212121212121212121212121212121212121212121212121212121212";
+        const CONTACT_V1: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+        const CONTACT_V2: &str = "2323232323232323232323232323232323232323232323232323232323232323";
+        const OTP_V1: &str = "3333333333333333333333333333333333333333333333333333333333333333";
+
+        let provider = IdentityKeyring::from_purpose_entries([
+            (
+                KeyPurpose::DataEncryption,
+                KeyVersion(2),
+                &[(KeyVersion(1), DATA_V1), (KeyVersion(2), DATA_V2)],
+            ),
+            (
+                KeyPurpose::ContactFingerprint,
+                KeyVersion(2),
+                &[(KeyVersion(1), CONTACT_V1), (KeyVersion(2), CONTACT_V2)],
+            ),
+            (
+                KeyPurpose::OtpVerification,
+                KeyVersion(1),
+                &[(KeyVersion(1), OTP_V1)],
+            ),
+        ])
+        .expect("valid Identity keyring should load");
+
+        assert_eq!(
+            provider.active_key(KeyPurpose::DataEncryption).unwrap().version,
+            KeyVersion(2)
+        );
+        assert_eq!(
+            provider.key_versions(KeyPurpose::ContactFingerprint).unwrap(),
+            vec![KeyVersion(1), KeyVersion(2)]
+        );
+        assert!(provider.active_key(KeyPurpose::AdminTotpSecret).is_err());
+        assert!(provider.key(KeyPurpose::OtpVerification, KeyVersion(2)).is_err());
     }
 
     #[test]
