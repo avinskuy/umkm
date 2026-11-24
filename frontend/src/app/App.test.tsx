@@ -35,9 +35,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(
-      screen.getByRole("heading", { name: "Buat akun baru" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Buat akun baru" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Pendaftaran belum dibuka.");
   });
