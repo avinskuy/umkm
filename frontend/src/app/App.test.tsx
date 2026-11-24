@@ -1,7 +1,9 @@
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { screen } from "@testing-library/dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
+
+afterEach(() => cleanup());
 
 describe("App", () => {
   beforeEach(() => {
@@ -28,6 +30,16 @@ describe("App", () => {
       screen.getByRole("heading", { name: "Selamat datang kembali" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
+  });
+
+  it("routes the registration path to the registration page", () => {
+    window.history.replaceState(null, "", "/register");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Buat akun baru" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Jenis akun" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Pendaftaran belum dibuka.");
   });
 
   it("routes the Admin login path to the dedicated login page", () => {

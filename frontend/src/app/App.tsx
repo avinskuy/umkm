@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminDashboardPage } from "./AdminDashboardPage";
 import { AdminLoginPage } from "./AdminLoginPage";
 import { ClientLoginPage } from "./ClientLoginPage";
+import { RegistrationPage } from "./RegistrationPage";
 import { ResetPasswordPage } from "./ResetPasswordPage";
 import styles from "./App.module.css";
 
@@ -24,6 +25,10 @@ export function App() {
 
   if (path === "/login" || path === "/login/") {
     return <ClientLoginPage />;
+  }
+
+  if (path === "/register" || path === "/register/") {
+    return <RegistrationPage />;
   }
 
   if (path.endsWith("/reset-password") || path.endsWith("/reset-password/")) {
