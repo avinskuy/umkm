@@ -8,8 +8,9 @@ use std::{future::Future, pin::Pin};
 use zeroize::Zeroizing;
 
 /// Hasil transport/provider dibedakan agar timeout tidak dianggap sebagai penolakan.
-/// Unavailable berarti hasil operasi mungkin belum diketahui dan perlu ditangani
-/// secara idempoten sebelum mengulang permintaan.
+/// Rejected berarti provider memproses operasi tetapi menolaknya (untuk check: kode
+/// tidak cocok); Unavailable berarti hasil operasi mungkin belum diketahui dan perlu
+/// ditangani secara idempoten sebelum mengulang permintaan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowKirimProviderOutcome<T> {
     Accepted(T),
