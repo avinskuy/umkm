@@ -111,10 +111,7 @@ pub fn app_with_authentication_admin_registration_and_recovery(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        app, app_with_authentication_admin_and_registration,
-        app_with_authentication_admin_registration_and_recovery,
-    };
+    use super::{app, app_with_authentication_admin_registration_and_recovery};
     use crate::identity::{
         crypto::{AdminTotpKeyring, KeyVersion},
         flowkirim_http::FlowKirimHttpProvider,
