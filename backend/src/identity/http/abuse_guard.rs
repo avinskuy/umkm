@@ -42,12 +42,12 @@ impl PostgresRegistrationAbuseGuard {
         limit: i32,
     ) -> Result<bool, sqlx::Error> {
         sqlx::query_scalar("SELECT public.reserve_identity_abuse_attempt($1, $2, $3, $4)")
-        .bind(scope)
-        .bind(fingerprint.as_slice())
-        .bind(limit)
-        .bind(WINDOW_SECONDS)
-        .fetch_one(&self.pool)
-        .await
+            .bind(scope)
+            .bind(fingerprint.as_slice())
+            .bind(limit)
+            .bind(WINDOW_SECONDS)
+            .fetch_one(&self.pool)
+            .await
     }
 
     fn fingerprint(&self, scope: &str, value: &[u8]) -> [u8; 32] {
