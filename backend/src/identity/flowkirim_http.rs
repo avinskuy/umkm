@@ -239,8 +239,7 @@ mod tests {
 
     #[test]
     fn parses_only_a_valid_start_request_id() {
-        let parsed: StartResponse =
-            serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
+        let parsed: StartResponse = serde_json::from_str(r#"{"request_id":"verify_123"}"#).unwrap();
         assert_eq!(parsed.request_id, "verify_123");
         assert!(serde_json::from_str::<StartResponse>(r#"{"request_id":""}"#).is_ok());
         assert!(serde_json::from_str::<StartResponse>(r#"{"id":"verify_123"}"#).is_err());
