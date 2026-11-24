@@ -94,8 +94,21 @@ pub fn app_with_authentication_admin_and_registration(
 
 #[cfg(test)]
 mod tests {
-    use super::app;
+    use super::{app, app_with_authentication_admin_and_registration};
+    use crate::identity::{
+        crypto::{AdminTotpKeyring, KeyVersion},
+        flowkirim_http::FlowKirimHttpProvider,
+        http::{
+            AdminAuthenticationApiState, AuthenticationApiState, PostgresRegistrationAbuseGuard,
+            RegistrationApiState, RegistrationPolicyVersions,
+        },
+        password::SimplePasswordPolicy,
+        resend_http::ResendHttpProvider,
+        AuthenticationRateLimitKey,
+    };
     use axum::body::Body;
+    use std::sync::Arc;
+    use zeroize::Zeroizing;
     use http_body_util::BodyExt;
     use sqlx::postgres::PgPoolOptions;
     use tower::ServiceExt;
@@ -140,6 +153,78 @@ mod tests {
             .expect("router should respond");
 
         assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn runtime_application_mounts_registration_routes() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://app_user:secret@127.0.0.1/usahapintar_test")
+            .expect("lazy pool configuration should be valid");
+        let rate_limit_key = AuthenticationRateLimitKey::from_hex(&"11".repeat(32))
+            .expect("test rate-limit key should be valid");
+        let admin_keyring = || {
+            Arc::new(
+                AdminTotpKeyring::from_hex_entries(
+                    KeyVersion(1),
+                    &[(
+                        KeyVersion(1),
+                        "2222222222222222222222222222222222222222222222222222222222222222",
+                    )],
+                )
+                .expect("test Admin keyring should be valid"),
+            )
+        };
+        let authentication =
+            AuthenticationApiState::new(pool.clone(), rate_limit_key.clone());
+        let admin_authentication = AdminAuthenticationApiState::new(
+            pool.clone(),
+            rate_limit_key.clone(),
+            admin_keyring(),
+        );
+        let registration = RegistrationApiState::new(
+            pool.clone(),
+            admin_keyring(),
+            Arc::new(
+                ResendHttpProvider::new(
+                    Zeroizing::new("test-resend-key".to_owned()),
+                    "USahapintar <noreply@example.test>".to_owned(),
+                )
+                .expect("test Resend provider should be valid"),
+            ),
+            Arc::new(PostgresRegistrationAbuseGuard::new(
+                pool.clone(),
+                rate_limit_key,
+            )),
+            Arc::new(SimplePasswordPolicy),
+            RegistrationPolicyVersions::new(
+                "terms-test-v1".to_owned(),
+                "privacy-test-v1".to_owned(),
+                None,
+            )
+            .expect("test policy versions should be valid"),
+        )
+        .with_flowkirim_provider(Arc::new(
+            FlowKirimHttpProvider::new(Zeroizing::new("test-flowkirim-key".to_owned()))
+                .expect("test FlowKirim provider should be valid"),
+        ));
+
+        let response = app_with_authentication_admin_and_registration(
+            pool,
+            authentication,
+            admin_authentication,
+            registration,
+        )
+        .oneshot(
+            axum::http::Request::builder()
+                .method(axum::http::Method::GET)
+                .uri("/api/v1/identity/registrations")
+                .body(Body::empty())
+                .expect("request should be valid"),
+        )
+        .await
+        .expect("router should respond");
+
+        assert_eq!(response.status(), axum::http::StatusCode::METHOD_NOT_ALLOWED);
     }
 
     #[tokio::test]
