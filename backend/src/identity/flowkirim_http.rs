@@ -1,8 +1,4 @@
 //! HTTP adapter FlowKirim Verify.
-//!
-//! API key hanya diberikan melalui constructor (nantinya dari secret runtime),
-//! tidak pernah dibaca dari frontend atau dicatat ke log.
-
 use std::time::Duration;
 
 use reqwest::{Client, StatusCode};
@@ -231,7 +227,8 @@ impl FlowKirimVerifyProvider for FlowKirimHttpProvider {
                         StatusCode::UNAUTHORIZED
                             | StatusCode::FORBIDDEN
                             | StatusCode::TOO_MANY_REQUESTS
-                    ) {
+                    )
+                {
                     FlowKirimProviderOutcome::Rejected
                 } else {
                     FlowKirimProviderOutcome::Unavailable
@@ -458,8 +455,7 @@ mod tests {
     fn check_accepts_only_documented_verified_status() {
         let verified: CheckResponse = serde_json::from_str(r#"{"status":"verified"}"#).unwrap();
 
-        let not_verified: CheckResponse =
-            serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
+        let not_verified: CheckResponse = serde_json::from_str(r#"{"status":"invalid"}"#).unwrap();
 
         assert_eq!(verified.status, "verified");
         assert_ne!(not_verified.status, "verified");
@@ -473,4 +469,4 @@ mod tests {
         assert_eq!(OTP_TTL_SECONDS, 600);
         assert_eq!(MAX_RESPONSE_BYTES, 16 * 1024);
     }
-    }
+                            }
