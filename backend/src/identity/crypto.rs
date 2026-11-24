@@ -994,6 +994,31 @@ mod tests {
     }
 
     #[test]
+    fn identity_keyring_rejects_reused_key_material_between_purposes() {
+        const SHARED: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+        const CONTACT: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+        const OTP: &str = "3333333333333333333333333333333333333333333333333333333333333333";
+
+        assert_eq!(
+            IdentityKeyring::from_purpose_entries([
+                (KeyPurpose::DataEncryption, KeyVersion(1), &[(KeyVersion(1), SHARED)]),
+                (KeyPurpose::ContactFingerprint, KeyVersion(1), &[(KeyVersion(1), SHARED)]),
+                (KeyPurpose::OtpVerification, KeyVersion(1), &[(KeyVersion(1), OTP)]),
+            ])
+            .err()
+            .expect("reused purpose key must be rejected"),
+            CryptoError::InvalidKey
+        );
+
+        assert!(IdentityKeyring::from_purpose_entries([
+            (KeyPurpose::DataEncryption, KeyVersion(1), &[(KeyVersion(1), SHARED)]),
+            (KeyPurpose::ContactFingerprint, KeyVersion(1), &[(KeyVersion(1), CONTACT)]),
+            (KeyPurpose::OtpVerification, KeyVersion(1), &[(KeyVersion(1), OTP)]),
+        ])
+        .is_ok());
+    }
+
+    #[test]
     fn admin_totp_keyring_supports_versioned_decryption_and_rotation() {
         let provider = AdminTotpKeyring::from_hex_entries(
             KeyVersion(2),
