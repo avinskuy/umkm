@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
@@ -16,6 +16,7 @@ use super::super::{
     verification::VerificationError,
 };
 use super::{
+    authentication::resolved_client_ip,
     opaque_verification_id, valid_contact_input, AbuseDecision, RegistrationAction,
     RegistrationApiState,
 };
@@ -112,11 +113,12 @@ pub fn registration_router(state: RegistrationApiState) -> Router {
 async fn register(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<RegistrationRequest>,
 ) -> Response {
     let decision = state
         .abuse_guard
-        .check(RegistrationAction::Create, peer.ip(), None)
+        .check(RegistrationAction::Create, resolved_client_ip(&headers, peer.ip()), None)
         .await;
     if let Some(response) = rate_limit_response(decision) {
         return response;
@@ -240,13 +242,14 @@ async fn register(
 async fn resend(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Path(verification_id): Path<String>,
 ) -> Response {
     let decision = state
         .abuse_guard
         .check(
             RegistrationAction::Resend,
-            peer.ip(),
+            resolved_client_ip(&headers, peer.ip()),
             Some(&verification_id),
         )
         .await;
@@ -271,6 +274,7 @@ async fn resend(
 async fn verify(
     State(state): State<RegistrationApiState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Path(verification_id): Path<String>,
     Json(request): Json<VerifyRequest>,
 ) -> Response {
@@ -278,7 +282,7 @@ async fn verify(
         .abuse_guard
         .check(
             RegistrationAction::Verify,
-            peer.ip(),
+            resolved_client_ip(&headers, peer.ip()),
             Some(&verification_id),
         )
         .await;
