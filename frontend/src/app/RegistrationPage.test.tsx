@@ -35,7 +35,7 @@ describe("RegistrationPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
 
     expect(
-      screen.getByText(/format lokal 08.*internasional 628.*\\+628/i),
+      screen.getByText(/format lokal 08.*internasional 628.*\+628/i),
     ).toBeInTheDocument();
   });
 
