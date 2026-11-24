@@ -8,6 +8,7 @@ use super::{
         KeyProvider, OtpVerificationContext,
     },
     delivery::{DeliveryChannel, DispatchStatus, OtpDeliveryMessage, OtpDeliveryProvider},
+    flowkirim::{FlowKirimProviderOutcome, FlowKirimVerifyProvider},
     registration::{create_client_user, ClientRegistration, ContactChannel},
 };
 
@@ -23,6 +24,7 @@ pub struct VerificationService<'a> {
     pool: &'a PgPool,
     keys: &'a dyn KeyProvider,
     delivery: &'a dyn OtpDeliveryProvider,
+    flowkirim: Option<&'a dyn FlowKirimVerifyProvider>,
 }
 
 pub struct RegistrationStart {
@@ -37,6 +39,8 @@ pub enum VerificationError {
     Crypto(super::crypto::CryptoError),
     InvalidInput,
     InvalidStoredData,
+    ProviderRejected,
+    ProviderUnavailable,
 }
 
 impl std::fmt::Display for VerificationError {
@@ -46,6 +50,8 @@ impl std::fmt::Display for VerificationError {
             Self::Crypto(_) => "verification cryptographic operation failed",
             Self::InvalidInput => "verification input is invalid",
             Self::InvalidStoredData => "stored verification data is invalid",
+            Self::ProviderRejected => "verification provider rejected the operation",
+            Self::ProviderUnavailable => "verification provider is unavailable",
         };
         formatter.write_str(message)
     }
@@ -75,6 +81,21 @@ impl<'a> VerificationService<'a> {
             pool,
             keys,
             delivery,
+            flowkirim: None,
+        }
+    }
+
+    pub fn new_with_flowkirim(
+        pool: &'a PgPool,
+        keys: &'a dyn KeyProvider,
+        delivery: &'a dyn OtpDeliveryProvider,
+        flowkirim: &'a dyn FlowKirimVerifyProvider,
+    ) -> Self {
+        Self {
+            pool,
+            keys,
+            delivery,
+            flowkirim: Some(flowkirim),
         }
     }
 
@@ -142,6 +163,13 @@ impl<'a> VerificationService<'a> {
 
     /// Memeriksa OTP, mencatat percobaan, dan mengaktifkan akun secara atomik di database.
     pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
+        validate_uuid(session_id)?;
+        if let Some(provider) = self.flowkirim {
+            let session = load_verification_session(self.pool, session_id, "registration").await?;
+            if session.0 == "whatsapp" {
+                return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code).await;
+            }
+        }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
     }
 
@@ -149,6 +177,12 @@ impl<'a> VerificationService<'a> {
         &self,
         session_id: &str,
     ) -> Result<DispatchStatus, VerificationError> {
+        if let Some(provider) = self.flowkirim {
+            let session = load_verification_session(self.pool, session_id, "registration").await?;
+            if session.0 == "whatsapp" {
+                return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id).await;
+            }
+        }
         dispatch_otp_challenge(
             self.pool,
             self.keys,
@@ -158,6 +192,104 @@ impl<'a> VerificationService<'a> {
         )
         .await
     }
+}
+
+async fn dispatch_flowkirim_challenge(
+    pool: &PgPool,
+    keys: &dyn KeyProvider,
+    provider: &dyn FlowKirimVerifyProvider,
+    session_id: &str,
+) -> Result<DispatchStatus, VerificationError> {
+    validate_uuid(session_id)?;
+    let session = load_verification_session(pool, session_id, "registration").await?;
+    if session.0 != "whatsapp" {
+        return Err(VerificationError::InvalidInput);
+    }
+    let destination = decrypt_destination(keys, session_id, "registration", &session)?;
+    let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
+    let alias_bytes = aliases.into_iter().map(|alias| alias.digest.to_vec()).collect::<Vec<_>>();
+    let challenge_id = new_uuid()?;
+
+    let (reserved_challenge_id, delivery_event_id) = sqlx::query_as::<_, (String, String)>(
+        "SELECT challenge_id::text, delivery_event_id::text FROM public.reserve_flowkirim_otp_challenge($1::uuid, $2::uuid, $3)",
+    )
+    .bind(session_id)
+    .bind(&challenge_id)
+    .bind(alias_bytes)
+    .fetch_one(pool)
+    .await?;
+
+    if reserved_challenge_id != challenge_id {
+        return Err(VerificationError::InvalidStoredData);
+    }
+
+    let idempotency_key = format!("registration-whatsapp-{challenge_id}");
+    let status = match provider.start(destination, idempotency_key).await {
+        FlowKirimProviderOutcome::Accepted(request_id) => {
+            if request_id.trim().is_empty() || request_id.len() > 256 {
+                DispatchStatus::Unknown
+            } else {
+                sqlx::query("SELECT public.bind_flowkirim_otp_request($1::uuid, $2::uuid, $3)")
+                    .bind(session_id)
+                    .bind(&challenge_id)
+                    .bind(request_id)
+                    .execute(pool)
+                    .await?;
+                DispatchStatus::Accepted
+            }
+        }
+        FlowKirimProviderOutcome::Rejected => DispatchStatus::Failed,
+        FlowKirimProviderOutcome::Unavailable => DispatchStatus::Unknown,
+    };
+
+    sqlx::query("SELECT public.record_otp_delivery_result($1::uuid, $2)")
+        .bind(delivery_event_id)
+        .bind(status.as_db_value())
+        .execute(pool)
+        .await?;
+
+    Ok(status)
+}
+
+async fn verify_flowkirim_session(
+    pool: &PgPool,
+    keys: &dyn KeyProvider,
+    provider: &dyn FlowKirimVerifyProvider,
+    session_id: &str,
+    code: &str,
+) -> Result<bool, VerificationError> {
+    if code.len() != OTP_DIGITS as usize || !code.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(VerificationError::InvalidInput);
+    }
+    let session = load_verification_session(pool, session_id, "registration").await?;
+    if session.0 != "whatsapp" {
+        return Err(VerificationError::InvalidInput);
+    }
+    let destination = decrypt_destination(keys, session_id, "registration", &session)?;
+    let aliases = contact_aliases(keys, "whatsapp", &destination, &session)?;
+    let (challenge_id, request_id) = sqlx::query_as::<_, (String, String)>(
+        "SELECT challenge_id::text, provider_request_id FROM public.get_pending_flowkirim_otp_challenge($1::uuid)",
+    )
+    .bind(session_id)
+    .fetch_one(pool)
+    .await?;
+
+    let provider_matches = match provider.check(request_id, Zeroizing::new(code.to_owned())).await {
+        FlowKirimProviderOutcome::Accepted(matches) => matches,
+        FlowKirimProviderOutcome::Rejected => return Err(VerificationError::ProviderRejected),
+        FlowKirimProviderOutcome::Unavailable => return Err(VerificationError::ProviderUnavailable),
+    };
+    let alias_bytes = aliases.into_iter().map(|alias| alias.digest.to_vec()).collect::<Vec<_>>();
+    sqlx::query_scalar::<_, bool>(
+        "SELECT public.record_otp_verification_attempt($1::uuid, $2::uuid, $3, $4)",
+    )
+    .bind(session_id)
+    .bind(challenge_id)
+    .bind(provider_matches)
+    .bind(alias_bytes)
+    .fetch_one(pool)
+    .await
+    .map_err(VerificationError::from)
 }
 
 pub(crate) async fn dispatch_otp_challenge(
