@@ -297,6 +297,7 @@ fn is_canonical_uuid(value: &str) -> bool {
             _ => byte.is_ascii_hexdigit(),
         })
 }
+
 /// Fingerprint kontak untuk pencarian/rate-limit tanpa menyimpan kontak plaintext.
 pub fn contact_fingerprint(
     provider: &dyn KeyProvider,
@@ -599,7 +600,8 @@ impl IdentityKeyring {
                 "IDENTITY_CONTACT_FINGERPRINT_KEYS",
             )?,
         );
-        purposes.insert(            KeyPurpose::OtpVerification,
+        purposes.insert(
+            KeyPurpose::OtpVerification,
             PurposeKeyring::from_env(
                 "IDENTITY_OTP_VERIFICATION_KEY_ACTIVE_VERSION",
                 "IDENTITY_OTP_VERIFICATION_KEYS",
@@ -897,7 +899,8 @@ mod tests {
         assert_eq!(parse_key_version("v0"), Err(CryptoError::InvalidInput));
     }
 
-    #[test]    fn otp_digest_is_bound_to_challenge_and_session() {
+    #[test]
+    fn otp_digest_is_bound_to_challenge_and_session() {
         let provider = TestKeyProvider;
         let original_context = OtpVerificationContext {
             challenge_id: b"challenge-a",
