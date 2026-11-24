@@ -164,11 +164,10 @@ impl<'a> VerificationService<'a> {
     /// Memeriksa OTP, mencatat percobaan, dan mengaktifkan akun secara atomik di database.
     pub async fn verify(&self, session_id: &str, code: &str) -> Result<bool, VerificationError> {
         validate_uuid(session_id)?;
-        if let Some(provider) = self.flowkirim {
-            let session = load_verification_session(self.pool, session_id, "registration").await?;
-            if session.0 == "whatsapp" {
-                return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code).await;
-            }
+        let session = load_verification_session(self.pool, session_id, "registration").await?;
+        if session.0 == "whatsapp" {
+            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            return verify_flowkirim_session(self.pool, self.keys, provider, session_id, code).await;
         }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
     }
@@ -177,11 +176,10 @@ impl<'a> VerificationService<'a> {
         &self,
         session_id: &str,
     ) -> Result<DispatchStatus, VerificationError> {
-        if let Some(provider) = self.flowkirim {
-            let session = load_verification_session(self.pool, session_id, "registration").await?;
-            if session.0 == "whatsapp" {
-                return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id).await;
-            }
+        let session = load_verification_session(self.pool, session_id, "registration").await?;
+        if session.0 == "whatsapp" {
+            let provider = self.flowkirim.ok_or(VerificationError::ProviderUnavailable)?;
+            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id).await;
         }
         dispatch_otp_challenge(
             self.pool,
