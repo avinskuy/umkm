@@ -168,10 +168,7 @@ impl RegistrationApiState {
         }
     }
 
-    pub fn with_flowkirim_provider(
-        mut self,
-        provider: Arc<dyn FlowKirimVerifyProvider>,
-    ) -> Self {
+    pub fn with_flowkirim_provider(mut self, provider: Arc<dyn FlowKirimVerifyProvider>) -> Self {
         self.flowkirim = Some(provider);
         self
     }
@@ -184,11 +181,9 @@ impl RegistrationApiState {
                 self.delivery.as_ref(),
                 provider,
             ),
-            None => VerificationService::new(
-                &self.pool,
-                self.keys.as_ref(),
-                self.delivery.as_ref(),
-            ),
+            None => {
+                VerificationService::new(&self.pool, self.keys.as_ref(), self.delivery.as_ref())
+            }
         }
     }
 }
