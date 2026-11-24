@@ -167,8 +167,15 @@ impl<'a> VerificationService<'a> {
             let provider = self
                 .flowkirim
                 .ok_or(VerificationError::ProviderUnavailable)?;
-            return verify_flowkirim_session(self.pool, self.keys, provider, session_id, "registration", code)
-                .await;
+            return verify_flowkirim_session(
+                self.pool,
+                self.keys,
+                provider,
+                session_id,
+                "registration",
+                code,
+            )
+            .await;
         }
         verify_otp_session(self.pool, self.keys, session_id, "registration", code).await
     }
@@ -182,8 +189,14 @@ impl<'a> VerificationService<'a> {
             let provider = self
                 .flowkirim
                 .ok_or(VerificationError::ProviderUnavailable)?;
-            return dispatch_flowkirim_challenge(self.pool, self.keys, provider, session_id, "registration")
-                .await;
+            return dispatch_flowkirim_challenge(
+                self.pool,
+                self.keys,
+                provider,
+                session_id,
+                "registration",
+            )
+            .await;
         }
         dispatch_otp_challenge(
             self.pool,
