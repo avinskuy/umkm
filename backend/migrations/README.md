@@ -25,7 +25,8 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 | 0017 | `20261123110000_add_password_reset_runtime.sql` | Penerbitan dan pencabutan token reset, konsumsi satu kali, penggantian hash password atomik, pencabutan seluruh sesi, penyelesaian kasus, dan audit event. |
 | 0018 | `20261123120000_add_single_admin_totp_credentials.sql` | Membatasi akun Admin menjadi satu dan menyediakan penyimpanan kredensial TOTP terenkripsi dengan perlindungan replay-counter dan perubahan langsung. 
 | 0019 | `20261123130000_add_admin_authentication_database_runtime.sql` | Challenge login Admin sekali pakai, rate limit terpisah, sesi Admin terisolasi, konsumsi TOTP atomik, dan audit login berhasil. |\n| 0020 | `20261123140000_add_admin_totp_operator_workflows.sql` | Aktivasi enrollment dan reset/re-enrollment TOTP melalui prosedur operator internal, termasuk pencabutan challenge/sesi dan audit. |
-| 0021 | `20261124100000_add_flowkirim_verification_support.sql` | Challenge OTP FlowKirim untuk registrasi WhatsApp, pengikatan request ID satu kali, dan operasi database terkontrol. |\n| 0022 | `20261124110000_add_identity_abuse_rate_limits.sql` | Rate limit PostgreSQL terpisah untuk aksi registrasi dan pemulihan akun dengan fingerprint HMAC. |
+| 0021 | `20261124100000_add_flowkirim_verification_support.sql` | Challenge OTP FlowKirim untuk registrasi WhatsApp, pengikatan request ID satu kali, dan operasi database terkontrol. |
+| 0022 | `20261124110000_add_identity_abuse_rate_limits.sql` | Rate limit PostgreSQL terpisah untuk aksi registrasi dan pemulihan akun dengan fingerprint HMAC. |
 
 ## Batas runtime
 
