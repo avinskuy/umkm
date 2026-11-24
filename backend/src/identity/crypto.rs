@@ -605,6 +605,7 @@ impl IdentityKeyring {
                 "IDENTITY_OTP_VERIFICATION_KEYS",
             )?,
         );
+        validate_key_material_separation(&purposes)?;
         Ok(Self { purposes })
     }
 
@@ -627,8 +628,27 @@ impl IdentityKeyring {
                 return Err(CryptoError::InvalidInput);
             }
         }
+        validate_key_material_separation(&purposes)?;
         Ok(Self { purposes })
     }
+}
+
+fn validate_key_material_separation(
+    purposes: &HashMap<KeyPurpose, PurposeKeyring>,
+) -> Result<(), CryptoError> {
+    let keys: Vec<&SecretKey> = purposes
+        .values()
+        .flat_map(|purpose| purpose.keys.values())
+        .collect();
+    for (index, key) in keys.iter().enumerate() {
+        if keys[index + 1..]
+            .iter()
+            .any(|other| key.expose() == other.expose())
+        {
+            return Err(CryptoError::InvalidKey);
+        }
+    }
+    Ok(())
 }
 
 impl KeyProvider for IdentityKeyring {
