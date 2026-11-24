@@ -19,12 +19,8 @@ use usahapintar_api::{
 use zeroize::Zeroizing;
 
 fn required_env(name: &'static str) -> Result<String, io::Error> {
-    env::var(name).map_err(|_| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("{name} is required"),
-        )
-    })
+    env::var(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, format!("{name} is required")))
 }
 
 #[tokio::main]
@@ -57,11 +53,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ADMIN_TOTP_ENCRYPTION_KEY_ACTIVE_VERSION and ADMIN_TOTP_ENCRYPTION_KEYS are required and must be valid",
         )
     })?);
-    let admin_authentication = AdminAuthenticationApiState::new(
-        pool.clone(),
-        rate_limit_key.clone(),
-        admin_totp_keyring,
-    );
+    let admin_authentication =
+        AdminAuthenticationApiState::new(pool.clone(), rate_limit_key.clone(), admin_totp_keyring);
 
     let identity_keyring = Arc::new(IdentityKeyring::from_env().map_err(|_| {
         io::Error::new(
@@ -82,13 +75,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?,
     );
     let flowkirim = Arc::new(
-        FlowKirimHttpProvider::new(Zeroizing::new(required_env("FLOWKIRIM_API_KEY")?))
-            .map_err(|_| {
+        FlowKirimHttpProvider::new(Zeroizing::new(required_env("FLOWKIRIM_API_KEY")?)).map_err(
+            |_| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "FlowKirim API configuration is invalid",
                 )
-            })?,
+            },
+        )?,
     );
     let abuse_guard = Arc::new(PostgresRegistrationAbuseGuard::new(
         pool.clone(),
