@@ -41,8 +41,12 @@ export function App() {
         Connecting business owners and investors through meaningful opportunities.
       </p>
       <div className={styles.actions}>
-        <a className={styles.primaryAction} href="/login">Masuk</a>
-        <a className={styles.secondaryAction} href="/register">Buat akun</a>
+        <a className={styles.primaryAction} href="/login">
+          Masuk
+        </a>
+        <a className={styles.secondaryAction} href="/register">
+          Buat akun
+        </a>
       </div>
       <span className={styles.status}>Temukan peluang. Bangun koneksi.</span>
     </main>
