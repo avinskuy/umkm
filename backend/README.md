@@ -26,7 +26,7 @@ Server membaca alamat bind dari variabel lingkungan:
 
 Variabel wajib yang tercantum tanpa nilai bawaan harus disediakan sebelum server dijalankan. Konfigurasi key Identity, Resend, FlowKirim, dan versi kebijakan divalidasi saat startup; konfigurasi yang hilang atau tidak valid menghentikan startup. Setiap purpose Identity harus memakai material key yang berbeda. Pertahankan versi key lama selama data yang dienkripsi atau fingerprint yang dibuat dengan versi tersebut masih perlu dibaca. Jangan menaruh key produksi di source control, dokumentasi, atau log.
 
-Jika salah satu variabel tidak diisi, server menggunakan nilai bawaannya. Nilai yang tidak valid akan menghentikan proses startup dengan kesalahan konfigurasi, bukan diam-diam diganti dengan nilai bawaan.
+`HOST` dan `PORT` memakai nilai bawaan jika tidak diisi. Variabel wajib tanpa nilai bawaan harus disediakan; nilai yang tidak valid menghentikan startup dengan kesalahan konfigurasi.
 
 Alamat loopback bawaan menjaga API tetap dapat diakses dari host itu sendiri. Atur `HOST=0.0.0.0` hanya jika lingkungan deployment memang memerlukan antarmuka yang dapat dijangkau dari luar. Lindungi layanan menggunakan kontrol jaringan atau reverse proxy yang sesuai. Jangan membuka API secara langsung ke internet publik tanpa tinjauan keamanan deployment yang jelas.
 
