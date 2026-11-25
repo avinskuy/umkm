@@ -47,6 +47,8 @@ Pool runtime membuka minimal satu koneksi saat startup untuk memverifikasi datab
 
 `DATABASE_URL` tetap disediakan untuk tooling migration dan pengujian integrasi yang dijalankan secara eksplisit. Variabel ini tidak digunakan untuk membuat pool HTTP runtime. Pemisahan ini mencegah aplikasi secara tidak sengaja berjalan dengan hak migrator.
 
+Runner migration produksi terpisah tersedia sebagai binary `usahapintar-migrate`. Bangun dengan `cargo build --release --locked -p usahapintar-api --bin usahapintar-migrate`, lalu jalankan secara eksplisit dengan `DATABASE_URL` milik `usahapintar_migrator`. Runner hanya menerapkan SQLx migrations dan tidak menjalankan tes integrasi. Jangan jalankan runner memakai kredensial DBA atau principal runtime. Setelah seluruh migration berhasil, jalankan `backend/database/bootstrap/002_identity_core_grants.sql` sebagai DBA sesuai panduan provisioning.
+
 SQLx migrations berada di `backend/migrations` dan dijalankan secara eksplisit melalui `database::migrations::run(&pool)` oleh proses/alat migration yang menggunakan principal `usahapintar_migrator`. Server HTTP tidak menjalankan migrasi otomatis saat startup. Jangan pernah menjalankan migrasi produksi sebagai bagian dari startup aplikasi.
 
 Principal dan grant PostgreSQL disiapkan terpisah melalui `backend/database/bootstrap/`. Lihat [panduan provisioning principal](../docs/security/database-principal-bootstrap.md) untuk urutan dan batas privilege. Jangan menyimpan kredensial database di source control, pengujian, log, atau dokumentasi.
