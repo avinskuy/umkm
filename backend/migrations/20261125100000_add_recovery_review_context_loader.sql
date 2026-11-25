@@ -24,10 +24,11 @@ AS $$
         recovery_case.target_user_id,
         recovery_case.status,
         target.account_status,
-        (
+        COALESCE(
             recovery_case.status = 'under_review'
             AND target.account_status = 'active'
-            AND recovery_case.target_user_id <> p_reviewer_user_id
+            AND recovery_case.target_user_id <> p_reviewer_user_id,
+            FALSE
         ) AS admin_scope_granted
     FROM public.account_recovery_cases AS recovery_case
     JOIN public.users AS reviewer
