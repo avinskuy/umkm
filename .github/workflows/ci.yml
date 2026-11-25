@@ -79,3 +79,5 @@ jobs:
       - run: cargo test --locked -p usahapintar-api --test postgres -- --ignored
       - run: cargo test --locked -p usahapintar-api --test runtime -- --ignored
       - run: cargo build --workspace --locked
+      - name: Build production migration runner
+        run: cargo build --locked -p usahapintar-api --bin usahapintar-migrate
