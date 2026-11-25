@@ -1,0 +1,101 @@
+name: Run production PostgreSQL migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production_migration:
+        description: "Confirm that pending SQLx migrations should be applied to production"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: usahapintar-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Build and run production migration runner
+    if: inputs.confirm_production_migration == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release migration runner
+        run: cargo build --release --locked -p usahapintar-api --bin usahapintar-migrate
+
+      - name: Validate deployment configuration
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.MIGRATOR_DATABASE_URL }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          test -n "$VPS_PORT"
+          test -n "$VPS_SSH_PRIVATE_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+          case "$DATABASE_URL" in
+            postgres://usahapintar_migrator:*|postgresql://usahapintar_migrator:*) ;;
+            *) echo "MIGRATOR_DATABASE_URL must authenticate as usahapintar_migrator"; exit 1 ;;
+          esac
+          test -x target/release/usahapintar-migrate
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+          ssh-keygen -F "$VPS_HOST" -f "$HOME/.ssh/known_hosts" >/dev/null
+
+      - name: Upload migration runner to temporary directory
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          remote_runner="/tmp/usahapintar-migrate-${GITHUB_RUN_ID}"
+          scp -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -P "$VPS_PORT" \
+            target/release/usahapintar-migrate \
+            "$VPS_USER@$VPS_HOST:$remote_runner"
+
+      - name: Apply pending production migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.MIGRATOR_DATABASE_URL }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          remote_runner="/tmp/usahapintar-migrate-${GITHUB_RUN_ID}"
+          printf '%s\n' "$DATABASE_URL" | ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -p "$VPS_PORT" \
+            "$VPS_USER@$VPS_HOST" \
+            "bash -c 'set -eu; IFS= read -r DATABASE_URL; export DATABASE_URL; chmod 700 $remote_runner; trap \"rm -f $remote_runner\" EXIT; $remote_runner'"
