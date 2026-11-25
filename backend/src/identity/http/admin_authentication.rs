@@ -742,6 +742,24 @@ mod tests {
             owner_cookie_on_admin_route.status(),
             StatusCode::UNAUTHORIZED
         );
+
+        let review_route_without_admin_session = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(axum::http::Method::POST)
+                    .uri("/api/v1/identity/admin/recovery/cases/00000000-0000-4000-8000-000000000001/review")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(r#"{"decision":"approve","reason_code":"ownership_confirmed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .expect("Admin recovery review route should reject missing Admin session");
+        assert_eq!(
+            review_route_without_admin_session.status(),
+            StatusCode::UNAUTHORIZED
+        );
+
         assert!(owner_cookie_on_admin_route
             .headers()
             .get_all(header::SET_COOKIE)
