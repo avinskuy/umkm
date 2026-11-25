@@ -2374,6 +2374,17 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .expect("revoked Admin session must not load recovery review context");
     assert!(revoked_context.is_none());
 
+    let mismatched_actor_context = sqlx::query(
+        "SELECT resource_id FROM public.get_account_recovery_review_context($1::uuid, $2::uuid, $3)",
+    )
+    .bind(&recovery_case_id)
+    .bind(&first_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("an Admin session hash must not be reusable for another actor");
+    assert!(mismatched_actor_context.is_none());
+
     assert!(
         sqlx::query_scalar::<_, bool>(
             "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
