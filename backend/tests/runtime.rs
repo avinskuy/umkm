@@ -831,7 +831,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let session_token = "a".repeat(64);
     let session_token_hash = hash_session_token(&session_token);
     sqlx::query(
-        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+        "INSERT INTO public.admin_sessions (user_id, token_hash, expires_at) \
          VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
     )
     .bind(&registered.user_id)
@@ -1143,7 +1143,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let reviewer_session_token = "b".repeat(64);
     let reviewer_session_hash = hash_session_token(&reviewer_session_token);
     sqlx::query(
-        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+        "INSERT INTO public.admin_sessions (user_id, token_hash, expires_at) \
          VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
     )
     .bind(&reviewer_id)
@@ -1164,7 +1164,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .await
     .expect("a second Admin session should be created for revocation testing");
     sqlx::query(
-        "UPDATE public.sessions SET revoked_at = clock_timestamp(), revocation_reason = 'logout' \
+        "UPDATE public.admin_sessions SET revoked_at = clock_timestamp(), revocation_reason = 'logout' \
           WHERE token_hash = $1",
     )
     .bind(revoked_reviewer_session_hash.to_vec())
