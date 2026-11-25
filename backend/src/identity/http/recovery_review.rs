@@ -68,12 +68,9 @@ fn valid_uuid_shape(value: &str) -> bool {
         && [8, 13, 18, 23]
             .into_iter()
             .all(|position| value.as_bytes().get(position) == Some(&b'-'))
-        && value
-            .bytes()
-            .enumerate()
-            .all(|(position, byte)| {
-                matches!(position, 8 | 13 | 18 | 23) || byte.is_ascii_hexdigit()
-            })
+        && value.bytes().enumerate().all(|(position, byte)| {
+            matches!(position, 8 | 13 | 18 | 23) || byte.is_ascii_hexdigit()
+        })
 }
 
 fn decision_from_request(value: &str) -> Option<RecoveryReviewDecision> {
@@ -119,11 +116,7 @@ async fn load_recovery_resource(
     else {
         return error(StatusCode::UNAUTHORIZED, "Sesi Admin diperlukan.");
     };
-    let Some(token_hash) = request
-        .extensions()
-        .get::<AdminSessionTokenHash>()
-        .copied()
-    else {
+    let Some(token_hash) = request.extensions().get::<AdminSessionTokenHash>().copied() else {
         return error(StatusCode::UNAUTHORIZED, "Sesi Admin diperlukan.");
     };
 
@@ -174,13 +167,17 @@ async fn load_recovery_resource(
 
 fn review_error(error_value: VerificationError) -> Response {
     match error_value {
-        VerificationError::InvalidInput => {
-            error(StatusCode::BAD_REQUEST, "Data review pemulihan tidak valid.")
-        }
+        VerificationError::InvalidInput => error(
+            StatusCode::BAD_REQUEST,
+            "Data review pemulihan tidak valid.",
+        ),
         VerificationError::Database(sqlx::Error::Database(database_error))
             if database_error.code().as_deref() == Some("42501") =>
         {
-            error(StatusCode::FORBIDDEN, "Sesi Admin tidak berwenang melakukan review.")
+            error(
+                StatusCode::FORBIDDEN,
+                "Sesi Admin tidak berwenang melakukan review.",
+            )
         }
         VerificationError::Database(sqlx::Error::Database(database_error))
             if database_error.code().as_deref() == Some("P0002") =>
@@ -222,7 +219,12 @@ async fn review_case(
 
     let Json(request) = match payload {
         Ok(payload) => payload,
-        Err(_) => return error(StatusCode::BAD_REQUEST, "Data review pemulihan tidak valid."),
+        Err(_) => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "Data review pemulihan tidak valid.",
+            )
+        }
     };
     let Some(decision) = decision_from_request(&request.decision) else {
         return error(StatusCode::BAD_REQUEST, "Keputusan review tidak valid.");
@@ -243,13 +245,7 @@ async fn review_case(
     }
 
     match RecoveryReviewService::new(&pool)
-        .review_case(
-            &case_id,
-            &session.user_id,
-            &token_hash.0,
-            decision,
-            reason,
-        )
+        .review_case(&case_id, &session.user_id, &token_hash.0, decision, reason)
         .await
     {
         Ok(()) => message(StatusCode::OK, "Keputusan review berhasil dicatat."),
@@ -282,23 +278,16 @@ pub(super) fn recovery_review_router(admin_state: AdminAuthenticationApiState) -
         .with_state(pool)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn recovery_case_path_requires_uuid_shape() {
-        assert!(valid_uuid_shape(
-            "00000000-0000-4000-8000-000000000001"
-        ));
+        assert!(valid_uuid_shape("00000000-0000-4000-8000-000000000001"));
         assert!(!valid_uuid_shape("not-a-uuid"));
-        assert!(!valid_uuid_shape(
-            "00000000-0000-4000-8000-00000000000z"
-        ));
-        assert!(!valid_uuid_shape(
-            "00000000000040008000000000000001"
-        ));
+        assert!(!valid_uuid_shape("00000000-0000-4000-8000-00000000000z"));
+        assert!(!valid_uuid_shape("00000000000040008000000000000001"));
     }
 
     #[test]
