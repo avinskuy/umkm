@@ -29,6 +29,8 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 | 0021 | `20261124100000_add_flowkirim_verification_support.sql` | Challenge OTP FlowKirim untuk registrasi WhatsApp, pengikatan request ID satu kali, dan operasi database terkontrol. |
 | 0022 | `20261124110000_add_identity_abuse_rate_limits.sql` | Rate limit PostgreSQL terpisah untuk aksi registrasi dan pemulihan akun dengan fingerprint HMAC. |
 | 0023 | `20261124120000_extend_flowkirim_to_account_recovery.sql` | Memperluas challenge FlowKirim ke recovery WhatsApp dengan batas kirim dan validasi sesi yang sama. |
+| 0024 | `20261124130000_fix_recovery_review_admin_sessions.sql` | Mengikat keputusan review ke sesi Admin terisolasi, bukan sesi pengguna biasa. |
+| 0025 | `20261125100000_add_recovery_review_context_loader.sql` | Menyediakan konteks minimum recovery untuk authorization melalui fungsi `SECURITY DEFINER` yang memvalidasi Admin dan sesi aktif. |
 
 ## Batas runtime
 
@@ -41,7 +43,7 @@ Direktori ini berisi SQLx migrations berversi. Migration yang sudah diterapkan p
 
 ## Status integrasi
 
-- Runtime memasang router registrasi, autentikasi, Admin, dan recovery.
+- Runtime memasang router registrasi, autentikasi, Admin, recovery, dan endpoint review recovery yang hanya tersedia di router Admin.
 - OTP email menggunakan adapter Resend; OTP WhatsApp menggunakan FlowKirim Verify.
 - WhatsApp menerima nomor Indonesia dalam format lokal `08...`, internasional `628...`, atau E.164 `+628...`.
 - Key Identity dipisahkan berdasarkan purpose dan harus disediakan melalui secret manager/runtime environment. Pertahankan versi key lama selama data yang dienkripsi atau di-fingerprint dengan versi tersebut masih digunakan.
