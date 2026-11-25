@@ -17,6 +17,7 @@ use sqlx::PgPool;
 use zeroize::Zeroizing;
 
 use super::{authentication::resolved_client_ip, authorization::AuthorizationApiState};
+use crate::identity::authentication::hash_session_token;
 use crate::identity::{
     crypto::KeyProvider, AccessPurpose, AdminAuthenticatedSession, AdminAuthenticationError,
     AdminAuthenticationService, AuthenticationRateLimitKey, Permission,
@@ -28,9 +29,13 @@ const ADMIN_CHALLENGE_COOKIE: &str = "__Host-usahapintar_admin_challenge";
 const ADMIN_SESSION_MAX_AGE_SECONDS: u32 = 8 * 60 * 60;
 const ADMIN_CHALLENGE_MAX_AGE_SECONDS: i64 = 5 * 60;
 
+/// SHA-256 hash of the validated Admin cookie token; never contains the raw token.
+#[derive(Debug, Clone, Copy)]
+pub struct AdminSessionTokenHash(pub [u8; 32]);
+
 #[derive(Clone)]
 pub struct AdminAuthenticationApiState {
-    pool: PgPool,
+    pub(super) pool: PgPool,
     rate_limit_key: AuthenticationRateLimitKey,
     key_provider: Arc<dyn KeyProvider>,
 }
@@ -48,7 +53,7 @@ impl AdminAuthenticationApiState {
         }
     }
 
-    fn authorization_state(&self) -> AuthorizationApiState {
+    pub(super) fn authorization_state(&self) -> AuthorizationApiState {
         AuthorizationApiState::new(
             self.pool.clone(),
             Permission::AdminDashboardRead,
@@ -143,7 +148,7 @@ fn authentication_error(error_value: AdminAuthenticationError) -> Response {
 
 /// Require an exact same-origin Origin header for browser state-changing requests.
 /// HTTP is allowed only for loopback development hosts; production cookies require Secure.
-fn is_same_origin_request(headers: &HeaderMap) -> bool {
+pub(super) fn is_same_origin_request(headers: &HeaderMap) -> bool {
     if headers
         .get("sec-fetch-site")
         .and_then(|value| value.to_str().ok())
@@ -217,6 +222,7 @@ fn is_loopback_authority(authority: &str) -> bool {
 }
 
 pub fn admin_authentication_router(state: AdminAuthenticationApiState) -> Router {
+    let recovery_review_routes = super::recovery_review::recovery_review_router(state.clone());
     let public_routes = Router::new()
         .route("/api/v1/identity/admin/login", post(begin_login))
         .route("/api/v1/identity/admin/login/totp", post(complete_login))
@@ -239,6 +245,7 @@ pub fn admin_authentication_router(state: AdminAuthenticationApiState) -> Router
 
     public_routes
         .merge(protected_routes)
+        .merge(recovery_review_routes)
         .layer(middleware::from_fn(no_store_responses))
 }
 
@@ -363,7 +370,7 @@ async fn complete_login(
     }
 }
 
-async fn require_admin_session(
+pub(super) async fn require_admin_session(
     State(state): State<AdminAuthenticationApiState>,
     mut request: Request,
     next: Next,
@@ -375,6 +382,9 @@ async fn require_admin_session(
     match state.service().validate_session(token.as_str()).await {
         Ok(session) => {
             request.extensions_mut().insert(session);
+            request
+                .extensions_mut()
+                .insert(AdminSessionTokenHash(hash_session_token(token.as_str())));
             next.run(request).await
         }
         Err(AdminAuthenticationError::InvalidSession) => unauthorized_admin_session(),
@@ -732,6 +742,24 @@ mod tests {
             owner_cookie_on_admin_route.status(),
             StatusCode::UNAUTHORIZED
         );
+
+        let review_route_without_admin_session = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(axum::http::Method::POST)
+                    .uri("/api/v1/identity/admin/recovery/cases/00000000-0000-4000-8000-000000000001/review")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(r#"{"decision":"approve","reason_code":"ownership_confirmed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .expect("Admin recovery review route should reject missing Admin session");
+        assert_eq!(
+            review_route_without_admin_session.status(),
+            StatusCode::UNAUTHORIZED
+        );
+
         assert!(owner_cookie_on_admin_route
             .headers()
             .get_all(header::SET_COOKIE)

@@ -18,6 +18,7 @@ pub mod authorization;
 mod handlers;
 mod password_reset;
 mod recovery;
+mod recovery_review;
 pub use super::password::PasswordPolicy as RegistrationPasswordPolicy;
 pub use abuse_guard::PostgresRegistrationAbuseGuard;
 pub use admin_authentication::{admin_authentication_router, AdminAuthenticationApiState};

@@ -1172,13 +1172,14 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     .await
     .expect("Admin session should be revoked for the negative test");
 
+    let owner_session_hash = hash_session_token(&session_token);
     let review_service = RecoveryReviewService::new(&pool);
     assert!(
         review_service
             .review_case(
                 &recovery_case_id,
                 &registered.user_id,
-                &session_token,
+                &owner_session_hash,
                 RecoveryReviewDecision::Approve,
                 RecoveryReviewReason::OwnershipConfirmed,
             )
@@ -1192,7 +1193,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
             .review_case(
                 &recovery_case_id,
                 &reviewer_id,
-                &revoked_reviewer_session_token,
+                &revoked_reviewer_session_hash,
                 RecoveryReviewDecision::Approve,
                 RecoveryReviewReason::OwnershipConfirmed,
             )
@@ -1205,7 +1206,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
         .review_case(
             &recovery_case_id,
             &reviewer_id,
-            &reviewer_session_token,
+            &reviewer_session_hash,
             RecoveryReviewDecision::Approve,
             RecoveryReviewReason::OwnershipConfirmed,
         )
