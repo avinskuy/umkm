@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 
 use super::{
+    authentication::session_token_hash,
     crypto::{contact_fingerprint, encrypt, key_version_label, KeyProvider},
     delivery::{DispatchStatus, OtpDeliveryProvider},
     flowkirim::FlowKirimVerifyProvider,
