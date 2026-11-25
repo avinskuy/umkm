@@ -2094,14 +2094,39 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
 
     let reviewer_session_hash = vec![61_u8; 32];
     let reviewer_session_id: String = sqlx::query_scalar(
-        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
-         VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days') RETURNING id::text",
+        "INSERT INTO public.admin_sessions (user_id, token_hash) \
+         VALUES ($1::uuid, $2) RETURNING id::text",
     )
     .bind(&reviewer_user_id)
     .bind(&reviewer_session_hash)
     .fetch_one(pool)
     .await
-    .expect("active Admin session should be created for recovery review");
+    .expect("active dedicated Admin session should be created for recovery review");
+
+    let revoked_reviewer_session_hash = vec![63_u8; 32];
+    sqlx::query(
+        "INSERT INTO public.admin_sessions \
+         (user_id, token_hash, revoked_at, revocation_reason) \
+         VALUES ($1::uuid, $2, clock_timestamp(), 'logout')",
+    )
+    .bind(&reviewer_user_id)
+    .bind(&revoked_reviewer_session_hash)
+    .execute(pool)
+    .await
+    .expect("revoked Admin session fixture should be created");
+
+    let expired_reviewer_session_hash = vec![64_u8; 32];
+    sqlx::query(
+        "INSERT INTO public.admin_sessions \
+         (user_id, token_hash, created_at, last_seen_at, expires_at) \
+         VALUES ($1::uuid, $2, clock_timestamp() - INTERVAL '2 days', \
+                 clock_timestamp() - INTERVAL '2 days', clock_timestamp() - INTERVAL '1 day')",
+    )
+    .bind(&reviewer_user_id)
+    .bind(&expired_reviewer_session_hash)
+    .execute(pool)
+    .await
+    .expect("expired Admin session fixture should be created");
 
     let first_contact_session: String = sqlx::query_scalar(
         "INSERT INTO public.verification_sessions (user_id, purpose, channel, destination_ciphertext, destination_nonce, encryption_key_version, destination_hmac, hmac_key_version, expires_at)  VALUES ($1::uuid, 'recovery_contact_add', 'email', $2, $3, 'enc-v1', $4, 'hmac-v1', clock_timestamp() + INTERVAL '20 minutes') RETURNING id::text",
@@ -2319,6 +2344,32 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
             .await
             .expect("session signal check should safely reject a different account session");
     assert!(!unrelated_session_match);
+
+    assert!(
+        sqlx::query_scalar::<_, bool>(
+            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
+        )
+        .bind(&recovery_case_id)
+        .bind(&reviewer_user_id)
+        .bind(&revoked_reviewer_session_hash)
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "a revoked Admin session must not approve a recovery case"
+    );
+
+    assert!(
+        sqlx::query_scalar::<_, bool>(
+            "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
+        )
+        .bind(&recovery_case_id)
+        .bind(&reviewer_user_id)
+        .bind(&expired_reviewer_session_hash)
+        .fetch_one(pool)
+        .await
+        .is_err(),
+        "an expired Admin session must not approve a recovery case"
+    );
 
     assert!(
         sqlx::query_scalar::<_, bool>(
