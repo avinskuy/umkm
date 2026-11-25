@@ -831,7 +831,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let session_token = "a".repeat(64);
     let session_token_hash = hash_session_token(&session_token);
     sqlx::query(
-        "INSERT INTO public.admin_sessions (user_id, token_hash, expires_at) \
+        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
          VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
     )
     .bind(&registered.user_id)
@@ -1155,7 +1155,7 @@ async fn account_recovery_service_verifies_contact_and_binds_a_matching_account(
     let revoked_reviewer_session_token = "c".repeat(64);
     let revoked_reviewer_session_hash = hash_session_token(&revoked_reviewer_session_token);
     sqlx::query(
-        "INSERT INTO public.sessions (user_id, token_hash, expires_at) \
+        "INSERT INTO public.admin_sessions (user_id, token_hash, expires_at) \
          VALUES ($1::uuid, $2, clock_timestamp() + INTERVAL '30 days')",
     )
     .bind(&reviewer_id)
