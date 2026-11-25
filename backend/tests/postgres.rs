@@ -2345,12 +2345,11 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
             .expect("session signal check should safely reject a different account session");
     assert!(!unrelated_session_match);
 
-    let review_context: (String, Option<String>, String, Option<String>, bool) =
-        sqlx::query_as(
-            "SELECT resource_id::text, target_user_id::text, case_status, \
+    let review_context: (String, Option<String>, String, Option<String>, bool) = sqlx::query_as(
+        "SELECT resource_id::text, target_user_id::text, case_status, \
                     target_account_status, admin_scope_granted \
                FROM public.get_account_recovery_review_context($1::uuid, $2::uuid, $3)",
-        )
+    )
         .bind(&recovery_case_id)
         .bind(&reviewer_user_id)
         .bind(&reviewer_session_hash)
