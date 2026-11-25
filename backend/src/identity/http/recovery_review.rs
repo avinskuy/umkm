@@ -102,6 +102,12 @@ async fn load_recovery_resource(
     mut request: Request,
     next: Next,
 ) -> Response {
+    if !is_same_origin_request(request.headers()) {
+        return error(
+            StatusCode::FORBIDDEN,
+            "Permintaan lintas situs tidak diizinkan.",
+        );
+    }
     if !valid_uuid_shape(&case_id) {
         return error(StatusCode::BAD_REQUEST, "ID kasus pemulihan tidak valid.");
     }
