@@ -2345,6 +2345,35 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
             .expect("session signal check should safely reject a different account session");
     assert!(!unrelated_session_match);
 
+    let review_context: (String, Option<String>, String, Option<String>, bool) =
+        sqlx::query_as(
+            "SELECT resource_id::text, target_user_id::text, case_status, \
+                    target_account_status, admin_scope_granted \
+               FROM public.get_account_recovery_review_context($1::uuid, $2::uuid, $3)",
+        )
+        .bind(&recovery_case_id)
+        .bind(&reviewer_user_id)
+        .bind(&reviewer_session_hash)
+        .fetch_one(pool)
+        .await
+        .expect("active Admin session should load minimal recovery review context");
+    assert_eq!(review_context.0, recovery_case_id);
+    assert_eq!(review_context.1.as_deref(), Some(first_user_id.as_str()));
+    assert_eq!(review_context.2, "under_review");
+    assert_eq!(review_context.3.as_deref(), Some("active"));
+    assert!(review_context.4);
+
+    let revoked_context = sqlx::query(
+        "SELECT resource_id FROM public.get_account_recovery_review_context($1::uuid, $2::uuid, $3)",
+    )
+    .bind(&recovery_case_id)
+    .bind(&reviewer_user_id)
+    .bind(&revoked_reviewer_session_hash)
+    .fetch_optional(pool)
+    .await
+    .expect("revoked Admin session must not load recovery review context");
+    assert!(revoked_context.is_none());
+
     assert!(
         sqlx::query_scalar::<_, bool>(
             "SELECT public.review_account_recovery_case($1::uuid, $2::uuid, $3, 'approved', 'ownership_confirmed')",
@@ -2394,6 +2423,18 @@ async fn assert_account_recovery_schema_invariants(pool: &PgPool) {
     .await
     .expect("active Admin may approve an eligible recovery case");
     assert!(approved);
+
+    let completed_context: (bool,) = sqlx::query_as(
+        "SELECT admin_scope_granted \
+           FROM public.get_account_recovery_review_context($1::uuid, $2::uuid, $3)",
+    )
+    .bind(&recovery_case_id)
+    .bind(&reviewer_user_id)
+    .bind(&reviewer_session_hash)
+    .fetch_one(pool)
+    .await
+    .expect("completed review context should remain readable for authorization");
+    assert!(!completed_context.0);
 
     let review_row: (String, String, String) = sqlx::query_as(
         "SELECT decision, reason_code, reviewer_session_id::text \
@@ -3224,7 +3265,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         (false, true, false, true, true, true, true, true)
     );
 
-    let recovery_function_access: (bool, bool, bool, bool, bool, bool, bool, bool) =
+    let recovery_function_access: (bool, bool, bool, bool, bool, bool, bool, bool, bool) =
         sqlx::query_as(
             "SELECT has_function_privilege(current_user, \
                         'public.record_otp_verification_attempt(uuid,uuid,boolean,bytea[])', 'EXECUTE'), \
@@ -3234,6 +3275,8 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
                         'public.record_account_recovery_session_signal(uuid,bytea)', 'EXECUTE'), \
                     has_function_privilege(current_user, \
                         'public.review_account_recovery_case(uuid,uuid,bytea,text,text)', 'EXECUTE'), \
+                    has_function_privilege(current_user, \
+                        'public.get_account_recovery_review_context(uuid,uuid,bytea)', 'EXECUTE'), \
                     has_function_privilege(current_user, \
                         'public.get_approved_account_recovery_delivery_context(uuid)', 'EXECUTE'), \
                     has_function_privilege(current_user, \
@@ -3248,7 +3291,7 @@ async fn assert_database_principal_bootstrap(pool: &PgPool) {
         .expect("recovery function privileges should be queryable");
     assert_eq!(
         recovery_function_access,
-        (true, true, true, true, true, true, true, true)
+        (true, true, true, true, true, true, true, true, true)
     );
 
     let admin_function_grants: i64 = sqlx::query_scalar(
