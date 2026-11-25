@@ -275,3 +275,46 @@ pub(super) fn recovery_review_router(admin_state: AdminAuthenticationApiState) -
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
         .with_state(pool)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recovery_case_path_requires_uuid_shape() {
+        assert!(valid_uuid_shape(
+            "00000000-0000-4000-8000-000000000001"
+        ));
+        assert!(!valid_uuid_shape("not-a-uuid"));
+        assert!(!valid_uuid_shape(
+            "00000000-0000-4000-8000-00000000000z"
+        ));
+        assert!(!valid_uuid_shape(
+            "00000000000040008000000000000001"
+        ));
+    }
+
+    #[test]
+    fn review_decision_and_reason_codes_are_allowlisted() {
+        assert_eq!(
+            decision_from_request("approve"),
+            Some(RecoveryReviewDecision::Approve)
+        );
+        assert_eq!(
+            decision_from_request("reject"),
+            Some(RecoveryReviewDecision::Reject)
+        );
+        assert_eq!(decision_from_request("delete"), None);
+
+        assert_eq!(
+            reason_from_request("ownership_confirmed"),
+            Some(RecoveryReviewReason::OwnershipConfirmed)
+        );
+        assert_eq!(
+            reason_from_request("insufficient_evidence"),
+            Some(RecoveryReviewReason::InsufficientEvidence)
+        );
+        assert_eq!(reason_from_request("free_text"), None);
+    }
+}
